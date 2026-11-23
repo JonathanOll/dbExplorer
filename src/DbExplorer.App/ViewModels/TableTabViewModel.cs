@@ -295,6 +295,7 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
     public async Task ReloadAsync()
     {
         if (IsSaving) return;   // a save is in flight: asking to discard would continue into a reload underneath it
+        if (IsSwitching) return;   // the tab is moving to another database: a reload now would reinstall the old session
         if (HasPendingEdits)
         {
             switch (await AskPendingAsync())
@@ -335,6 +336,12 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
         if (IsSaving)
         {
             SetError("A save is running: wait for it to finish before switching.");
+            return false;
+        }
+        if (IsLoading)
+        {
+            // Includes a Reload that is still reconnecting: it would finish on the connection the tab is leaving.
+            SetError("The table is still loading or reconnecting: try again when it has finished.");
             return false;
         }
         if (!await ConfirmLeaveAsync()) return false;
@@ -378,16 +385,21 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
         return loaded;
     }
 
-    /// <summary>The connection to resolve a live session for: the one the tab is on now (it follows a switch).</summary>
-    private Task<Session?> ResolveCurrentAsync() => _hooks.ResolveSessionAsync(Connection.Id);
-
-    /// <summary>The live session of the connection, or null after setting the error state (and the Reload button).</summary>
+    /// <summary>
+    /// The live session of the connection the tab is on now (it follows a switch), or null after setting the error state (and
+    /// the Reload button). A slow resolve can straddle a group switch: when the tab moved to another connection (or a switch
+    /// is in progress) meanwhile, its outcome, success or failure, is about a connection the tab is leaving. It is then
+    /// discarded (null) WITHOUT touching the session, the error or the loading state: those belong to the switch.
+    /// </summary>
     private async Task<Session?> ResolveLiveSessionAsync()
     {
+        var id = Connection.Id;
+        bool Stale() => Connection.Id != id || IsSwitching;
         IsLoading = true;
         try
         {
-            var live = await ResolveCurrentAsync();
+            var live = await _hooks.ResolveSessionAsync(id);
+            if (Stale()) return null;
             if (live is null)
             {
                 SetError("The connection no longer exists — close this tab.");
@@ -397,13 +409,14 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
         }
         catch (Exception e)
         {
+            if (Stale()) return null;
             SetError("Could not reconnect: " + ErrorText.Describe(e));
             NeedsReload = true;
             return null;
         }
         finally
         {
-            IsLoading = false;
+            if (!Stale()) IsLoading = false;
         }
     }
     [RelayCommand]

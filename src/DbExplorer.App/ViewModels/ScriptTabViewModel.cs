@@ -354,18 +354,26 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         return _script = new ScriptConnection(session);
     }
 
-    /// <summary>The live session, resolved through the hooks; null (with <see cref="ErrorMessage"/> set) when there is none.</summary>
+    /// <summary>
+    /// The live session, resolved through the hooks; null (with <see cref="ErrorMessage"/> set) when there is none. A slow
+    /// resolve can straddle a group switch: when the tab moved to another connection (or a switch is in progress) meanwhile,
+    /// the outcome, success or failure, is about a connection the tab is leaving and is discarded (null) WITHOUT touching the
+    /// session or the error state.
+    /// </summary>
     private async Task<Session?> ResolveSessionAsync(CancellationToken ct)
     {
+        var id = Connection.Id;
+        bool Stale() => Connection.Id != id || IsSwitching;
         try
         {
             // WaitAsync: Cancel returns at once even when the connect itself cannot be interrupted (it may finish in the background).
-            var resolving = ResolveHook(Connection.Id, ct);
+            var resolving = ResolveHook(id, ct);
             // After a cancel the connect carries on unobserved; if it fails later nobody awaits it, so observe that failure here.
             _ = resolving.ContinueWith(
                 static t => _ = t.Exception, CancellationToken.None,
                 TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
             var live = await resolving.WaitAsync(ct);
+            if (Stale()) return null;
             if (live is null)
             {
                 ErrorMessage = "The connection no longer exists — close this tab.";
@@ -384,6 +392,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         }
         catch (Exception e)
         {
+            if (Stale()) return null;
             ErrorMessage = "Could not connect: " + ErrorText.Describe(e);
             _status.Error(ErrorMessage);
             return null;
@@ -411,6 +420,11 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         if (IsRunning)
         {
             _status.Info("Cannot switch database while a script is running — cancel it first.");
+            return false;
+        }
+        if (_reconnecting)
+        {
+            _status.Info("Cannot switch database while reconnecting — try again when it has finished.");
             return false;
         }
 
@@ -450,12 +464,24 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     [RelayCommand]
     public async Task ReconnectAsync()
     {
-        if (IsRunning) return;
-        ErrorMessage = null;
-        NeedsReconnect = false;
-        var session = await ResolveSessionAsync(CancellationToken.None);
-        if (session is null) NeedsReconnect = true;
+        if (IsRunning || IsSwitching || _reconnecting) return;   // while switching it would reinstall the old session
+        var id = Connection.Id;
+        _reconnecting = true;   // a switch is refused until this has finished
+        try
+        {
+            ErrorMessage = null;
+            NeedsReconnect = false;
+            var session = await ResolveSessionAsync(CancellationToken.None);
+            if (Connection.Id != id || IsSwitching) return;   // the tab moved on: this outcome is not about its connection
+            if (session is null) NeedsReconnect = true;
+        }
+        finally
+        {
+            _reconnecting = false;
+        }
     }
+
+    private bool _reconnecting;
 
     [RelayCommand]
     public void DismissError() => ErrorMessage = null;

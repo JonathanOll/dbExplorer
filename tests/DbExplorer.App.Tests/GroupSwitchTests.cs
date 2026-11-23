@@ -61,8 +61,29 @@ internal sealed class GroupSwitchFixture : IDisposable
     /// <summary>What MainViewModel hands to its tabs: sessions resolved through the tree (node state follows).</summary>
     public GroupSwitchHooks Switch => new(() => Tree.Config, ResolveAsync);
 
+    private readonly Dictionary<Guid, TaskCompletionSource> _gates = [];
+    private readonly List<Guid> _resolved = [];
+
+    /// <summary>Makes every resolve of the connection wait until the returned source is completed (a slow or hanging connect).</summary>
+    public TaskCompletionSource Gate(Guid id)
+    {
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_gates) _gates[id] = gate;
+        return gate;
+    }
+
+    /// <summary>How many times a session of the connection was asked for through the hooks.</summary>
+    public int ResolveCount(Guid id)
+    {
+        lock (_resolved) return _resolved.Count(r => r == id);
+    }
+
     public async Task<Session?> ResolveAsync(Guid id, CancellationToken ct)
     {
+        lock (_resolved) _resolved.Add(id);
+        TaskCompletionSource? gate;
+        lock (_gates) _gates.TryGetValue(id, out gate);
+        if (gate is not null) await gate.Task;
         var config = Tree.Config.Connections.FirstOrDefault(c => c.Id == id);
         if (config is null) return null;
         return await Tree.EnsureConnectedAsync(config, ct)
@@ -483,6 +504,165 @@ public class GroupSwitchTests : IDisposable
 
         Assert.Contains(nameof(TabViewModel.GroupMembers), changed);
         Assert.Contains(nameof(TabViewModel.HasGroupSwitch), changed);
+    }
+
+    // ---- a slow Reload / Reconnect must never straddle a switch and reinstall the old session ----
+
+    [Fact]
+    public async Task Table_Switch_WhileAReloadIsReconnecting_IsRefused()
+    {
+        var tab = await _g.OpenTable(_g.A);
+        var gate = _g.Gate(_g.A.Id);   // A's server is slow: the reload hangs on connecting
+        var reload = tab.ReloadAsync();
+        Assert.True(tab.IsLoading);
+
+        Assert.False(await tab.SwitchConnectionAsync(_g.B));
+
+        Assert.Contains("still loading or reconnecting", tab.ErrorMessage);
+        Assert.Equal(_g.A.Id, tab.Connection.Id);
+        Assert.False(tab.IsSwitching);
+        Assert.False(_g.Tree.NodeOf(_g.B.Id)!.IsConnected);
+        gate.SetResult();
+        await reload;
+        Assert.Equal(_g.A.Id, tab.Connection.Id);
+        Assert.StartsWith("a", Label(tab));
+    }
+
+    [Fact]
+    public async Task Table_Reload_WhileASwitchIsInFlight_DoesNothing()
+    {
+        var tab = await _g.OpenTable(_g.A);
+        var gate = _g.Gate(_g.B.Id);
+        var switching = tab.SwitchConnectionAsync(_g.B);
+        Assert.True(tab.IsSwitching);
+        var resolvedA = _g.ResolveCount(_g.A.Id);
+
+        await tab.ReloadAsync();   // returns at once: no resolve of the connection being left
+
+        Assert.Equal(resolvedA, _g.ResolveCount(_g.A.Id));
+        Assert.Equal(_g.A.Id, tab.Connection.Id);
+        gate.SetResult();
+        Assert.True(await switching);
+        Assert.Equal(_g.B.Id, tab.Connection.Id);
+        Assert.StartsWith("b", Label(tab));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Table_LateReloadResultForTheOldConnection_IsDiscardedAfterTheSwap(bool oldConnectFails)
+    {
+        var tab = await _g.OpenTable(_g.A);
+        var gate = _g.Gate(_g.A.Id);
+        var reload = tab.ReloadAsync();
+        await tab.RefreshAsync();   // another load ends meanwhile and puts IsLoading back to false: the switch gate is open
+        Assert.False(tab.IsLoading);
+        Assert.True(await tab.SwitchConnectionAsync(_g.Prod));
+        var rows = tab.Rows;
+
+        if (oldConnectFails) gate.SetException(new InvalidOperationException("A is down"));
+        else gate.SetResult();
+        await reload;
+
+        Assert.Equal(_g.Prod.Id, tab.Connection.Id);
+        Assert.True(tab.IsReadOnlyConnection);   // still the session of Prod, not A's
+        Assert.False(tab.CanEdit);
+        Assert.Same(rows, tab.Rows);   // no rerun on the old connection
+        Assert.Null(tab.ErrorMessage);   // nothing about A written on the healthy tab
+        Assert.False(tab.NeedsReload);
+        Assert.False(tab.IsLoading);
+    }
+
+    [Fact]
+    public async Task Table_OverlappingSwitches_SecondIsRefused()
+    {
+        var tab = await _g.OpenTable(_g.A);
+        var gate = _g.Gate(_g.B.Id);
+        var first = tab.SwitchConnectionAsync(_g.B);
+        Assert.True(tab.IsSwitching);
+
+        Assert.False(await tab.SwitchConnectionAsync(_g.Prod));
+        Assert.False(await tab.SwitchRelativeAsync(+1));
+
+        gate.SetResult();
+        Assert.True(await first);
+        Assert.Equal(_g.B.Id, tab.Connection.Id);
+        Assert.False(tab.IsSwitching);
+    }
+
+    [Fact]
+    public async Task Script_Switch_WhileReconnecting_IsRefused()
+    {
+        var tab = await _g.NewScript(_g.A, "SELECT 1");
+        var gate = _g.Gate(_g.A.Id);
+        var reconnect = tab.ReconnectAsync();
+
+        Assert.False(await tab.SwitchConnectionAsync(_g.B));
+
+        Assert.Contains("reconnecting", _g.Fx.Status.Message);
+        Assert.Equal(_g.A.Id, tab.Connection.Id);
+        Assert.False(_g.Tree.NodeOf(_g.B.Id)!.IsConnected);
+        gate.SetResult();
+        await reconnect;
+        Assert.Equal(_g.A.Id, tab.Connection.Id);
+        Assert.False(tab.NeedsReconnect);
+    }
+
+    [Fact]
+    public async Task Script_Reconnect_WhileASwitchIsInFlight_DoesNothing()
+    {
+        var tab = await _g.NewScript(_g.A, "SELECT 1");
+        var gate = _g.Gate(_g.B.Id);
+        var switching = tab.SwitchConnectionAsync(_g.B);
+        Assert.True(tab.IsSwitching);
+        var resolvedA = _g.ResolveCount(_g.A.Id);
+
+        await tab.ReconnectAsync();
+
+        Assert.Equal(resolvedA, _g.ResolveCount(_g.A.Id));
+        gate.SetResult();
+        Assert.True(await switching);
+        Assert.Equal(_g.B.Id, tab.Connection.Id);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Script_LateReconnectResultForTheOldConnection_IsDiscardedAfterTheSwap(bool oldConnectFails)
+    {
+        var tab = await _g.NewScript(_g.A);
+        var gate = _g.Gate(_g.A.Id);
+        var reconnect = tab.ReconnectAsync();
+        // The public API refuses a switch while reconnecting; force the "somehow it arrives after the swap" case by
+        // lifting that gate, to prove the late outcome is dropped anyway (defence in depth).
+        typeof(ScriptTabViewModel).GetField("_reconnecting", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .SetValue(tab, false);
+        Assert.True(await tab.SwitchConnectionAsync(_g.B));
+
+        if (oldConnectFails) gate.SetException(new InvalidOperationException("A is down"));
+        else gate.SetResult();
+        await reconnect;
+
+        Assert.Equal(_g.B.Id, tab.Connection.Id);
+        Assert.Null(tab.ErrorMessage);   // nothing about A written on the healthy tab
+        Assert.False(tab.NeedsReconnect);
+        await GroupSwitchFixture.Run(tab, "SELECT label FROM big WHERE id = 1");
+        Assert.Equal("b1", tab.Results.Single().Sets[0].Rows[0][0]);   // the session is still B's, not A's
+    }
+
+    [Fact]
+    public async Task Script_OverlappingSwitches_SecondIsRefused()
+    {
+        var tab = await _g.NewScript(_g.A);
+        var gate = _g.Gate(_g.B.Id);
+        var first = tab.SwitchConnectionAsync(_g.B);
+        Assert.True(tab.IsSwitching);
+
+        Assert.False(await tab.SwitchConnectionAsync(_g.Prod));
+
+        gate.SetResult();
+        Assert.True(await first);
+        Assert.Equal(_g.B.Id, tab.Connection.Id);
     }
 
     // ---- the selector control (headless) ----

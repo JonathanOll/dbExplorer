@@ -88,13 +88,20 @@ public partial class GroupSwitcher : UserControl
         vm.ActiveGroup = group;   // notifies: the member list follows
     }
 
-    private async void OnPreviousClick(object? sender, RoutedEventArgs e)
-    {
-        if (_vm is { } vm) await vm.SwitchRelativeAsync(-1);
-    }
+    private async void OnPreviousClick(object? sender, RoutedEventArgs e) => await SwitchRelativeSafeAsync(-1);
 
-    private async void OnNextClick(object? sender, RoutedEventArgs e)
+    private async void OnNextClick(object? sender, RoutedEventArgs e) => await SwitchRelativeSafeAsync(+1);
+
+    // async void must never let an exception escape (it would crash the process); the switch reports its own failures.
+    private async Task SwitchRelativeSafeAsync(int delta)
     {
-        if (_vm is { } vm) await vm.SwitchRelativeAsync(+1);
+        try
+        {
+            if (_vm is { } vm) await vm.SwitchRelativeAsync(delta);
+        }
+        catch (Exception)
+        {
+            // SwitchConnectionAsync never throws; this only guards the contract.
+        }
     }
 }
