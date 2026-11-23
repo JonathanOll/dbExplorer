@@ -292,6 +292,29 @@ public class SessionManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task GetOrOpen_ConnectFailsSynchronously_NextCallRetriesInsteadOfRethrowingTheStaleFailure()
+    {
+        // A fast failure can complete the attempt before the manager registers it as pending: the stale faulted
+        // attempt must never be joined by a later call (it would rethrow the old error forever).
+        var fail = true;
+        var driver = new FakeDriver
+        {
+            OnOpen = (_, _) => fail ? Task.FromException(new InvalidOperationException("boom: no route")) : Task.CompletedTask,
+        };
+        var manager = FakeManager(driver, out _);
+        var cfg = FakeConfig();
+
+        for (var i = 0; i < 2000; i++)
+        {
+            fail = true;
+            await Assert.ThrowsAsync<InvalidOperationException>(() => manager.GetOrOpenAsync(cfg, CancellationToken.None));
+            fail = false;
+            Assert.NotNull(await manager.GetOrOpenAsync(cfg, CancellationToken.None));
+            manager.Close(cfg.Id);
+        }
+    }
+
+    [Fact]
     public async Task GetOrOpen_FirstCallerCancels_SecondCallerStillGetsTheSession()
     {
         var gate = new TaskCompletionSource();

@@ -4,7 +4,11 @@ namespace DbExplorer.Core.Scripting;
 
 /// <summary>
 /// Best-effort check used by read-only connections. It is deliberately conservative: anything that is not
-/// recognised as a plain read is reported as a write. It does not know about functions with side effects.
+/// recognised as a plain read is reported as a write. It is lexical: it only knows a fixed deny-list of functions
+/// with side effects (server control, statistics reset, session advisory locks, dblink / linked-server access,
+/// server-side file and replication-slot functions, NEXT VALUE FOR), matched by exact name when followed by "(", also
+/// when schema-qualified or double-quoted. Any other function with side effects, and obfuscated forms, are not detected.
+/// The guard also gates ordinary read-only connections and the raw WHERE box, which is intended.
 /// </summary>
 public static class ReadOnlyGuard
 {
@@ -16,6 +20,35 @@ public static class ReadOnlyGuard
         "INSERT", "UPDATE", "DELETE", "MERGE", "TRUNCATE", "DROP", "CREATE", "ALTER", "RENAME",
         "GRANT", "REVOKE", "DENY", "EXEC", "EXECUTE", "CALL", "INTO",
         "DBCC", "SHUTDOWN", "KILL", "BACKUP", "RESTORE", "VACUUM", "REINDEX", "ATTACH", "DETACH",
+    };
+
+    // Functions callable from a plain SELECT that still have side effects (or reach outside the connection). Exact names,
+    // matched when followed by "(" (a column or table with the same name is fine). Deliberately absent: nextval/setval,
+    // set_config, lo_create/lo_unlink (PostgreSQL refuses or rolls those back in a read-only transaction) and the
+    // transaction-scoped advisory locks (pg_advisory_xact_lock...), which release at the end of the transaction.
+    private static readonly HashSet<string> SideEffectFunctions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // PostgreSQL: server control
+        "pg_terminate_backend", "pg_cancel_backend", "pg_reload_conf", "pg_rotate_logfile", "pg_switch_wal",
+        "pg_create_restore_point", "pg_promote", "pg_wal_replay_pause", "pg_wal_replay_resume",
+        // PostgreSQL: statistics reset
+        "pg_stat_reset", "pg_stat_reset_shared", "pg_stat_reset_single_table_counters",
+        "pg_stat_reset_single_function_counters", "pg_stat_reset_slru", "pg_stat_reset_replication_slot",
+        // PostgreSQL: session-level advisory locks
+        "pg_advisory_lock", "pg_advisory_lock_shared", "pg_try_advisory_lock", "pg_try_advisory_lock_shared",
+        // PostgreSQL: dblink (runs statements on another database)
+        "dblink", "dblink_exec", "dblink_send_query", "dblink_connect", "dblink_connect_u",
+        // PostgreSQL: server-side files, replication
+        "lo_export", "pg_file_write", "pg_file_rename", "pg_file_unlink",
+        "pg_drop_replication_slot", "pg_create_physical_replication_slot", "pg_create_logical_replication_slot",
+        "pg_replication_slot_advance", "pg_logical_emit_message", "pg_copy_physical_replication_slot",
+        "pg_copy_logical_replication_slot",
+        // PostgreSQL: consuming reads of a logical slot (they advance it); the _peek_ variants do not consume and stay allowed
+        "pg_logical_slot_get_changes", "pg_logical_slot_get_binary_changes",
+        // PostgreSQL 15+/17+: more statistics resets
+        "pg_stat_reset_subscription_stats", "pg_stat_reset_backend_stats",
+        // SQL Server: linked servers / ad-hoc remote sources
+        "OPENQUERY", "OPENROWSET", "OPENDATASOURCE",
     };
 
     // SQLite pragmas that only read, whatever their arguments.
@@ -117,6 +150,7 @@ public static class ReadOnlyGuard
     {
         for (var i = from; i < to; i++)
         {
+            if (IsSideEffectCall(sql, tokens, i, to)) return true;
             if (tokens[i].Kind != SqlTokenKind.Word) continue;
             var word = Word(sql, tokens[i]);
             if (!WriteVerbs.Contains(word)) continue;
@@ -130,6 +164,26 @@ public static class ReadOnlyGuard
 
             return true;
         }
+        return false;
+    }
+
+    /// <summary>A deny-listed function name followed by "(" (plain or double-quoted / bracketed / backticked), or NEXT VALUE FOR.</summary>
+    private static bool IsSideEffectCall(string sql, List<SqlToken> tokens, int i, int to)
+    {
+        var t = tokens[i];
+        if (t.Kind == SqlTokenKind.Word)
+        {
+            if (i + 2 < to && Word(sql, t).Equals("NEXT", StringComparison.OrdinalIgnoreCase)
+                && tokens[i + 1].Kind == SqlTokenKind.Word && Word(sql, tokens[i + 1]).Equals("VALUE", StringComparison.OrdinalIgnoreCase)
+                && tokens[i + 2].Kind == SqlTokenKind.Word && Word(sql, tokens[i + 2]).Equals("FOR", StringComparison.OrdinalIgnoreCase))
+                return true;   // OFFSET n ROWS FETCH NEXT n ROWS ONLY has a number after NEXT, so it never matches
+            return i + 1 < to && IsChar(sql, tokens[i + 1], '(') && SideEffectFunctions.Contains(Word(sql, t));
+        }
+
+        // A quoted identifier ("pg_terminate_backend"(1), [OPENQUERY](...)); never a string literal or a $$ body.
+        if (t.Kind == SqlTokenKind.Quoted && t.End - t.Start > 2 && i + 1 < to && IsChar(sql, tokens[i + 1], '(')
+            && sql[t.Start] is '"' or '[' or '`')
+            return SideEffectFunctions.Contains(sql.Substring(t.Start + 1, t.End - t.Start - 2));
         return false;
     }
 }

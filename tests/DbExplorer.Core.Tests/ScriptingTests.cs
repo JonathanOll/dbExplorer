@@ -265,6 +265,68 @@ public class ReadOnlyGuardTests
         Assert.True(ReadOnlyGuard.IsWrite("SELECT 'a;b'; /* c */ DROP TABLE t;"));
         Assert.False(ReadOnlyGuard.IsWrite("SELECT 'a;b'; SELECT 2;"));
     }
+
+    [Theory]
+    [InlineData("SELECT pg_terminate_backend(123)", DbKind.Postgres)]
+    [InlineData("SELECT pg_catalog.pg_cancel_backend(1)", DbKind.Postgres)]
+    [InlineData("select PG_ADVISORY_LOCK(1)", DbKind.Postgres)]
+    [InlineData("SELECT pg_try_advisory_lock_shared (1)", DbKind.Postgres)]
+    [InlineData("SELECT dblink_exec('c','DELETE FROM t')", DbKind.Postgres)]
+    [InlineData("SELECT * FROM dblink('c','select 1') AS t(a int)", DbKind.Postgres)]
+    [InlineData("SELECT lo_export(1,'/tmp/x')", DbKind.Postgres)]
+    [InlineData("SELECT \"pg_terminate_backend\"(1)", DbKind.Postgres)]
+    [InlineData("SELECT NEXT VALUE FOR dbo.seq", DbKind.SqlServer)]
+    [InlineData("SELECT * FROM OPENQUERY(srv,'SELECT 1')", DbKind.SqlServer)]
+    [InlineData("SELECT * FROM OPENROWSET('SQLNCLI','x','SELECT 1')", DbKind.SqlServer)]
+    [InlineData("SELECT * FROM [OPENDATASOURCE]('a','b').d.s.t", DbKind.SqlServer)]
+    public void Guard_SideEffectFunctions_Refused(string sql, DbKind kind)
+    {
+        Assert.True(ReadOnlyGuard.IsWrite(sql, kind));
+        Assert.True(ReadOnlyGuard.IsWrite(sql));   // kind-agnostic: also refused
+    }
+
+    [Theory]
+    [InlineData("pg_stat_reset_subscription_stats")]
+    [InlineData("pg_stat_reset_backend_stats")]
+    [InlineData("pg_copy_physical_replication_slot")]
+    [InlineData("pg_copy_logical_replication_slot")]
+    [InlineData("pg_logical_slot_get_changes")]
+    [InlineData("pg_logical_slot_get_binary_changes")]
+    public void Guard_MoreSideEffectFunctions_Refused(string function)
+    {
+        Assert.True(ReadOnlyGuard.IsWrite($"SELECT {function}(1)", DbKind.Postgres));
+        Assert.True(ReadOnlyGuard.IsWrite($"SELECT * FROM {function}('s', NULL, NULL)"));
+    }
+
+    [Theory]
+    [InlineData("SELECT * FROM pg_logical_slot_peek_changes('s', NULL, NULL)")]
+    [InlineData("SELECT * FROM pg_logical_slot_peek_binary_changes('s', NULL, NULL)")]
+    public void Guard_PeekingALogicalSlot_Allowed(string sql) => Assert.False(ReadOnlyGuard.IsWrite(sql, DbKind.Postgres));
+
+    [Theory]
+    [InlineData("SELECT pg_terminate_backend /*x*/ (1)")]
+    [InlineData("SELECT pg_terminate_backend -- x\n(1)")]
+    [InlineData("SELECT pg_terminate_backend\n  /* a */ -- b\n  (1)")]
+    public void Guard_CommentBetweenNameAndParenthesis_StillRefused(string sql)
+    {
+        Assert.True(ReadOnlyGuard.IsWrite(sql, DbKind.Postgres));
+        Assert.True(ReadOnlyGuard.IsWrite(sql));
+    }
+
+    [Theory]
+    [InlineData("SELECT dblink FROM t", DbKind.Postgres)]
+    [InlineData("SELECT 'pg_terminate_backend(1)'", DbKind.Postgres)]
+    [InlineData("SELECT pid FROM pg_stat_activity", DbKind.Postgres)]
+    [InlineData("SELECT pg_try_advisory_xact_lock(1)", DbKind.Postgres)]
+    [InlineData("SELECT * FROM t ORDER BY id OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY", DbKind.SqlServer)]
+    [InlineData("SELECT * FROM t ORDER BY id OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY", DbKind.Postgres)]
+    [InlineData("SELECT next FROM t", DbKind.SqlServer)]
+    [InlineData("SELECT next, value, for_x FROM t", DbKind.Postgres)]
+    public void Guard_SideEffectNamesUsedAsPlainText_Allowed(string sql, DbKind kind)
+    {
+        Assert.False(ReadOnlyGuard.IsWrite(sql, kind));
+        Assert.False(ReadOnlyGuard.IsWrite(sql));
+    }
 }
 
 public class ScriptRunnerTests : IDisposable

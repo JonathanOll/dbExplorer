@@ -60,6 +60,7 @@ corner radius 3 (cards 8). Accent: `#3B6EA5` light, `#4F8FD0` dark.
 | `DbxEnginePostgres` / `SqlServer` / `Sqlite` | `#336FA8` / `#A02A30` / `#14907F` | `#5B9BD5` / `#E26D6D` / `#3FC1B0` | engine icons |
 | `DbxIconFolder` / `Table` / `View` / `Key` | `#D69E2E` `#4C739E` `#8A64B8` `#C7971A` | `#E2B24F` `#7FA3CC` `#B49BE0` `#E0BD4A` | icon tints |
 | `DbxLink` | `#2B63A8` | `#6FAAE8` | foreign-key values, links |
+| `DbxColumnFlash` / `DbxColumnFlashHeader` | `#FFE27A` / `#FFC933` | `#6E5B12` / `#9A7F10` | `Ctrl+L`: the column just jumped to (cells / header) |
 | `DbxScrim` | `#66101820` | `#A0000000` | quick-open backdrop |
 
 Grid cell states (translucent so they read on both themes): edited cell amber `#66F2B600`, new row green `#4429A329`,

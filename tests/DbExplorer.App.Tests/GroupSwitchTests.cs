@@ -334,6 +334,8 @@ public class GroupSwitchTests : IDisposable
         Assert.Equal(text, tab.Text);
         Assert.Equal(results, tab.Results);   // same result objects
         Assert.Equal("• Script 1 · B", tab.Title);   // dirty: the text was never saved
+        Assert.Contains("Switched to B", _g.Fx.Status.Message);
+        Assert.Contains("The connection to A was released: a transaction left open there was rolled back (a later COMMIT will not commit it).", _g.Fx.Status.Message);
         // The old dedicated connection was released: its transaction is rolled back and nobody holds A's write lock.
         Assert.Equal(0, _g.Scalar(_g.FileA, "SELECT COUNT(*) FROM big WHERE id = 9999"));
         using (var c = new SqliteConnection($"Data Source={_g.FileA};Pooling=False;Default Timeout=1"))
@@ -348,6 +350,30 @@ public class GroupSwitchTests : IDisposable
 
         Assert.Null(tab.ErrorMessage);
         Assert.Equal("b1", tab.Results.Single().Sets[0].Rows[0][0]);   // the next run is on B
+    }
+
+    [Fact]
+    public async Task Script_Switch_WithoutAnOpenTransaction_DoesNotMentionARollback()
+    {
+        var tab = await _g.NewScript(_g.A);
+        await GroupSwitchFixture.Run(tab, "SELECT label FROM big WHERE id = 1");
+        await GroupSwitchFixture.Run(tab, "BEGIN");
+        await GroupSwitchFixture.Run(tab, "COMMIT");   // a transaction that was finished by the user
+
+        Assert.True(await tab.SwitchConnectionAsync(_g.B));
+
+        Assert.Contains("Switched to B", _g.Fx.Status.Message);
+        Assert.DoesNotContain("rolled back", _g.Fx.Status.Message);
+    }
+
+    [Fact]
+    public async Task Script_Switch_BeforeAnyRun_DoesNotMentionARollback()
+    {
+        var tab = await _g.NewScript(_g.A);   // no dedicated connection exists yet
+
+        Assert.True(await tab.SwitchConnectionAsync(_g.B));
+
+        Assert.DoesNotContain("rolled back", _g.Fx.Status.Message);
     }
 
     [Fact]

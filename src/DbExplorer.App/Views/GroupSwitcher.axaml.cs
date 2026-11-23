@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using DbExplorer.App.ViewModels;
 using DbExplorer.Core.Model;
 
@@ -20,7 +21,10 @@ public partial class GroupSwitcher : UserControl
     public GroupSwitcher()
     {
         InitializeComponent();
-        DataContextChanged += (_, _) => Follow(DataContext as TabViewModel);
+        DataContextChanged += (_, _) =>
+        {
+            if (this.IsAttachedToVisualTree()) Follow(DataContext as TabViewModel);   // detached views never subscribe (the tab outlives them)
+        };
         AttachedToVisualTree += (_, _) => Follow(DataContext as TabViewModel);
         DetachedFromVisualTree += (_, _) => Follow(null);   // the tab outlives its view: do not stay subscribed
         MemberBox.SelectionChanged += OnMemberChanged;

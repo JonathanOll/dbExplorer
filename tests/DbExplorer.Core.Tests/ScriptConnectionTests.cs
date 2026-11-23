@@ -59,6 +59,134 @@ public class ScriptConnectionReleaseTests
     }
 }
 
+/// <summary>
+/// The open-transaction probe behind the "rolled back" message on a database switch. A false positive would print a wrong
+/// warning after every switch, so every doubt must answer false.
+/// </summary>
+public class ScriptConnectionTransactionProbeTests
+{
+    private static async Task<ScriptConnection> Opened(DbKind kind, FakeDbConnection fake)
+    {
+        var config = new ConnectionConfig(Guid.NewGuid(), "c", kind, null, "h", null, "d", null, null, false, false, false);
+        var script = new ScriptConnection(new Session(config, new StubDriver(kind, fake), [], null));
+        await foreach (var _ in script.RunAsync(ScriptSplitter.Split("SELECT 1", kind), new ScriptOptions(Kind: kind), CancellationToken.None)) { }
+        return script;
+    }
+
+    [Fact]
+    public async Task Postgres_TwoNowsEqual_MeansInATransaction_AndTheProbeIsTwoSeparateCommands()
+    {
+        var start = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var fake = new FakeDbConnection(affected: 1) { Scalars = _ => start };   // a transaction: now() is frozen
+        using var script = await Opened(DbKind.Postgres, fake);
+
+        Assert.True(await script.HasOpenTransactionAsync());
+        Assert.DoesNotContain(fake.Commands, c => c.CommandText.Contains("statement_timestamp"));
+    }
+
+    [Fact]
+    public async Task Postgres_TwoNowsDiffer_MeansAutocommit()
+    {
+        var tick = 0;
+        var fake = new FakeDbConnection(affected: 1) { Scalars = _ => new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc).AddTicks(++tick) };
+        using var script = await Opened(DbKind.Postgres, fake);
+
+        Assert.False(await script.HasOpenTransactionAsync());
+    }
+
+    [Theory]
+    [InlineData(false)]   // the server answers nothing
+    [InlineData(true)]    // the probe throws (e.g. "current transaction is aborted")
+    public async Task Postgres_ProbeTrouble_IsAFalseNegative(bool throws)
+    {
+        var fake = new FakeDbConnection(affected: 1) { Scalars = _ => throws ? throw new InvalidOperationException("25P02") : null };
+        using var script = await Opened(DbKind.Postgres, fake);
+
+        Assert.False(await script.HasOpenTransactionAsync());
+    }
+
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(0, false)]
+    public async Task SqlServer_TranCount(int trancount, bool expected)
+    {
+        var fake = new FakeDbConnection(affected: 1) { Scalars = sql => sql.Contains("@@TRANCOUNT") ? trancount : null };
+        using var script = await Opened(DbKind.SqlServer, fake);
+
+        Assert.Equal(expected, await script.HasOpenTransactionAsync());
+    }
+
+    [Fact]
+    public async Task NoConnectionYet_OrDisposed_IsFalse()
+    {
+        var config = new ConnectionConfig(Guid.NewGuid(), "c", DbKind.Postgres, null, "h", null, "d", null, null, false, false, false);
+        var fresh = new ScriptConnection(new Session(config, new StubDriver(DbKind.Postgres, new FakeDbConnection(1)), [], null));
+        Assert.False(await fresh.HasOpenTransactionAsync());
+
+        var script = await Opened(DbKind.Postgres, new FakeDbConnection(affected: 1) { Scalars = _ => 1 });
+        script.Dispose();
+        Assert.False(await script.HasOpenTransactionAsync());
+    }
+
+    [Fact]
+    public async Task Sqlite_BeginInsideATransaction_IsReported_AndOutsideItIsNot()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "dbx-probe-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var file = Path.Combine(dir, "p.db");
+            using (var c = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={file};Pooling=False"))
+            {
+                c.Open();
+                using var create = c.CreateCommand();
+                create.CommandText = "CREATE TABLE t (id INTEGER)";
+                create.ExecuteNonQuery();
+            }
+            var config = new ConnectionConfig(Guid.NewGuid(), "c", DbKind.Sqlite, null, null, null, file, null, null, false, false, false);
+            using var session = new Session(config, new SqliteDriver(), [], null);
+            using var script = new ScriptConnection(session);
+            var o = new ScriptOptions(Kind: DbKind.Sqlite);
+            async Task Run(string sql) { await foreach (var _ in script.RunAsync(ScriptSplitter.Split(sql, DbKind.Sqlite), o, CancellationToken.None)) { } }
+
+            await Run("SELECT 1");
+            Assert.False(await script.HasOpenTransactionAsync());
+            await Run("BEGIN");
+            Assert.True(await script.HasOpenTransactionAsync());
+            Assert.True(await script.HasOpenTransactionAsync());   // the probe changed nothing
+            await Run("ROLLBACK");
+            Assert.False(await script.HasOpenTransactionAsync());
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            try { Directory.Delete(dir, true); } catch (IOException) { }
+        }
+    }
+
+    [SkippableFact]
+    public async Task Postgres_RealServer_ReportsOnlyARealOpenTransaction()
+    {
+        Skip.If(string.IsNullOrWhiteSpace(PostgresDbFixture.ConnectionString), "DBX_PG not set");
+        var env = new Npgsql.NpgsqlConnectionStringBuilder(PostgresDbFixture.ConnectionString);
+        var config = new ConnectionConfig(Guid.NewGuid(), "it", DbKind.Postgres, null, env.Host, env.Port, env.Database!, env.Username, null, false, false, false);
+        using var session = new Session(config, new PostgresDriver(), [], null);
+        using var script = new ScriptConnection(session);
+        var o = new ScriptOptions(Kind: DbKind.Postgres);
+        async Task Run(string sql) { await foreach (var _ in script.RunAsync(ScriptSplitter.Split(sql, DbKind.Postgres), o, CancellationToken.None)) { } }
+
+        await Run("SELECT 1");
+        Assert.False(await script.HasOpenTransactionAsync());   // autocommit, extended protocol
+        Assert.False(await script.HasOpenTransactionAsync());
+        await Run("BEGIN");
+        Assert.True(await script.HasOpenTransactionAsync());
+        await Run("SELECT 2");
+        Assert.True(await script.HasOpenTransactionAsync());
+        await Run("ROLLBACK");
+        Assert.False(await script.HasOpenTransactionAsync());
+    }
+}
+
 /// <summary>One dedicated connection per script tab: transactions, temp tables and session state survive between runs.</summary>
 public class ScriptConnectionTests : IDisposable
 {

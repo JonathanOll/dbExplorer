@@ -61,6 +61,72 @@ public sealed class ScriptConnection : IDisposable
     /// <summary>The connection currently held, or null before the first run and after it was dropped.</summary>
     internal DbConnection? CurrentConnection => _connection;
 
+    /// <summary>
+    /// Best-effort: true when the held connection has a transaction left open by the user's script (so releasing the
+    /// connection will roll it back). Never changes state and never runs while a script is active (it holds the same
+    /// "running" guard as a run, so a concurrent <see cref="Dispose"/> waits for it to finish before dropping the connection).
+    /// SQL Server reads <c>@@TRANCOUNT</c>. PostgreSQL sends two separate <c>SELECT now()</c> commands: inside a transaction
+    /// both return the transaction's start time (equal), in autocommit each statement is its own transaction (different);
+    /// <c>statement_timestamp()</c> cannot be used, it moves at Bind/Execute under the extended protocol. SQLite tries a
+    /// <c>BEGIN</c> (refused inside a transaction) and rolls it straight back. The failure mode is a false negative: false when
+    /// there is no usable connection, the probe fails (e.g. a PostgreSQL transaction already aborted) or the answer is unclear.
+    /// The answer only feeds a status message.
+    /// </summary>
+    public async Task<bool> HasOpenTransactionAsync()
+    {
+        DbConnection? connection;
+        lock (_gate)
+        {
+            if (_disposed || _running) return false;
+            if (_connection is not { State: ConnectionState.Open } held) return false;
+            connection = held;
+            _running = true;   // a run now throws "already running" (the tab refuses runs while it switches) and Dispose defers the drop
+        }
+
+        try
+        {
+            return await ProbeTransactionAsync(connection).ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                _running = false;
+                if (_disposed || _connection is { State: not ConnectionState.Open }) DropConnection();
+            }
+        }
+    }
+
+    private async Task<bool> ProbeTransactionAsync(DbConnection connection)
+    {
+        await using var cmd = connection.CreateCommand();
+        cmd.CommandTimeout = 5;
+        switch (Session.Driver.Kind)
+        {
+            case Model.DbKind.SqlServer:
+                cmd.CommandText = "SELECT @@TRANCOUNT";
+                return Convert.ToInt32(await cmd.ExecuteScalarAsync().ConfigureAwait(false)) > 0;
+            case Model.DbKind.Postgres:
+            {
+                cmd.CommandText = "SELECT now()";
+                var first = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
+                var second = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
+                return first is not null and not DBNull && first.Equals(second);
+            }
+            default:
+                cmd.CommandText = "BEGIN";
+                try { await cmd.ExecuteNonQueryAsync().ConfigureAwait(false); }
+                catch (Exception e) { return e.Message.Contains("within a transaction", StringComparison.OrdinalIgnoreCase); }
+                cmd.CommandText = "ROLLBACK";
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                return false;
+        }
+    }
+
     /// <summary>The connection settings changed: the next run uses a fresh connection. Safe to call from any thread.</summary>
     internal void Invalidate() => _invalidated = true;
 
