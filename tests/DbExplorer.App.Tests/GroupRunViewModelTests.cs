@@ -44,7 +44,10 @@ public class GroupRunViewModelTests : IDisposable
 
     private static MemberStatusViewModel Member(GroupRunViewModel run, string name) => run.Members.Single(m => m.Name == name);
 
-    private const string Three = "SELECT id, label FROM big WHERE id <= 3 ORDER BY id";
+    /// <summary>A gate that is missing must fail a test, not hang it.</summary>
+    private static readonly TimeSpan Bound = TimeSpan.FromSeconds(10);
+
+    private const string Three ="SELECT id, label FROM big WHERE id <= 3 ORDER BY id";
 
     // ---- status panel, per-member results, All, Differences ----
 
@@ -399,7 +402,7 @@ public class GroupRunViewModelTests : IDisposable
             await Eventually(() => tab.IsSwitching, "the switch started");
             var before = _g.ResolveCount(_g.Prod.Id);
 
-            await RunGroup(tab, Three);
+            await RunGroup(tab, Three).WaitAsync(Bound);
 
             Assert.Null(tab.GroupRun);
             Assert.False(tab.IsGroupRunning);
@@ -407,7 +410,7 @@ public class GroupRunViewModelTests : IDisposable
             Assert.Contains("Switching", _g.Fx.Status.Message);
 
             hang.SetResult();
-            Assert.True(await switching);
+            Assert.True(await switching.WaitAsync(Bound));
         }
         finally
         {
@@ -427,8 +430,8 @@ public class GroupRunViewModelTests : IDisposable
             var running = tab.RunOnGroupAsync(false);
             await Eventually(() => tab.IsGroupRunning && tab.GroupRun is { } r && Member(r, "B").IsRunning, "run active");
 
-            Assert.False(await tab.SwitchConnectionAsync(_g.Prod));
-            Assert.False(await tab.SwitchRelativeAsync(1));
+            Assert.False(await tab.SwitchConnectionAsync(_g.Prod).WaitAsync(Bound));
+            Assert.False(await tab.SwitchRelativeAsync(1).WaitAsync(Bound));   // would hang on B's gate if the switch went through
 
             Assert.Equal(_g.A.Id, tab.Connection.Id);   // the tab did not move
             Assert.False(tab.IsSwitching);
@@ -436,7 +439,7 @@ public class GroupRunViewModelTests : IDisposable
 
             tab.CancelGroup();
             await running.WaitAsync(TimeSpan.FromSeconds(15));
-            Assert.True(await tab.SwitchConnectionAsync(_g.Prod));   // allowed again once it has ended
+            Assert.True(await tab.SwitchConnectionAsync(_g.Prod).WaitAsync(Bound));   // allowed again once it has ended
         }
         finally
         {
@@ -458,12 +461,12 @@ public class GroupRunViewModelTests : IDisposable
             var run = tab.GroupRun;
             var opened = tab.GroupConnectionsOpened.Count;
 
-            await tab.RunStatementAsync();
+            await tab.RunStatementAsync().WaitAsync(Bound);
             Assert.False(tab.IsRunning);
             Assert.Empty(tab.Results);
             Assert.Contains("group run is in progress", _g.Fx.Status.Message);
 
-            await tab.RunOnGroupAsync(false);
+            await tab.RunOnGroupAsync(false).WaitAsync(Bound);
             Assert.Same(run, tab.GroupRun);   // no second panel, no second set of connections
             Assert.Equal(opened, tab.GroupConnectionsOpened.Count);
             Assert.False(tab.CanRun);
@@ -638,6 +641,43 @@ public class GroupRunViewModelTests : IDisposable
         var ok = new SafeProgress<int>(seen.Add);
         ok.Report(7);
         Assert.Equal([7], seen);
+    }
+
+    [Fact]
+    public void RunViewModel_CancelMember_AndCancelAllCommand_CallTheRunner_AndMarkTheLines()
+    {
+        var one = Conn("one");
+        var two = Conn("two");
+        var cancelled = new List<Guid>();
+        var cancelAll = 0;
+        var run = new GroupRunViewModel([one, two], 100, () => cancelAll++, cancelled.Add);
+
+        run.Members[0].CancelCommand.Execute(null);   // the line's button goes through CancelMember
+
+        Assert.Equal([one.Id], cancelled);
+        Assert.Equal(MemberState.Cancelled, run.Members[0].State);
+        Assert.False(run.Members[0].CanCancel);
+        Assert.Equal(MemberState.Pending, run.Members[1].State);
+
+        run.CancelMember(two.Id);
+        Assert.Equal([one.Id, two.Id], cancelled);
+
+        run.CancelAllCommand.Execute(null);
+        Assert.Equal(1, cancelAll);
+
+        run.Apply(new MemberProgress(one.Id, MemberState.Done, 5, TimeSpan.FromMilliseconds(42), null));   // ended lines have a time
+        Assert.Equal(42, run.Members[0].Ms);
+    }
+
+    [Fact]
+    public async Task RunOnGroup_AResultColumnNamedDatabase_KeepsEveryValueInItsOwnColumn()
+    {
+        var tab = await Tab();
+        await RunGroup(tab, "SELECT 1 AS Database");
+
+        var run = tab.GroupRun!;
+        Assert.Equal(["Database", "Database"], run.AllColumns.Select(c => c.Name));   // two same-named headers: a known limitation
+        Assert.Equal([("A", 1L), ("B", 1L), ("Prod", 1L)], run.AllRows.Select(r => ((string)r[0]!, (long)r[1]!)));
     }
 
     // ---- chords ----

@@ -75,11 +75,7 @@ public sealed partial class ScriptTabViewModel
     }
 
     /// <summary>Cancels one member of the running group run; the others go on. No-op when none runs.</summary>
-    public void CancelGroupMember(Guid connectionId)
-    {
-        _groupRunner?.CancelMember(connectionId);
-        GroupRun?.MarkMemberCancelled(connectionId);
-    }
+    public void CancelGroupMember(Guid connectionId) => GroupRun?.CancelMember(connectionId);
 
     /// <summary>
     /// Runs the statement under the caret / the selection (<paramref name="wholeScript"/> false, the rules of Ctrl+Enter) or the
@@ -139,7 +135,7 @@ public sealed partial class ScriptTabViewModel
         using var cts = _groupCts = new CancellationTokenSource();
         var ct = cts.Token;
         var maxRows = RowLimit;
-        var run = GroupRun = new GroupRunViewModel(members, maxRows, CancelGroup, CancelGroupMember);
+        var run = GroupRun = new GroupRunViewModel(members, maxRows, CancelGroup, id => _groupRunner?.CancelMember(id));
         lock (_groupGate) _groupConnections = [];
 
         // One resolve per member, started here on the UI thread: it goes through the tree, whose node state is UI state.

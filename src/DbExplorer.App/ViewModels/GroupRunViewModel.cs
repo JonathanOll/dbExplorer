@@ -35,7 +35,7 @@ public sealed partial class MemberStatusViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(StatusText))]
     [ObservableProperty] private int? _rows;
 
-    [NotifyPropertyChangedFor(nameof(StatusText))]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(Ms))]
     [ObservableProperty] private TimeSpan? _duration;
 
     [NotifyPropertyChangedFor(nameof(StatusText))]
@@ -55,14 +55,17 @@ public sealed partial class MemberStatusViewModel : ObservableObject
     {
         MemberState.Pending => "waiting",
         MemberState.Running => "running…",
-        MemberState.Done => $"{RowsText} · {Ms} ms",
+        MemberState.Done => $"{RowsText} · {MsText} ms",
         MemberState.Cancelled => "cancelled",
         _ => Error ?? "failed",
     };
 
     private string RowsText => Rows is 1 ? "1 row" : $"{(Rows ?? 0).ToString(CultureInfo.InvariantCulture)} rows";
 
-    private string Ms => ((long)(Duration?.TotalMilliseconds ?? 0)).ToString(CultureInfo.InvariantCulture);
+    /// <summary>Time spent on the member in milliseconds, once it ended; null before.</summary>
+    public long? Ms => Duration is { } d ? (long)d.TotalMilliseconds : null;
+
+    private string MsText => (Ms ?? 0).ToString(CultureInfo.InvariantCulture);
 
     /// <summary>Cancels this member only (a pending one never starts, a running one is interrupted).</summary>
     [RelayCommand(CanExecute = nameof(CanCancel))]
@@ -112,14 +115,16 @@ public sealed partial class GroupRunViewModel : ObservableObject
     public GroupRunViewModel(IReadOnlyList<ConnectionConfig> members, int maxRows, Action? cancelAll = null, Action<Guid>? cancelMember = null)
     {
         MaxRows = maxRows;
-        CancelAll = cancelAll;
+        _cancelAll = cancelAll;
+        _cancelMember = cancelMember;
         var names = UniqueNames(members.Select(m => m.Name));
         for (var i = 0; i < members.Count; i++)
-            Members.Add(new MemberStatusViewModel(members[i], names[i], cancelMember));
+            Members.Add(new MemberStatusViewModel(members[i], names[i], CancelMember));
         IsRunning = members.Count > 0;
     }
 
-    private Action? CancelAll { get; }
+    private readonly Action? _cancelAll;
+    private readonly Action<Guid>? _cancelMember;
 
     public int MaxRows { get; }
 
@@ -172,8 +177,18 @@ public sealed partial class GroupRunViewModel : ObservableObject
         member.Set(progress.State, progress.Rows ?? member.Rows, progress.Duration ?? member.Duration, progress.Error);
     }
 
-    /// <summary>The user cancelled this member: its line says so at once, without waiting for the runner's report.</summary>
-    public void MarkMemberCancelled(Guid id)
+    /// <summary>
+    /// Cancels one member (its Cancel button): the runner is told, and the line says "cancelled" at once, without waiting for
+    /// the runner's report (which stays authoritative). The other members go on.
+    /// </summary>
+    public void CancelMember(Guid id)
+    {
+        if (_detached || !IsRunning) return;
+        _cancelMember?.Invoke(id);
+        MarkMemberCancelled(id);
+    }
+
+    private void MarkMemberCancelled(Guid id)
     {
         if (Members.FirstOrDefault(m => m.Id == id) is { CanCancel: true } member)
             member.Set(MemberState.Cancelled, null, null, null);
@@ -346,8 +361,9 @@ public sealed partial class GroupRunViewModel : ObservableObject
         Notice = view.Notices.Count == 0 ? null : string.Join(Environment.NewLine, view.Notices);
     }
 
+    /// <summary>Cancel all: every member is cancelled (the runner ends them at once; see ScriptTabViewModel.CancelGroup).</summary>
     [RelayCommand]
-    private void CancelAllMembers() => CancelAll?.Invoke();
+    private void CancelAll() => _cancelAll?.Invoke();
 
     // ---- helpers ----
 

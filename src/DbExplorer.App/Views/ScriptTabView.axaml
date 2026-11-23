@@ -201,7 +201,7 @@
                     </ItemsControl>
                     <Button Grid.Column="1" Theme="{StaticResource DbxToolButton}" Classes="stop" Tag="{StaticResource IconStop}"
                             Content="Cancel all" Margin="8,0,0,0" VerticalAlignment="Top"
-                            Command="{Binding CancelAllMembersCommand}" IsVisible="{Binding IsRunning}"
+                            Command="{Binding CancelAllCommand}" IsVisible="{Binding IsRunning}"
                             ToolTip.Tip="Cancel the group run on every database (Ctrl+Break)" />
                   </Grid>
                 </Border>
