@@ -18,6 +18,9 @@
 .PARAMETER Env       Extra environment variables for the launched process, e.g. @{ DBEXPLORER_RENDERING = 'gpu' }.
 .PARAMETER Label     Free text printed in the summary.
 .PARAMETER TimeoutSeconds  Per-run limit waiting for the window (default 30).
+.PARAMETER SessionTabs  When > 0, the throw-away data dir also gets a session.json with that many table tabs (on the
+  synthetic SQL Server connections, which are unreachable: the last one is active, so its background connect attempt is
+  part of the run) plus one script tab, to measure the restore of open tabs.
 #>
 [CmdletBinding()]
 param(
@@ -26,7 +29,8 @@ param(
     [double]$SettleSeconds = 3,
     [hashtable]$Env = @{},
     [string]$Label = '',
-    [int]$TimeoutSeconds = 30
+    [int]$TimeoutSeconds = 30,
+    [int]$SessionTabs = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -99,6 +103,18 @@ function New-SyntheticDataDir {
     }
     $cfg = [ordered]@{ Folders = $folders; Connections = @($conns); VirtualKeys = @{} }
     $cfg | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 (Join-Path $root 'config.json')
+    if ($SessionTabs -gt 0) {
+        $tabs = @(for ($t = 0; $t -lt $SessionTabs; $t++) {
+            [ordered]@{
+                Kind = 'Table'; ConnectionId = $conns[$t % 5].Id; Schema = 'dbo'; Table = "Table$t"
+                Filters = @{ name = '=x' }; RawWhere = 'id > 1'; SortColumn = 'id'; SortDescending = $false; ScriptId = $null; FilePath = $null
+            }
+        })
+        $tabs += [ordered]@{ Kind = 'Script'; ConnectionId = $conns[0].Id; Schema = $null; Table = $null; Filters = $null
+            RawWhere = $null; SortColumn = $null; SortDescending = $false; ScriptId = [Guid]::NewGuid().ToString(); FilePath = $null }
+        $session = [ordered]@{ ActiveIndex = $SessionTabs - 1; Tabs = $tabs }
+        $session | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 (Join-Path $root 'session.json')
+    }
     return [pscustomobject]@{ Root = $root; DBeaver = $dbeaver }
 }
 

@@ -48,6 +48,16 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
   temp tables (`#t`), variables and `SET` options survive from one run to the next, and `ROLLBACK`/`COMMIT` in a later run
   works. It is released when the tab closes (a transaction still open is rolled back), on Disconnect, when the connection
   is edited, or when it is found broken; the next run then reconnects and the status bar says the session state was reset.
+- **Tabs survive closing the app**: the open tabs come back at the next start, in the same order and with the same tab
+  active: tables (with the connection they are on now, so a tab switched to another group member returns on that member,
+  plus column filters, WHERE and sort) and scripts (connection, file, and any unsaved text from the autosave). Only the
+  active table tab loads at start (it connects and reads its first page in the background, after the window is shown);
+  every other restored table tab loads, connecting if needed, the first time you select it, and scripts connect only when
+  they run. Nothing connects before the first paint. A tab whose connection was deleted is skipped; one that cannot
+  connect shows the usual error with Reload. Tabs you closed yourself are not restored (and neither is a script you chose
+  Discard for when closing the window); the Ctrl+Shift+T history of closed tabs is not kept across runs. The list is saved
+  about a second after every change and when the window closes, in `session.json`; to forget it, delete that file (with
+  no file the app restores only the unsaved scripts, as before).
 - **Linked database groups**: link databases that share one schema (dev, preprod, customer copies) into a named group, switch
   a tab between them with one key press, run the same read-only query on all of them at once and see where the results
   differ, or compare their schemas. Details, shortcuts and limits: [Linked database groups](#linked-database-groups).
@@ -192,10 +202,12 @@ Everything lives in `%APPDATA%\dbExplorer`:
 | `cache\` | per-connection metadata cache (schema/table/column names) used by `Ctrl+Shift+P` |
 | `scripts\` | unsaved script tabs, restored at the next start |
 | `window.json` | size, position and maximised state of the main window |
+| `session.json` | the open tabs (order, active tab, table filters / WHERE / sort, script files); delete it to start with no tabs |
 
 A corrupt `config.json` is moved to `config.json.bad-<timestamp>` and the app starts empty with a notice. If the file
 cannot be read at all (locked, unreadable) the app starts in read-only-config mode: a red banner says so and nothing is
-ever written to it.
+ever written to it (`session.json` is then neither read nor written either). A corrupt `session.json` is moved to
+`session.json.bad-<timestamp>` the same way, with a notice, and the app starts with no tabs.
 
 ### Command line and environment
 
@@ -249,6 +261,13 @@ app showed the first painted frame lands about 55 ms after that moment. Median o
 | + config load on a worker thread | ~385 ms | ~1 350 ms | 77-82 MB |
 | + ReadyToRun composite, framework-dependent | ~325 ms (316-336) | 4 085-4 204 ms | 82 MB |
 | **+ ReadyToRun composite, self-contained (published default)** | **260 ms (256-290)** | **3 747-8 730 ms** | **84 MB** |
+
+Restoring open tabs costs nothing before the window is visible: the session file is read on the same worker thread as the
+config, and the tabs are rebuilt after the window opened (as shells; only the active table tab connects and queries, in
+the background). A/B on a plain Release build (`measure-startup.ps1 -SessionTabs 6`: six table tabs on unreachable servers
+plus a script, 12 launches per series, two rounds, the machine was noisy): warm min 766 / 874 ms before, 754 / 863 ms with
+the change and no session file, 766 / 768 ms with a six-tab session; medians moved by the machine's noise (785-1099 ms in
+every series), not by the feature.
 
 The warm column is the one that matters day to day. The "cold" column is the very first launch after a build or publish
 (a new copy of the files); it is dominated by Windows Defender's one-time scan of the new files, not by our code, and
