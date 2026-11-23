@@ -13,11 +13,28 @@ concurrency:
     group: release
     cancel-in-progress: true
 
+env:
+    GV_VERSION: '6.4.x'
+
 jobs:
     release:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Install GitVersion
+              uses: gittools/actions/gitversion/setup@v4.1.0
+              with:
+                versionSpec: ${{ env.GV_VERSION }}
+            
+            - name: Determine Version
+              id: version
+              uses: gittools/actions/gitversion/execute@v4.1.0
+
+            - name: Push tags
+              if: ${{ github.ref == 'refs/heads/main' }}
+              run: git tag v${{ steps.version.outputs.SemVer }} && git push origin v${{ steps.version.outputs.SemVer }}
 
             - name: Install .NET
               uses: actions/setup-dotnet@v4
