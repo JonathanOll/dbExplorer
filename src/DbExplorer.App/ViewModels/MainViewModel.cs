@@ -12,7 +12,7 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly MetadataCache? _cache;
 
-    /// <param name="cache">Metadata cache searched by Ctrl+Shift+T; without it that search reports "not available".</param>
+    /// <param name="cache">Metadata cache searched by Ctrl+Shift+P; without it that search reports "not available".</param>
     public MainViewModel(ConnectionTreeViewModel tree, StatusModel status, MetadataCache? cache = null)
     {
         Tree = tree;
@@ -83,11 +83,17 @@ public partial class MainViewModel : ObservableObject
     /// Opens a new tab for <paramref name="t"/> with initial column filters (<c>column -&gt; filter text</c>, e.g. a
     /// followed foreign key). Table tabs start loading right away; failures show in the tab, never here.
     /// </summary>
-    public Task OpenTable(Session s, TableRef t, IReadOnlyDictionary<string, string>? filters)
+    public Task OpenTable(Session s, TableRef t, IReadOnlyDictionary<string, string>? filters) => OpenTable(s, t, filters, null);
+
+    private Task OpenTable(Session s, TableRef t, IReadOnlyDictionary<string, string>? filters, string? rawWhere)
     {
         var tab = TableTabFactory(s, t);
-        if (tab is TableTabViewModel table && filters is not null)
-            foreach (var (column, text) in filters) table.ColumnFilters[column] = text;
+        if (tab is TableTabViewModel table)
+        {
+            if (filters is not null)
+                foreach (var (column, text) in filters) table.ColumnFilters[column] = text;
+            if (rawWhere is not null) table.RawWhere = rawWhere;
+        }
         Tabs.Add(tab);
         ActiveTab = tab;
         if (tab is TableTabViewModel loading) _ = loading.LoadAsync();
@@ -251,7 +257,10 @@ public partial class MainViewModel : ObservableObject
             ?? throw new InvalidOperationException($"{config.Name} is not available (see the status bar).");
     }
 
-    // ---- quick open (Ctrl+T, Ctrl+Shift+T, Ctrl+L) ----
+    // ---- quick open (Ctrl+T, Ctrl+Shift+P, Ctrl+L) ----
+
+    // The text last typed in the Ctrl+T box, offered again (selected) the next time it opens. Memory only: not saved to disk.
+    private string _lastTableQuery = "";
 
     /// <summary>The overlay currently shown, or null. A fresh view model per opening: nothing is remembered.</summary>
     [ObservableProperty] private QuickOpenViewModel? _quickOpen;
@@ -276,7 +285,9 @@ public partial class MainViewModel : ObservableObject
                 return;
             }
 
-            Show(QuickOpenViewModel.ForTables(session, OpenTable, Status));
+            var picker = QuickOpenViewModel.ForTables(session, OpenTable, Status, _lastTableQuery);
+            picker.CloseRequested += () => _lastTableQuery = picker.LastQuery;   // kept on Esc too: the next Ctrl+T starts from it
+            Show(picker);
         }
         catch (Exception e)
         {
@@ -284,7 +295,7 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    /// <summary>Ctrl+Shift+T: tables of every connection that has a metadata cache. Never connects by itself.</summary>
+    /// <summary>Ctrl+Shift+P: tables of every connection that has a metadata cache. Never connects by itself.</summary>
     [RelayCommand]
     public async Task ShowAllTablesPickerAsync()
     {
@@ -422,6 +433,7 @@ public partial class MainViewModel : ObservableObject
             if (!await AskToCloseAsync(tab)) return;   // e.g. unsaved edits: the user chose Cancel
             var index = Tabs.IndexOf(tab);
             if (index < 0) return;
+            RememberClosed(tab);
             (tab as ScriptTabViewModel)?.Close();
             Tabs.RemoveAt(index);
             if (ReferenceEquals(ActiveTab, tab) || ActiveTab is null)
@@ -435,6 +447,92 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             _closingTab = false;
+        }
+    }
+
+    // ---- reopen closed tabs (Ctrl+Shift+T) ----
+
+    private abstract record ClosedTab(Guid ConnectionId);
+
+    private sealed record ClosedTable(Guid ConnectionId, TableRef Table, IReadOnlyDictionary<string, string> Filters, string? RawWhere)
+        : ClosedTab(ConnectionId);
+
+    private sealed record ClosedScript(Guid ConnectionId, string Text, string? FilePath) : ClosedTab(ConnectionId);
+
+    /// <summary>How many closed tabs are remembered; the oldest are forgotten first.</summary>
+    public const int MaxClosedTabs = 50;
+
+    // Oldest first: Ctrl+Shift+T gives them back in the order they were closed (first in, first out).
+    private readonly List<ClosedTab> _closedTabs = [];
+    private bool _reopening;
+
+    /// <summary>How many closed tabs can be reopened.</summary>
+    public int ClosedTabCount => _closedTabs.Count;
+
+    /// <summary>Keeps what is needed to reopen a tab that was just closed: a table with its filters, or a script with its text and file.</summary>
+    private void RememberClosed(TabViewModel tab)
+    {
+        ClosedTab? entry = tab switch
+        {
+            TableTabViewModel t => new ClosedTable(t.Connection.Id, t.Table,
+                new Dictionary<string, string>(t.ColumnFilters, StringComparer.OrdinalIgnoreCase),
+                string.IsNullOrWhiteSpace(t.RawWhere) ? null : t.RawWhere),
+            ScriptTabViewModel s when !string.IsNullOrWhiteSpace(s.Text) || s.FilePath is not null =>
+                new ClosedScript(s.Connection.Id, s.Text, s.FilePath),
+            _ => null,   // an empty script or a placeholder: nothing worth bringing back
+        };
+        if (entry is null) return;
+        _closedTabs.Add(entry);
+        if (_closedTabs.Count > MaxClosedTabs) _closedTabs.RemoveRange(0, _closedTabs.Count - MaxClosedTabs);
+    }
+
+    /// <summary>
+    /// Ctrl+Shift+T: reopens the OLDEST closed tab still remembered (first in, first out), connecting its connection when needed.
+    /// Entries whose connection was deleted are dropped; an entry whose connection cannot be reached stays for the next try.
+    /// Never throws.
+    /// </summary>
+    [RelayCommand]
+    public async Task ReopenClosedTabAsync()
+    {
+        if (_reopening) return;
+        _reopening = true;
+        try
+        {
+            while (_closedTabs.Count > 0)
+            {
+                var entry = _closedTabs[0];
+                var config = Tree.Config.Connections.FirstOrDefault(c => c.Id == entry.ConnectionId);
+                if (config is null)
+                {
+                    _closedTabs.RemoveAt(0);   // its connection was deleted
+                    continue;
+                }
+
+                switch (entry)
+                {
+                    case ClosedTable closed:
+                        if (await Tree.EnsureConnectedAsync(config) is not { } session) return;   // reported by the tree; kept for later
+                        _closedTabs.Remove(entry);
+                        await OpenTable(session, closed.Table, closed.Filters, closed.RawWhere);
+                        break;
+                    case ClosedScript closed:
+                        _closedTabs.Remove(entry);
+                        var tab = CreateScriptTab(config, new SavedScript(Guid.NewGuid(), config.Id, closed.Text, closed.FilePath));
+                        Tabs.Add(tab);
+                        ActiveTab = tab;
+                        break;
+                }
+                return;
+            }
+            Status.Info("No closed tab to reopen.");
+        }
+        catch (Exception e)
+        {
+            Status.Error($"Cannot reopen the tab: {ErrorText.Describe(e)}");
+        }
+        finally
+        {
+            _reopening = false;
         }
     }
 

@@ -41,7 +41,11 @@ public partial class QuickOpenOverlay : UserControl
         _window = this.GetVisualRoot() as Window;
         _previousFocus = _window?.FocusManager?.GetFocusedElement();
         if (_window is not null) _window.Deactivated += OnWindowDeactivated;
-        Dispatcher.UIThread.Post(() => _queryBox.Focus(), DispatcherPriority.Input);
+        Dispatcher.UIThread.Post(() =>
+        {
+            _queryBox.Focus();
+            _queryBox.SelectAll();   // a remembered query is selected: typing replaces it, Enter reuses it
+        }, DispatcherPriority.Input);
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)

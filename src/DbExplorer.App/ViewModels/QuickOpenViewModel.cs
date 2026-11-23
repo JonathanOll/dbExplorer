@@ -30,9 +30,13 @@ public sealed partial class QuickOpenViewModel : ObservableObject
     [ObservableProperty] private IReadOnlyList<QuickOpenItem> _results = [];
     [ObservableProperty] private int _selectedIndex = -1;
 
-    public QuickOpenViewModel(string title, IReadOnlyList<QuickOpenItem> items, StatusModel? status = null, string? notice = null)
+    /// <param name="initialQuery">Text the box starts with (the remembered query of the last opening); results are ranked for it.</param>
+    public QuickOpenViewModel(string title, IReadOnlyList<QuickOpenItem> items, StatusModel? status = null, string? notice = null,
+        string initialQuery = "")
     {
         Title = title;
+        _query = initialQuery;
+        LastQuery = initialQuery;
         _items = items as QuickOpenItem[] ?? items.ToArray();
         _status = status;
         Notice = notice;
@@ -41,6 +45,12 @@ public sealed partial class QuickOpenViewModel : ObservableObject
 
     /// <summary>Short caption shown above the text box (what is being searched).</summary>
     public string Title { get; }
+
+    /// <summary>
+    /// The last text typed, kept when the overlay is cancelled (Esc clears the box but not this), so the next opening can start
+    /// from it.
+    /// </summary>
+    public string LastQuery { get; private set; }
 
     /// <summary>Optional hint under the list, e.g. connections without a cache.</summary>
     public string? Notice { get; }
@@ -51,7 +61,8 @@ public sealed partial class QuickOpenViewModel : ObservableObject
     // ---- factories ----
 
     /// <summary>Tables and views of the LIVE schema of an open session, labelled <c>schema.table</c>.</summary>
-    public static QuickOpenViewModel ForTables(Session session, Func<Session, TableRef, Task> openTable, StatusModel? status = null)
+    public static QuickOpenViewModel ForTables(Session session, Func<Session, TableRef, Task> openTable, StatusModel? status = null,
+        string initialQuery = "")
     {
         var items = session.Schema
             .Select(t => new QuickOpenItem(t.Ref.ToString(), t.IsView ? "view" : null, () => openTable(session, t.Ref))
@@ -60,7 +71,7 @@ public sealed partial class QuickOpenViewModel : ObservableObject
                 Icon = t.IsView ? "IconView" : "IconTable",
             })
             .ToList();
-        return new QuickOpenViewModel($"Go to table in {session.Config.Name}", items, status);
+        return new QuickOpenViewModel($"Go to table in {session.Config.Name}", items, status, initialQuery: initialQuery);
     }
 
     /// <summary>
@@ -145,7 +156,9 @@ public sealed partial class QuickOpenViewModel : ObservableObject
 
     partial void OnQueryChanged(string value)
     {
-        if (!_suppressRank) Rank();
+        if (_suppressRank) return;
+        LastQuery = value;
+        Rank();
     }
 
     public void MoveDown() => Move(1);
@@ -206,7 +219,7 @@ public sealed partial class QuickOpenViewModel : ObservableObject
 
         for (var i = 0; i < _items.Length; i++)
         {
-            if (FuzzyMatcher.Score(query, _items[i].Label) is not { } score) continue;
+            if (FuzzyMatcher.ScoreTolerant(query, _items[i].Label) is not { } score) continue;
             if (count == MaxResults && !Better(score, i, topScore[MaxResults - 1], topIndex[MaxResults - 1])) continue;
 
             var pos = count < MaxResults ? count++ : MaxResults - 1;

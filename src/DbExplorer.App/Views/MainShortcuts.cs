@@ -28,6 +28,9 @@ public static class MainShortcuts
                 main.ShowTablePickerCommand.Execute(null);
                 return true;
             case (Key.T, KeyModifiers.Control | KeyModifiers.Shift):
+                main.ReopenClosedTabCommand.Execute(null);
+                return true;
+            case (Key.P, KeyModifiers.Control | KeyModifiers.Shift):
                 main.ShowAllTablesPickerCommand.Execute(null);
                 return true;
             case (Key.N, KeyModifiers.Control):

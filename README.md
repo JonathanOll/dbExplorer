@@ -28,8 +28,10 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
     "filter by this value" from the cell context menu, and a raw `WHERE` box. Filters run server-side with parameters.
   - **Structure**: columns, types, nullability, primary key, foreign keys, indexes.
 - **Follow foreign keys**: `Ctrl+click` (or double-click) an FK value to open the referenced row in a new tab.
-- **Quick open**: fuzzy-search tables/views of the active connection (`Ctrl+T`) or of all connections (`Ctrl+Shift+T`,
+- **Quick open**: fuzzy-search tables/views of the active connection (`Ctrl+T`) or of all connections (`Ctrl+Shift+P`,
   served from an on-disk metadata cache, never connects by itself); `Ctrl+L` jumps to a column in the current table.
+  The search forgives typos (a wrong, extra or missing letter, two letters swapped; from 4 letters on), exact matches
+  rank first, and `Ctrl+T` reopens with the text you typed last time, selected (type to replace it, Enter to reuse it).
 - **Row editing**: edits are staged in the grid (highlighted), `Ctrl+S` shows the generated SQL, then applies it in one
   transaction. Insert and delete rows. Tables without a primary key are read-only until you define "virtual key"
   columns for them (persisted, like DBeaver's virtual PK). Edit is disabled on connections flagged read-only.
@@ -54,7 +56,8 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
 | Shortcut | Where | Action |
 | --- | --- | --- |
 | `Ctrl+T` | anywhere | Quick open a table/view of the active connection |
-| `Ctrl+Shift+T` | anywhere | Quick open a table/view across all connections (metadata cache) |
+| `Ctrl+Shift+P` | anywhere | Quick open a table/view across all connections (metadata cache) |
+| `Ctrl+Shift+T` | anywhere | Reopen a closed tab (the oldest closed one first; up to 50 are remembered; a table keeps its filters, a script its text) |
 | `Ctrl+L` | table tab | Fuzzy-search a column and scroll to it |
 | `Ctrl+N` | anywhere | New script tab on the active (or selected) connection |
 | `Ctrl+O` | anywhere | Open a script file in a script tab |
@@ -101,7 +104,7 @@ Everything lives in `%APPDATA%\dbExplorer`:
 | Path | Content |
 | --- | --- |
 | `config.json` | folders, connections (passwords DPAPI-encrypted for the current Windows user), virtual keys |
-| `cache\` | per-connection metadata cache (schema/table/column names) used by `Ctrl+Shift+T` |
+| `cache\` | per-connection metadata cache (schema/table/column names) used by `Ctrl+Shift+P` |
 | `scripts\` | unsaved script tabs, restored at the next start |
 | `window.json` | size, position and maximised state of the main window |
 
@@ -199,7 +202,7 @@ What was tried, and what was kept:
 ## Known limitations
 
 - Large object columns (text, binary) are fully materialised for each 200-row page.
-- No background schema refresh: the schema and the metadata cache behind `Ctrl+Shift+T` are reloaded when a connection is
+- No background schema refresh: the schema and the metadata cache behind `Ctrl+Shift+P` are reloaded when a connection is
   (re)opened or on the tree's Refresh action, never while a connection just stays open.
 - SQL Server read-only mode is a statement guard plus a rolled-back transaction, not a database-enforced read-only session.
   PostgreSQL uses a `READ ONLY` transaction. SQLite read-only is enforced by the database: the file is opened read-only
