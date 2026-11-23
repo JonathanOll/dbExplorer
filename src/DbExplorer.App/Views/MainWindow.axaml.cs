@@ -128,6 +128,14 @@ public partial class MainWindow : Window
         {
             // best effort: the autosave copies written while editing are still there
         }
+        try
+        {
+            (DataContext as MainViewModel)?.PersistSession();   // after the scripts: the tabs that remain, minus the discarded ones
+        }
+        catch (Exception)
+        {
+            // best effort: the session written while working is still there
+        }
         SaveWindowState();
     }
 

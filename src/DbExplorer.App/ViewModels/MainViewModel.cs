@@ -135,7 +135,7 @@ public partial class MainViewModel : ObservableObject
         if (newValue is not null) newValue.PropertyChanged += OnActiveTabPropertyChanged;
         OnPropertyChanged(nameof(CurrentConnection));
         // A restored table tab connects and loads when it is first selected (never before).
-        if (newValue is TableTabViewModel { IsDeferred: true } deferred) _ = deferred.EnsureLoadedAsync();
+        if (!_restoringTabs && newValue is TableTabViewModel { IsDeferred: true } deferred) _ = deferred.EnsureLoadedAsync();
         ScheduleSessionSave();
     }
 
@@ -247,6 +247,7 @@ public partial class MainViewModel : ObservableObject
 
     private TabSessionStore? _sessionStore;
     private SavedTabs? _savedSession;
+    private bool _restoringTabs;
     private bool _sessionRestored;   // writing starts once the restore ran: an early close must not wipe the saved session
     private readonly object _sessionGate = new();
     private int _sessionVersion;
@@ -323,27 +324,36 @@ public partial class MainViewModel : ObservableObject
 
         TabViewModel? active = null;
         var skipped = 0;
-        for (var i = 0; i < saved.Tabs.Count; i++)
+        _restoringTabs = true;   // the tab control selects the first tab it is given: that selection must not start a load
+        try
         {
-            var entry = saved.Tabs[i];
-            var config = Tree.Config.Connections.FirstOrDefault(c => c.Id == entry.ConnectionId);
-            TabViewModel? tab = config is null ? null : entry.Kind switch
+            for (var i = 0; i < saved.Tabs.Count; i++)
             {
-                SavedTabKind.Table when !string.IsNullOrEmpty(entry.Table) && RestoredTableTabFactory is { } create =>
-                    CreateRestoredTable(create, config, entry),
-                SavedTabKind.Script => CreateRestoredScript(config, entry, unsavedById),
-                _ => null,
-            };
-            if (tab is null)
-            {
-                skipped++;
-                continue;
+                var entry = saved.Tabs[i];
+                var config = Tree.Config.Connections.FirstOrDefault(c => c.Id == entry.ConnectionId);
+                TabViewModel? tab = config is null ? null : entry.Kind switch
+                {
+                    SavedTabKind.Table when !string.IsNullOrEmpty(entry.Table) && RestoredTableTabFactory is { } create =>
+                        CreateRestoredTable(create, config, entry),
+                    SavedTabKind.Script => CreateRestoredScript(config, entry, unsavedById),
+                    _ => null,
+                };
+                if (tab is null)
+                {
+                    skipped++;
+                    continue;
+                }
+                Tabs.Add(tab);
+                if (i == saved.ActiveIndex) active = tab;
             }
-            Tabs.Add(tab);
-            if (i == saved.ActiveIndex) active = tab;
+            ActiveTab = active ?? Tabs.FirstOrDefault();
         }
-        // The active tab last and once: only it starts loading (see OnActiveTabChanged).
-        ActiveTab = active ?? Tabs.FirstOrDefault();
+        finally
+        {
+            _restoringTabs = false;
+        }
+        // Only the active tab loads now (the others when first selected).
+        if (ActiveTab is TableTabViewModel { IsDeferred: true } current) _ = current.EnsureLoadedAsync();
 
         // Unsaved copies the session does not know (written after its last save, e.g. a crash) must not be lost: keep them too.
         var known = saved.Tabs.Where(t => t.ScriptId is not null).Select(t => t.ScriptId!.Value).ToHashSet();

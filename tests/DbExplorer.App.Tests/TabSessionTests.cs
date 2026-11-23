@@ -88,10 +88,10 @@ public class TabSessionTests : ShellTestBase
 
         a.ColumnFilters["name"] = "=Alice";
         await a.ApplyFiltersAsync();
-        await WaitFor(() => SessionStore.Load().Session!.Tabs[0].Filters is { Count: 1 });
+        await WaitFor(() => SessionStore.Load().Session?.Tabs[0].Filters is { Count: 1 });
 
         await main.CloseTabCommand.ExecuteAsync(b);
-        await WaitFor(() => SessionStore.Load().Session!.Tabs.Count == 1);
+        await WaitFor(() => SessionStore.Load().Session?.Tabs.Count == 1);
     }
 
     [Fact]

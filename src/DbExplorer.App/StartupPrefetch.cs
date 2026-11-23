@@ -15,12 +15,37 @@ internal sealed record Prefetched(AppPaths Paths, DpapiSecretProtector Protector
 internal static class StartupPrefetch
 {
     private static Task<Prefetched>? _config;
+    private static Task<TabSessionLoad>? _session;
 
-    public static void Begin(string[] args) => _config = Task.Run(() => LoadConfig(args));
+    public static void Begin(string[] args)
+    {
+        _config = Task.Run(() => LoadConfig(args));
+        // The tab session (one tiny file) is read right after the config, still off the UI thread. A separate task: the startup
+        // path (Take) never waits for it, only the post-paint restore does.
+        _session = _config.ContinueWith(c => LoadSession(c.Result), TaskScheduler.Default);
+    }
 
     /// <summary>The prefetched result, or a synchronous load when <see cref="Begin"/> was not called (tests).</summary>
     public static Prefetched Take(string[] args) =>
         _config is null ? LoadConfig(args) : _config.GetAwaiter().GetResult();
+
+    /// <summary>The session read from disk: no session when persistence is disabled, the file is missing or anything failed.</summary>
+    public static TabSessionLoad TakeSession(Prefetched prefetched)
+    {
+        try
+        {
+            return _session is null ? LoadSession(prefetched) : _session.GetAwaiter().GetResult();
+        }
+        catch (Exception)
+        {
+            return new TabSessionLoad(null, null);
+        }
+    }
+
+    private static TabSessionLoad LoadSession(Prefetched prefetched) =>
+        prefetched.Startup.PersistenceEnabled
+            ? new TabSessionStore(prefetched.Paths.SessionFile).Load()
+            : new TabSessionLoad(null, null);   // read-only-config mode: nothing may be touched, not even a corrupt file moved
 
     private static Prefetched LoadConfig(string[] args)
     {

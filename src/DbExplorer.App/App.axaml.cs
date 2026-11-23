@@ -38,12 +38,17 @@ public class App : Application
             var editDialogs = new EditDialogService(window);
             main.UseTableTabs(sessions, editDialogs);
             main.UseScriptTabs(new ScriptFiles(window), new Core.Scripting.ScriptSessionStore(paths.ScriptsDir), editDialogs);
-            // After the window is up: creating the editor of a restored script must not delay the first paint.
-            window.Opened += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(
-                () => main.RestoreScripts(), Avalonia.Threading.DispatcherPriority.Background);
-            // The window persists the scripts itself once its close is confirmed (MainWindow.OnClosed); this covers an exit
-            // that does not go through the window (idempotent).
-            desktop.Exit += (_, _) => main.PersistScripts();
+            // After the window is up: restoring the tabs (their editors, views) must not delay the first paint. Only tab shells
+            // are built; nothing connects until a table tab is first selected (the active one loads at once).
+            SessionStartup.Wire(window, main, startup, new Core.Config.TabSessionStore(paths.SessionFile),
+                () => StartupPrefetch.TakeSession(prefetched));
+            // The window persists the scripts and the tab session itself once its close is confirmed (MainWindow.OnClosed);
+            // this covers an exit that does not go through the window (idempotent).
+            desktop.Exit += (_, _) =>
+            {
+                main.PersistScripts();
+                main.PersistSession();
+            };
             window.RestorePlacement(paths.WindowStateFile);
             window.DataContext = main;
             desktop.MainWindow = window;
