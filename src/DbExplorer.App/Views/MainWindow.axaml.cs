@@ -27,6 +27,20 @@ public partial class MainWindow : Window
         tree.PointerReleased += (_, _) => _dragStart = null;
         tree.AddHandler(DragDrop.DragOverEvent, OnTreeDragOver);
         tree.AddHandler(DragDrop.DropEvent, OnTreeDrop);
+        this.FindControl<TabControl>("DocTabs")!.AddHandler(PointerReleasedEvent, OnDocTabsPointerReleased, RoutingStrategies.Tunnel);
+    }
+
+    // Middle-click on a document tab header closes it, through the same path as the x button (unsaved work is asked about).
+    // On release, like browsers, so a press that slides off the tab does nothing. The tab strip only: the sub-tabs of a table
+    // tab (Data / Structure) are TabItems too and must not close anything.
+    private void OnDocTabsPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (e.InitialPressMouseButton != MouseButton.Middle || sender is not TabControl tabs || DataContext is not MainViewModel main) return;
+        if ((e.Source as Visual)?.FindAncestorOfType<TabItem>(includeSelf: true) is not { DataContext: TabViewModel tab } item) return;
+        if (!ReferenceEquals(item.FindAncestorOfType<TabControl>(), tabs)) return;
+        e.Handled = true;
+        if (ReferenceEquals(tab, main.ActiveTab) && !CommitOpenCellEdit()) return;   // like Ctrl+W: a refused half-typed cell stops the close
+        main.CloseTabCommand.Execute(tab);
     }
 
     private ConnectionTreeViewModel? Tree => (DataContext as MainViewModel)?.Tree;

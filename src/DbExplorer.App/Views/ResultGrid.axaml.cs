@@ -7,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using DbExplorer.App.ViewModels;
 
@@ -47,6 +48,9 @@ public partial class ResultGrid : UserControl
     {
         InitializeComponent();
         Grid.AddHandler(PointerPressedEvent, OnGridPointerPressed, RoutingStrategies.Tunnel);
+        Grid.AddHandler(PointerPressedEvent, OnPanPressed, RoutingStrategies.Tunnel);
+        Grid.AddHandler(PointerMovedEvent, OnPanMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        Grid.AddHandler(PointerReleasedEvent, OnPanReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
         Grid.DoubleTapped += OnGridDoubleTapped;
         Grid.LoadingRow += (_, e) => e.Row.Classes.Set("odd", (e.Row.Index & 1) == 1);
         // Link cells carry a theme colour chosen when they are drawn: repaint them when the theme switches while the app runs.
@@ -111,6 +115,92 @@ public partial class ResultGrid : UserControl
         if (item is not null) Grid.ScrollIntoView(item, column);
         if (index < _headers.Count && _headers[index].Filter is { } filter) filter.Focus();
         else if (item is not null) Grid.CurrentColumn = column;
+        FlashColumn(index);
+    }
+
+    // ---- column flash (Ctrl+L) ----
+
+    private static readonly TimeSpan FlashDuration = TimeSpan.FromMilliseconds(1600);
+    private DispatcherTimer? _flashTimer;
+    private int _flashIndex = -1;
+
+    /// <summary>Lights the header and the realised cells of the column for a moment, so the eye finds it after a jump.</summary>
+    private void FlashColumn(int index)
+    {
+        ClearFlash();
+        _flashIndex = index;
+        ApplyFlash();
+        Dispatcher.UIThread.Post(ApplyFlash, DispatcherPriority.Loaded);   // cells realised by the scroll's layout pass
+        _flashTimer = new DispatcherTimer { Interval = FlashDuration };
+        _flashTimer.Tick += (_, _) => ClearFlash();
+        _flashTimer.Start();
+    }
+
+    private void ApplyFlash()
+    {
+        if (!_attached || _flashIndex < 0) return;
+        foreach (var cell in Grid.GetVisualDescendants().OfType<DataGridCell>())
+            cell.Classes.Set("flash", cell.Content is GridCell { } content && content.Index == _flashIndex);
+        if (_flashIndex < _headers.Count) _headers[_flashIndex].Root.Classes.Set("flashHeader", true);
+    }
+
+    private void ClearFlash()
+    {
+        _flashTimer?.Stop();
+        _flashTimer = null;
+        _flashIndex = -1;
+        foreach (var cell in Grid.GetVisualDescendants().OfType<DataGridCell>()) cell.Classes.Set("flash", false);
+        foreach (var header in _headers) header.Root.Classes.Set("flashHeader", false);
+    }
+
+    // ---- middle-button drag: pans the grid (content follows the pointer) ----
+
+    private Point? _panLast;
+
+    // The DataGrid exposes no scroll API and ignores its scroll bars when they are set from code, so the pan is fed to it as
+    // what it does understand: mouse-wheel input (one notch = this many pixels in DataGrid.OnPointerWheelChanged).
+    private const double WheelNotchPixels = 50;
+
+    private void OnPanPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(Grid).Properties.PointerUpdateKind != PointerUpdateKind.MiddleButtonPressed) return;
+        if (e.Source is Visual source && source.FindAncestorOfType<CellEditor>(includeSelf: true) is not null) return;   // text box: leave it alone
+        _panLast = e.GetPosition(Grid);
+        e.Pointer.Capture(Grid);
+        Grid.Cursor = new Cursor(StandardCursorType.SizeAll);
+        e.Handled = true;
+    }
+
+    private void OnPanMoved(object? sender, PointerEventArgs e)
+    {
+        if (_panLast is not { } last || TopLevel.GetTopLevel(Grid) is not { } top) return;
+        if (!e.GetCurrentPoint(Grid).Properties.IsMiddleButtonPressed) { EndPan(e.Pointer); return; }
+        var position = e.GetPosition(Grid);
+        var moved = position - last;
+        _panLast = position;
+        if (moved.X == 0 && moved.Y == 0) return;
+        // Content follows the pointer: dragging down is wheeling up.
+        var wheel = new PointerWheelEventArgs(Grid, e.Pointer, top, e.GetPosition(top), (ulong)Environment.TickCount64,
+            e.GetCurrentPoint(Grid).Properties, KeyModifiers.None, new Vector(moved.X, moved.Y) / WheelNotchPixels)
+        {
+            RoutedEvent = PointerWheelChangedEvent,
+        };
+        Grid.RaiseEvent(wheel);
+        e.Handled = true;
+    }
+
+    private void OnPanReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (_panLast is null || e.InitialPressMouseButton != MouseButton.Middle) return;
+        EndPan(e.Pointer);
+        e.Handled = true;
+    }
+
+    private void EndPan(IPointer pointer)
+    {
+        _panLast = null;
+        Grid.ClearValue(CursorProperty);
+        if (ReferenceEquals(pointer.Captured, Grid)) pointer.Capture(null);
     }
 
     // ---- columns and headers ----
@@ -204,6 +294,8 @@ public partial class ResultGrid : UserControl
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         _attached = false;
+        ClearFlash();
+        _panLast = null;
         SubscribeToFeatures();
         AttachEditing();
         BindItems();

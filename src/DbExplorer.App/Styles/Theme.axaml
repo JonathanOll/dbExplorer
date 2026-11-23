@@ -64,6 +64,8 @@
       <SolidColorBrush x:Key="DbxGridFilterBg" Color="#F6F8FB" />
       <SolidColorBrush x:Key="DbxGridLine" Color="#E7EBF1" />
       <SolidColorBrush x:Key="DbxGridZebra" Color="#F4F7FB" />
+      <SolidColorBrush x:Key="DbxColumnFlash" Color="#FFE27A" />          <!-- Ctrl+L: the column just jumped to -->
+      <SolidColorBrush x:Key="DbxColumnFlashHeader" Color="#FFC933" />
       <SolidColorBrush x:Key="DbxRowHover" Color="#EDF2F8" />
       <SolidColorBrush x:Key="DbxRowSelected" Color="#CCDFF4" />
       <SolidColorBrush x:Key="DbxRowSelectedInactive" Color="#DCE6F1" />
@@ -204,6 +206,8 @@
       <SolidColorBrush x:Key="DbxGridFilterBg" Color="#23272D" />
       <SolidColorBrush x:Key="DbxGridLine" Color="#333941" />
       <SolidColorBrush x:Key="DbxGridZebra" Color="#2C3137" />
+      <SolidColorBrush x:Key="DbxColumnFlash" Color="#6E5B12" />
+      <SolidColorBrush x:Key="DbxColumnFlashHeader" Color="#9A7F10" />
       <SolidColorBrush x:Key="DbxRowHover" Color="#30363E" />
       <SolidColorBrush x:Key="DbxRowSelected" Color="#2E4C72" />
       <SolidColorBrush x:Key="DbxRowSelectedInactive" Color="#303F52" />
