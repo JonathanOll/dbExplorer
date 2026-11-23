@@ -41,7 +41,7 @@ public partial class GroupSwitcher : UserControl
     {
         if (e.PropertyName is nameof(TabViewModel.Connection) or nameof(TabViewModel.Groups) or nameof(TabViewModel.ActiveGroup)
             or nameof(TabViewModel.GroupMembers) or nameof(TabViewModel.SelectedMember) or nameof(TabViewModel.HasGroupSwitch)
-            or nameof(TabViewModel.HasGroupPicker) or nameof(TabViewModel.IsSwitching))
+            or nameof(TabViewModel.HasGroupPicker) or nameof(TabViewModel.IsSwitching) or nameof(ScriptTabViewModel.IsGroupRunning))
         {
             if (Dispatcher.UIThread.CheckAccess()) Sync();
             else Dispatcher.UIThread.Post(Sync);
@@ -55,7 +55,7 @@ public partial class GroupSwitcher : UserControl
         try
         {
             Root.IsVisible = vm.HasGroupSwitch;
-            Root.IsEnabled = !vm.IsSwitching;
+            Root.IsEnabled = !vm.IsSwitching && vm is not ScriptTabViewModel { IsGroupRunning: true };   // a group run pins the tab to its database
             if (!vm.HasGroupSwitch) return;
             GroupBox.IsVisible = vm.HasGroupPicker;
             GroupBox.ItemsSource = vm.Groups;

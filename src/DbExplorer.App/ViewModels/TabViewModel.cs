@@ -123,6 +123,11 @@ public abstract class TabViewModel : ObservableObject
             return false;
         }
         if (member.Id == Connection.Id) return true;
+        if (SwitchRefusal is { } refusal)
+        {
+            ReportSwitchProblem(refusal);
+            return false;
+        }
 
         IsSwitching = true;
         try
@@ -152,6 +157,9 @@ public abstract class TabViewModel : ObservableObject
 
     /// <summary>Does the tab-specific part of a switch to <paramref name="target"/> (a member of the group, not the current connection).</summary>
     protected virtual Task<bool> SwitchCoreAsync(ConnectionConfig target) => Task.FromResult(false);
+
+    /// <summary>Why the tab cannot switch right now (e.g. a group run is in progress), or null. Checked before a switch starts.</summary>
+    protected virtual string? SwitchRefusal => null;
 
     /// <summary>Shows why a switch was refused (error strip / status bar).</summary>
     protected virtual void ReportSwitchProblem(string message) { }

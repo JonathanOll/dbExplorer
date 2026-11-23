@@ -10,7 +10,46 @@
     <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml" />
     <Style Selector="PathIcon.ok"><Setter Property="Foreground" Value="{DynamicResource DbxSuccess}" /></Style>
     <Style Selector="PathIcon.bad"><Setter Property="Foreground" Value="{DynamicResource DbxError}" /></Style>
+    <Style Selector="PathIcon.run"><Setter Property="Foreground" Value="{DynamicResource DbxAccent}" /></Style>
   </UserControl.Styles>
+
+  <UserControl.Resources>
+    <!-- What one statement (or one member of a group run) produced: result line, error banner, result grids. -->
+    <DataTemplate x:Key="StatementResultContent" x:DataType="vm:StatementResultViewModel">
+      <DockPanel>
+        <!-- Result line: "N rows · X ms" -->
+        <Border DockPanel.Dock="Bottom" Classes="toolbar" BorderThickness="0,1,0,0" Padding="10,4">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center" />
+            <Border Classes="badge warn" IsVisible="{Binding IsTruncated}">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <PathIcon Data="{StaticResource IconWarning}" Width="10" Height="10" />
+                <TextBlock Text="{Binding TruncatedNotice}" FontSize="11.5" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </Border>
+        <Border DockPanel.Dock="Top" Classes="banner error" IsVisible="{Binding HasError}">
+          <Grid ColumnDefinitions="Auto,*">
+            <PathIcon Classes="bi" Data="{StaticResource IconError}" Margin="0,0,8,0" VerticalAlignment="Top" />
+            <TextBlock Grid.Column="1" Text="{Binding Error}" TextWrapping="Wrap" FontFamily="{DynamicResource DbxMonoFont}" />
+          </Grid>
+        </Border>
+        <ItemsControl ItemsSource="{Binding Sets}" IsVisible="{Binding HasSets}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <UniformGrid Columns="1" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ResultSetViewModel">
+              <views:ResultGrid Columns="{Binding Columns}" ItemsSource="{Binding Rows}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </DockPanel>
+    </DataTemplate>
+  </UserControl.Resources>
 
   <DockPanel>
     <!-- Toolbar: run | row limit | files, and the connection this script runs on -->
@@ -18,19 +57,27 @@
       <Grid ColumnDefinitions="*,Auto">
         <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
           <Button Theme="{StaticResource DbxToolButton}" Classes="run" Tag="{StaticResource IconPlay}" Content="Run statement"
-                  Command="{Binding RunStatementCommand}" IsEnabled="{Binding !IsRunning}"
+                  Command="{Binding RunStatementCommand}" IsEnabled="{Binding CanRun}"
                   ToolTip.Tip="Run the selection, or the statement at the caret (Ctrl+Enter)" />
           <Button Theme="{StaticResource DbxToolButton}" Classes="run" Tag="{StaticResource IconPlayAll}" Content="Run script"
-                  Command="{Binding RunScriptCommand}" IsEnabled="{Binding !IsRunning}"
+                  Command="{Binding RunScriptCommand}" IsEnabled="{Binding CanRun}"
                   ToolTip.Tip="Run the whole script (F5)" />
           <Button Theme="{StaticResource DbxToolButton}" Classes="stop" Tag="{StaticResource IconStop}" Content="Cancel"
-                  Command="{Binding CancelCommand}" IsEnabled="{Binding IsRunning}"
-                  ToolTip.Tip="Cancel the running script (Ctrl+Break)" />
+                  Command="{Binding CancelCommand}" IsEnabled="{Binding IsBusy}"
+                  ToolTip.Tip="Cancel the running script or group run (Ctrl+Break)" />
+          <!-- Run on group: read-only on every database of the group, whatever each connection's own flag says -->
+          <Border Classes="vsep" IsVisible="{Binding HasGroupSwitch}" />
+          <Button Theme="{StaticResource DbxToolButton}" Classes="run" Tag="{StaticResource IconGroup}" Content="Run on group"
+                  Command="{Binding RunStatementOnGroupCommand}" IsEnabled="{Binding CanRun}" IsVisible="{Binding HasGroupSwitch}"
+                  ToolTip.Tip="Run the selection, or the statement at the caret, on every database of the group, read-only (Ctrl+Shift+Enter)" />
+          <Button Theme="{StaticResource DbxToolButton}" Classes="run" Tag="{StaticResource IconPlayAll}" Content="Script on group"
+                  Command="{Binding RunScriptOnGroupCommand}" IsEnabled="{Binding CanRun}" IsVisible="{Binding HasGroupSwitch}"
+                  ToolTip.Tip="Run the whole script on every database of the group, read-only (Ctrl+Shift+F5)" />
           <Border Classes="vsep" />
           <TextBlock Classes="dim" Text="Rows" VerticalAlignment="Center" Margin="2,0,6,0" />
           <NumericUpDown x:Name="RowLimitBox" Minimum="1" Maximum="100000" Increment="100" FormatString="0" Width="112"
                          MinHeight="0" Height="26" Padding="6,0" VerticalAlignment="Center"
-                         ToolTip.Tip="Maximum rows kept per result set (1 to 100000)" />
+                         ToolTip.Tip="Maximum rows kept per result set (1 to 100000), per database in a group run" />
           <Border Classes="vsep" />
           <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconFileOpen}" Content="Open"
                   Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).OpenScriptFileCommand}"
@@ -39,8 +86,8 @@
                   Command="{Binding SaveCommand}" ToolTip.Tip="Save to a file (Ctrl+S)" />
         </WrapPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="8,0,4,0" VerticalAlignment="Center">
-          <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsRunning}">
-            <ProgressBar IsIndeterminate="{Binding IsRunning}" Width="70" Height="4" VerticalAlignment="Center" />
+          <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsBusy}">
+            <ProgressBar IsIndeterminate="{Binding IsBusy}" Width="70" Height="4" VerticalAlignment="Center" />
             <TextBlock Classes="dim" Text="running…" VerticalAlignment="Center" />
           </StackPanel>
           <views:GroupSwitcher />
@@ -53,7 +100,7 @@
         </StackPanel>
       </Grid>
     </Border>
-    <ProgressBar DockPanel.Dock="Top" IsIndeterminate="True" Height="3" IsVisible="{Binding IsRunning}" />
+    <ProgressBar DockPanel.Dock="Top" IsIndeterminate="True" Height="3" IsVisible="{Binding IsBusy}" />
 
     <!-- Run-level error (connection closed or reset, cannot connect, file problem) -->
     <Border DockPanel.Dock="Top" Classes="banner error"
@@ -79,68 +126,128 @@
 
       <GridSplitter Grid.Row="1" ResizeDirection="Rows" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
 
-      <!-- One tab per executed statement -->
+      <!-- One tab per executed statement, or the group run (status panel + result tabs) -->
       <Grid Grid.Row="2" Background="{DynamicResource DbxContentBg}">
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" IsVisible="{Binding !Results.Count}">
-          <PathIcon Classes="dim" Data="{StaticResource IconPlay}" Width="26" Height="26" Opacity="0.5" HorizontalAlignment="Center" />
-          <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-            <Border Classes="kbd"><TextBlock Text="Ctrl+Enter" /></Border>
-            <TextBlock Classes="dim" Text="runs the statement at the caret or the selection" VerticalAlignment="Center" />
+        <Grid IsVisible="{Binding GroupRun, Converter={x:Static ObjectConverters.IsNull}}">
+          <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8" IsVisible="{Binding !Results.Count}">
+            <PathIcon Classes="dim" Data="{StaticResource IconPlay}" Width="26" Height="26" Opacity="0.5" HorizontalAlignment="Center" />
+            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+              <Border Classes="kbd"><TextBlock Text="Ctrl+Enter" /></Border>
+              <TextBlock Classes="dim" Text="runs the statement at the caret or the selection" VerticalAlignment="Center" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+              <Border Classes="kbd"><TextBlock Text="F5" /></Border>
+              <TextBlock Classes="dim" Text="runs the whole script" VerticalAlignment="Center" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" IsVisible="{Binding HasGroupSwitch}">
+              <Border Classes="kbd"><TextBlock Text="Ctrl+Shift+Enter" /></Border>
+              <TextBlock Classes="dim" Text="runs it on every database of the group (read-only)" VerticalAlignment="Center" />
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" IsVisible="{Binding HasGroupSwitch}">
+              <Border Classes="kbd"><TextBlock Text="Ctrl+Shift+F5" /></Border>
+              <TextBlock Classes="dim" Text="runs the whole script on the group" VerticalAlignment="Center" />
+            </StackPanel>
           </StackPanel>
-          <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-            <Border Classes="kbd"><TextBlock Text="F5" /></Border>
-            <TextBlock Classes="dim" Text="runs the whole script" VerticalAlignment="Center" />
-          </StackPanel>
-        </StackPanel>
-        <TabControl Theme="{StaticResource DbxSubTabControl}" ItemContainerTheme="{StaticResource DbxSubTabItem}"
-                    ItemsSource="{Binding Results}" SelectedItem="{Binding SelectedResult}"
-                    IsVisible="{Binding !!Results.Count}">
-          <TabControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:StatementResultViewModel">
-              <StackPanel Orientation="Horizontal" Spacing="6" ToolTip.Tip="{Binding StatementText}">
-                <PathIcon Classes="ok" Data="{StaticResource IconCheck}" Width="12" Height="12" IsVisible="{Binding !HasError}" />
-                <PathIcon Classes="bad" Data="{StaticResource IconError}" Width="12" Height="12" IsVisible="{Binding HasError}" />
-                <TextBlock Text="{Binding Header}" TextTrimming="CharacterEllipsis" MaxWidth="240" />
-              </StackPanel>
-            </DataTemplate>
-          </TabControl.ItemTemplate>
-          <TabControl.ContentTemplate>
-            <DataTemplate x:DataType="vm:StatementResultViewModel">
+          <TabControl Theme="{StaticResource DbxSubTabControl}" ItemContainerTheme="{StaticResource DbxSubTabItem}"
+                      ItemsSource="{Binding Results}" SelectedItem="{Binding SelectedResult}"
+                      IsVisible="{Binding !!Results.Count}">
+            <TabControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:StatementResultViewModel">
+                <StackPanel Orientation="Horizontal" Spacing="6" ToolTip.Tip="{Binding StatementText}">
+                  <PathIcon Classes="ok" Data="{StaticResource IconCheck}" Width="12" Height="12" IsVisible="{Binding !HasError}" />
+                  <PathIcon Classes="bad" Data="{StaticResource IconError}" Width="12" Height="12" IsVisible="{Binding HasError}" />
+                  <TextBlock Text="{Binding Header}" TextTrimming="CharacterEllipsis" MaxWidth="240" />
+                </StackPanel>
+              </DataTemplate>
+            </TabControl.ItemTemplate>
+            <TabControl.ContentTemplate>
+              <StaticResource ResourceKey="StatementResultContent" />
+            </TabControl.ContentTemplate>
+          </TabControl>
+        </Grid>
+
+        <ContentControl Content="{Binding GroupRun}" IsVisible="{Binding GroupRun, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <ContentControl.ContentTemplate>
+            <DataTemplate x:DataType="vm:GroupRunViewModel">
               <DockPanel>
-                <!-- Result line: "N rows · X ms" -->
-                <Border DockPanel.Dock="Bottom" Classes="toolbar" BorderThickness="0,1,0,0" Padding="10,4">
-                  <StackPanel Orientation="Horizontal" Spacing="10">
-                    <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center" />
-                    <Border Classes="badge warn" IsVisible="{Binding IsTruncated}">
-                      <StackPanel Orientation="Horizontal" Spacing="4">
-                        <PathIcon Data="{StaticResource IconWarning}" Width="10" Height="10" />
-                        <TextBlock Text="{Binding TruncatedNotice}" FontSize="11.5" />
-                      </StackPanel>
-                    </Border>
-                  </StackPanel>
-                </Border>
-                <Border DockPanel.Dock="Top" Classes="banner error" IsVisible="{Binding HasError}">
-                  <Grid ColumnDefinitions="Auto,*">
-                    <PathIcon Classes="bi" Data="{StaticResource IconError}" Margin="0,0,8,0" VerticalAlignment="Top" />
-                    <TextBlock Grid.Column="1" Text="{Binding Error}" TextWrapping="Wrap" FontFamily="{DynamicResource DbxMonoFont}" />
+                <!-- Status panel: one line per member (state icon, name, rows and time or error) with its own cancel -->
+                <Border DockPanel.Dock="Top" Classes="toolbar" Padding="8,4" IsVisible="{Binding !!Members.Count}">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <ItemsControl ItemsSource="{Binding Members}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:MemberStatusViewModel">
+                          <Border Classes="badge" Margin="0,2,6,2" ToolTip.Tip="{Binding StatusText}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <PathIcon Classes="dim" Data="{StaticResource IconSchedule}" Width="12" Height="12" IsVisible="{Binding IsPending}" />
+                              <PathIcon Classes="run" Data="{StaticResource IconRefresh}" Width="12" Height="12" IsVisible="{Binding IsRunning}" />
+                              <PathIcon Classes="ok" Data="{StaticResource IconCheck}" Width="12" Height="12" IsVisible="{Binding IsDone}" />
+                              <PathIcon Classes="bad" Data="{StaticResource IconError}" Width="12" Height="12" IsVisible="{Binding IsFailed}" />
+                              <PathIcon Classes="dim" Data="{StaticResource IconStop}" Width="12" Height="12" IsVisible="{Binding IsCancelled}" />
+                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
+                              <TextBlock Classes="dim" Text="{Binding StatusText}" FontSize="11.5" MaxWidth="260" TextTrimming="CharacterEllipsis"
+                                         VerticalAlignment="Center" />
+                              <Button Classes="close" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}"
+                                      Command="{Binding CancelCommand}" IsVisible="{Binding CanCancel}"
+                                      ToolTip.Tip="Cancel this database only" />
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Grid.Column="1" Theme="{StaticResource DbxToolButton}" Classes="stop" Tag="{StaticResource IconStop}"
+                            Content="Cancel all" Margin="8,0,0,0" VerticalAlignment="Top"
+                            Command="{Binding CancelAllCommand}" IsVisible="{Binding IsRunning}"
+                            ToolTip.Tip="Cancel the group run on every database (Ctrl+Break)" />
                   </Grid>
                 </Border>
-                <ItemsControl ItemsSource="{Binding Sets}" IsVisible="{Binding HasSets}">
-                  <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                      <UniformGrid Columns="1" />
-                    </ItemsPanelTemplate>
-                  </ItemsControl.ItemsPanel>
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:ResultSetViewModel">
-                      <views:ResultGrid Columns="{Binding Columns}" ItemsSource="{Binding Rows}" />
+                <!-- Notices: read-only refusal, members left out, no common columns, truncation, identical -->
+                <Border DockPanel.Dock="Top" Classes="banner warn" IsVisible="{Binding Notice, Converter={x:Static ObjectConverters.IsNotNull}}">
+                  <Grid ColumnDefinitions="Auto,*">
+                    <PathIcon Classes="bi" Data="{StaticResource IconWarning}" Margin="0,0,8,0" VerticalAlignment="Top" />
+                    <TextBlock Grid.Column="1" Text="{Binding Notice}" TextWrapping="Wrap" />
+                  </Grid>
+                </Border>
+                <TabControl Theme="{StaticResource DbxSubTabControl}" ItemContainerTheme="{StaticResource DbxSubTabItem}"
+                            ItemsSource="{Binding Tabs}" SelectedItem="{Binding SelectedTab}" IsVisible="{Binding HasResults}">
+                  <TabControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:GroupResultTab">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <PathIcon Classes="dim" Data="{StaticResource IconGroup}" Width="12" Height="12" IsVisible="{Binding IsAll}" />
+                        <PathIcon Classes="bad" Data="{StaticResource IconError}" Width="12" Height="12" IsVisible="{Binding HasError}" />
+                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" MaxWidth="200" />
+                      </StackPanel>
                     </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                  </TabControl.ItemTemplate>
+                  <TabControl.ContentTemplate>
+                    <DataTemplate x:DataType="vm:GroupResultTab">
+                      <Grid>
+                        <!-- All: the rows of every member with a leading Database column, or only the rows that differ -->
+                        <DockPanel IsVisible="{Binding IsAll}">
+                          <Border DockPanel.Dock="Top" Classes="toolbar" BorderThickness="0,0,0,1" Padding="10,2">
+                            <CheckBox Content="Differences only" IsChecked="{Binding Run.ShowDifferences}"
+                                      IsEnabled="{Binding Run.CanShowDifferences}"
+                                      ToolTip.Tip="Show only the rows that are not identical in all members, with the databases that have them" />
+                          </Border>
+                          <Border DockPanel.Dock="Bottom" Classes="toolbar" BorderThickness="0,1,0,0" Padding="10,4">
+                            <TextBlock Text="{Binding Run.AllStatus}" FontWeight="SemiBold" FontSize="12.5" />
+                          </Border>
+                          <views:ResultGrid Columns="{Binding Run.AllColumns}" ItemsSource="{Binding Run.AllRows}" />
+                        </DockPanel>
+                        <ContentControl Content="{Binding Member}" ContentTemplate="{StaticResource StatementResultContent}"
+                                        IsVisible="{Binding IsMember}" />
+                      </Grid>
+                    </DataTemplate>
+                  </TabControl.ContentTemplate>
+                </TabControl>
               </DockPanel>
             </DataTemplate>
-          </TabControl.ContentTemplate>
-        </TabControl>
+          </ContentControl.ContentTemplate>
+        </ContentControl>
       </Grid>
     </Grid>
   </DockPanel>

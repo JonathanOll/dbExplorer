@@ -139,14 +139,17 @@ public partial class ScriptTabView : UserControl
     {
         if (_vm is not { } vm) return;
         Func<Task>? action = null;
-        if (e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.Control) action = vm.RunStatementAsync;
-        else if (e.Key == Key.F5 && e.KeyModifiers == KeyModifiers.None) action = vm.RunScriptAsync;
-        else if (e.Key == Key.S && e.KeyModifiers == KeyModifiers.Control) action = () => vm.SaveAsync(null);
-        else if ((e.Key is Key.Cancel or Key.Pause) && e.KeyModifiers == KeyModifiers.Control)
+        switch (ScriptTabKeys.Resolve(e.Key, e.KeyModifiers))
         {
-            vm.Cancel();
-            e.Handled = true;
-            return;
+            case ScriptKeyAction.RunStatement: action = vm.RunStatementAsync; break;
+            case ScriptKeyAction.RunScript: action = vm.RunScriptAsync; break;
+            case ScriptKeyAction.RunStatementOnGroup: action = vm.RunStatementOnGroupAsync; break;
+            case ScriptKeyAction.RunScriptOnGroup: action = vm.RunScriptOnGroupAsync; break;
+            case ScriptKeyAction.Save: action = () => vm.SaveAsync(null); break;
+            case ScriptKeyAction.Cancel:
+                vm.Cancel();   // also cancels a group run
+                e.Handled = true;
+                return;
         }
         if (action is null) return;
 

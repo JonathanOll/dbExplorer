@@ -16,7 +16,8 @@ public sealed class ResultSetViewModel(IReadOnlyList<ResultColumn> columns, IRea
 /// <summary>What one executed statement of a script produced: its result sets, or its error, and the status line.</summary>
 public sealed class StatementResultViewModel
 {
-    public StatementResultViewModel(int index, StatementResult result, int maxRows)
+    /// <param name="title">Replaces the statement preview in <see cref="Header"/> (a group run names the member).</param>
+    public StatementResultViewModel(int index, StatementResult result, int maxRows, string? title = null)
     {
         Index = index;
         StatementText = result.Statement.Text;
@@ -33,7 +34,9 @@ public sealed class StatementResultViewModel
             : Sets.Count > 0
                 ? $"{Rows(Sets.Sum(s => (long)s.Rows.Count))} · {ms} ms"
                 : result.RowsAffected is { } affected ? $"{Rows(affected)} affected" : $"OK · {ms} ms";
-        Header = $"{(result.Error is null ? "" : "! ")}{index}: {Preview(StatementText)}";
+        Header = title is not null
+            ? $"{(result.Error is null ? "" : "! ")}{title}"
+            : $"{(result.Error is null ? "" : "! ")}{index}: {Preview(StatementText)}";
     }
 
     /// <summary>1-based position of the statement in the run.</summary>

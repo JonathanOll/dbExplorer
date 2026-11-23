@@ -76,8 +76,14 @@ deleted row red `#55B3261E` with strike-through, NULL dim italic.
 - **Secondary tabs** (Data / Structure, script results): `DbxSubTabControl` / `DbxSubTabItem`, underline style.
 - **Table tab**: banners, then the tab strip, then one toolbar (reload, paging, count | add, delete, save, revert | define key,
   read-only badge), the WHERE row, the grid. The grid header is a darker name band over a lighter filter band.
-- **Script tab**: toolbar (run, run all, cancel | row limit | open, save | connection badge), editor (per-theme syntax colours),
-  splitter, result tabs with a result line (`N rows · X ms`), error banners.
+- **Script tab**: toolbar (run, run all, cancel | run on group, script on group, only for a connection in a group | row limit |
+  open, save | connection badge), editor (per-theme syntax colours), splitter, result tabs with a result line (`N rows · X ms`),
+  error banners. Chords: `Ctrl+Enter` / `F5` run here, `Ctrl+Shift+Enter` / `Ctrl+Shift+F5` run on the group (`ScriptTabKeys`).
+- **Group run panel** (below the editor, replaces the result tabs while a group run is shown): a toolbar strip with one `badge` per
+  database (state icon: `IconSchedule` waiting, `IconRefresh` running, `IconCheck` done, `IconError` failed, `IconStop` cancelled;
+  name, rows and time or error, a close button that cancels that database) and "Cancel all"; a `banner warn` with the notices; then
+  secondary tabs: "All" (a "Differences only" check box, a read-only `ResultGrid` with a leading `Database` / `Present in` column,
+  a result line) and one tab per database (the same content as a statement result tab).
 - **Database selector** (`GroupSwitcher`, in table and script tabs): group icon, a group picker (only when the connection is in
   several groups), previous / next chevrons and a combo of the group's databases (engine icon, name, lock for read-only). Shown
   only when the tab's connection is in a group with other members: in the table tab as a toolbar strip above the banners, in the
@@ -102,7 +108,8 @@ Scenes: `empty`, `main-table`, `table-edit`, `table-structure`, `script`, `scrip
 `main-table-125` (1024x640 DIP, the 1280x800 window at 125 percent scaling), and for linked groups `groups-tree` (the Groups
 section of the navigator), `group-editor`, `group-editor-warning` (one member + a name clash: warning and error bands) and
 `group-schema-diff` (schema-difference report with an unreachable member), `group-switch-table` and `group-switch-script`
-(the database selector in a table and a script tab). The `group-*` scenes use a demo config with three
+(the database selector in a table and a script tab), `group-run` and `group-run-differences` (a read-only run of one statement on
+three databases: status panel and All / Differences). The `group-*` scenes use a demo config with three
 groups; the Group icon is `IconGroup` / `IconGroupAdd` in `Icons.axaml`. The navigator is 304 px wide by default (it holds one
 more toolbar button than the "before" images). The "before" images were made from the same tool
 at the previous UI (commit `024c5ff`, with the one grid fix of commit `a5d3399`, without which a second table tab showed no grid).

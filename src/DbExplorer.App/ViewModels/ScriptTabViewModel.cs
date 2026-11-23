@@ -154,32 +154,38 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     /// delimited by ';', GO lines and blank lines (<see cref="ScriptSplitter.StatementAtCaret"/>).
     /// </summary>
     [RelayCommand]
-    public Task RunStatementAsync()
+    public Task RunStatementAsync() => RunAsync(StatementsAtCaretOrSelection(Connection.Kind));
+
+    /// <summary>
+    /// The statements Ctrl+Enter runs: the selection when there is one, else the statement under the caret. Shared with the
+    /// group run (Ctrl+Shift+Enter), so both follow exactly the same rules.
+    /// </summary>
+    private IReadOnlyList<ScriptStatement> StatementsAtCaretOrSelection(DbKind kind)
     {
         var text = Text;
-        var kind = Connection.Kind;
         if (Selection is { } sel)
         {
             var start = Math.Clamp(Math.Min(sel.Start, sel.End), 0, text.Length);
             var end = Math.Clamp(Math.Max(sel.Start, sel.End), 0, text.Length);
-            if (end > start) return RunAsync(ScriptSplitter.Split(text[start..end], kind));
+            if (end > start) return ScriptSplitter.Split(text[start..end], kind);
         }
 
         // No selection: a blank line also ends a statement (T-SQL needs no ';'), so only the one under the caret runs.
         var at = ScriptSplitter.StatementAtCaret(text, kind, CaretOffset);
-        return RunAsync(at is null ? [] : [at]);
+        return at is null ? [] : [at];
     }
 
     /// <summary>F5: every statement of the script.</summary>
     [RelayCommand]
     public Task RunScriptAsync() => RunAsync(ScriptSplitter.Split(Text, Connection.Kind));
 
-    /// <summary>Cancels the running script (button or Ctrl+Break). Safe to call at any time.</summary>
+    /// <summary>Cancels the running script, or the running group run (button or Ctrl+Break). Safe to call at any time.</summary>
     [RelayCommand]
     public void Cancel()
     {
         try { _runCts?.Cancel(); }
         catch (ObjectDisposedException) { /* the run just finished */ }
+        CancelGroup();
     }
 
     private async Task RunAsync(IReadOnlyList<ScriptStatement> statements)
@@ -187,6 +193,11 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         if (IsRunning)
         {
             _status.Info("A script is already running — cancel it first.");
+            return;
+        }
+        if (IsGroupRunning)
+        {
+            _status.Info("A group run is in progress — cancel it first.");
             return;
         }
         if (IsSwitching)
@@ -201,6 +212,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         }
 
         IsRunning = true;   // set before the first await: the caller sees it at once
+        GroupRun = null;    // the results of this run replace those of a group run
         ErrorMessage = null;
         NeedsReconnect = false;
         Results.Clear();
@@ -409,6 +421,9 @@ public sealed partial class ScriptTabViewModel : TabViewModel
 
     protected override void ReportSwitchProblem(string message) => _status.Info(message);
 
+    protected override string? SwitchRefusal =>
+        IsGroupRunning ? "Cannot switch database while a group run is in progress — cancel it first." : null;
+
     /// <summary>
     /// Moves the script to another database of the group: the text and the results stay, the next run uses the new
     /// connection. The target is connected first (through the tree), so an unreachable member is reported now and the tab
@@ -446,7 +461,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel
             _status.Error(ErrorMessage);
             return false;
         }
-        if (_closed || IsRunning) return false;   // closed meanwhile (nothing may be created now) or a run slipped in
+        if (_closed || IsRunning || IsGroupRunning) return false;   // closed meanwhile (nothing may be created now) or a run slipped in
 
         var old = _script;
         _script = null;
@@ -704,6 +719,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     {
         DiscardPersisted(keepOpen: false);
         Cancel();
+        CloseGroupRun();
         _script?.Dispose();
         _script = null;
     }

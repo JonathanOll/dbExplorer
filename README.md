@@ -47,6 +47,18 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
   temp tables (`#t`), variables and `SET` options survive from one run to the next, and `ROLLBACK`/`COMMIT` in a later run
   works. It is released when the tab closes (a transaction still open is rolled back), on Disconnect, when the connection
   is edited, or when it is found broken; the next run then reconnects and the status bar says the session state was reset.
+- **Run on group** (script tab on a connection that is in a group): `Ctrl+Shift+Enter` (statement under the cursor / selection,
+  same rules as `Ctrl+Enter`) or `Ctrl+Shift+F5` (whole script), or the "Run on group" buttons, run the same text on every
+  database of the group in parallel (4 at a time), each on its own dedicated connection that lives only for that run. It is
+  **read-only for every database whatever its own flag says**: a write statement is refused for all ("Group runs are read-only; run
+  writes on one database at a time") and nothing is contacted. A status panel shows every database (waiting, running, done with rows
+  and time, failed with its error, cancelled) with a cancel button each and "Cancel all"; one unreachable or failing database never
+  blocks the others. Results: one tab per database plus **All** (the rows of every database with a leading `Database` column, merged
+  on the common columns) and a **Differences only** toggle (rows that are not identical in all databases, with the databases that
+  have them). Databases that failed, were cancelled or returned no columns are left out of All and Differences and named in a notice;
+  a result cut at the row limit says so, and warns that differences may then be false. For a whole script, All and Differences compare
+  the last statement that returned rows. An ordinary run, a database switch and a second group run are refused while a group run is
+  active.
 - **Safety**: nothing is written without an explicit save; passwords are stored encrypted with Windows DPAPI (current
   user); SQL Server connections expose `encrypt` and `trustServerCertificate`.
 - Light/dark theme follows Windows.
@@ -63,6 +75,8 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
 | `Ctrl+O` | anywhere | Open a script file in a script tab |
 | `Ctrl+Enter` | script tab | Run the statement under the cursor (ends at `;`, a `GO` line or a blank line) or the selection |
 | `F5` | script tab | Run the whole script; in a table tab: reload the data |
+| `Ctrl+Shift+Enter` | script tab on a connection in a group | Run the statement under the cursor / the selection on **every database of the group** (read-only, see Run on group) |
+| `Ctrl+Shift+F5` | script tab on a connection in a group | Run the whole script on every database of the group (read-only) |
 | `Ctrl+S` | script tab / table tab | Save the script to a file / review the SQL and apply staged edits |
 | `Ctrl+W` | anywhere | Close the active tab |
 | `Ctrl+Tab` | anywhere | Next tab |
@@ -72,7 +86,7 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
 | `Esc` | quick open overlay | Close the overlay |
 | `Esc` | table tab | Discard staged edits: specified in the design, **not wired yet** (use the Revert button; in a cell editor Esc cancels that edit) |
 | `Ctrl+0` | table grid, cell selected | Set the cell to NULL (staged) |
-| `Ctrl+Break` | script tab | Cancel the running query |
+| `Ctrl+Break` | script tab | Cancel the running query, or the running group run (all databases) |
 | `F2` | table grid | Edit the cell |
 
 ## Build, test, publish
