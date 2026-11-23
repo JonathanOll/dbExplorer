@@ -9,7 +9,10 @@ internal sealed class FakeDbConnection(int affected, Func<DbParameter>? paramete
 {
     private ConnectionState _state = ConnectionState.Open;
 
-    public List<FakeDbCommand> Commands { get; } = [];
+    private readonly List<FakeDbCommand> _commands = [];
+
+    /// <summary>A snapshot of the commands created so far: a pooled-thread ROLLBACK may still be adding while a test reads.</summary>
+    public List<FakeDbCommand> Commands { get { lock (_commands) return [.. _commands]; } }
     public bool Committed { get; set; }
     public bool RolledBack { get; set; }
     public int Affected { get; } = affected;
@@ -33,7 +36,7 @@ internal sealed class FakeDbConnection(int affected, Func<DbParameter>? paramete
     protected override DbCommand CreateDbCommand()
     {
         var cmd = new FakeDbCommand(this);
-        Commands.Add(cmd);
+        lock (_commands) _commands.Add(cmd);
         return cmd;
     }
 }
