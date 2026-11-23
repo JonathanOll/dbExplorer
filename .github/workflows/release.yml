@@ -51,6 +51,7 @@ jobs:
                   dotnet publish src/DbExplorer.App/DbExplorer.App.csproj \
                   -c Release \
                   -o publish \
+                  -r win-x64 \
                   --self-contained true
             
             - name: Zip
