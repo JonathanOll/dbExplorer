@@ -286,6 +286,34 @@ public class ReadOnlyGuardTests
     }
 
     [Theory]
+    [InlineData("pg_stat_reset_subscription_stats")]
+    [InlineData("pg_stat_reset_backend_stats")]
+    [InlineData("pg_copy_physical_replication_slot")]
+    [InlineData("pg_copy_logical_replication_slot")]
+    [InlineData("pg_logical_slot_get_changes")]
+    [InlineData("pg_logical_slot_get_binary_changes")]
+    public void Guard_MoreSideEffectFunctions_Refused(string function)
+    {
+        Assert.True(ReadOnlyGuard.IsWrite($"SELECT {function}(1)", DbKind.Postgres));
+        Assert.True(ReadOnlyGuard.IsWrite($"SELECT * FROM {function}('s', NULL, NULL)"));
+    }
+
+    [Theory]
+    [InlineData("SELECT * FROM pg_logical_slot_peek_changes('s', NULL, NULL)")]
+    [InlineData("SELECT * FROM pg_logical_slot_peek_binary_changes('s', NULL, NULL)")]
+    public void Guard_PeekingALogicalSlot_Allowed(string sql) => Assert.False(ReadOnlyGuard.IsWrite(sql, DbKind.Postgres));
+
+    [Theory]
+    [InlineData("SELECT pg_terminate_backend /*x*/ (1)")]
+    [InlineData("SELECT pg_terminate_backend -- x\n(1)")]
+    [InlineData("SELECT pg_terminate_backend\n  /* a */ -- b\n  (1)")]
+    public void Guard_CommentBetweenNameAndParenthesis_StillRefused(string sql)
+    {
+        Assert.True(ReadOnlyGuard.IsWrite(sql, DbKind.Postgres));
+        Assert.True(ReadOnlyGuard.IsWrite(sql));
+    }
+
+    [Theory]
     [InlineData("SELECT dblink FROM t", DbKind.Postgres)]
     [InlineData("SELECT 'pg_terminate_backend(1)'", DbKind.Postgres)]
     [InlineData("SELECT pid FROM pg_stat_activity", DbKind.Postgres)]

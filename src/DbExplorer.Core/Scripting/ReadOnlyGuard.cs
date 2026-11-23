@@ -41,7 +41,12 @@ public static class ReadOnlyGuard
         // PostgreSQL: server-side files, replication
         "lo_export", "pg_file_write", "pg_file_rename", "pg_file_unlink",
         "pg_drop_replication_slot", "pg_create_physical_replication_slot", "pg_create_logical_replication_slot",
-        "pg_replication_slot_advance", "pg_logical_emit_message",
+        "pg_replication_slot_advance", "pg_logical_emit_message", "pg_copy_physical_replication_slot",
+        "pg_copy_logical_replication_slot",
+        // PostgreSQL: consuming reads of a logical slot (they advance it); the _peek_ variants do not consume and stay allowed
+        "pg_logical_slot_get_changes", "pg_logical_slot_get_binary_changes",
+        // PostgreSQL 15+/17+: more statistics resets
+        "pg_stat_reset_subscription_stats", "pg_stat_reset_backend_stats",
         // SQL Server: linked servers / ad-hoc remote sources
         "OPENQUERY", "OPENROWSET", "OPENDATASOURCE",
     };

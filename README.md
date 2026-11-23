@@ -295,14 +295,14 @@ What was tried, and what was kept:
   row-returning statement (details in [Linked database groups](#linked-database-groups)).
 - A lexical guard that does not know functions with side effects: the read-only guard (ordinary read-only connections, the raw
   WHERE box and group runs) looks at tokens, not at what a function does. It refuses a fixed deny-list, matched by exact name
-  when followed by ( (schema-qualified and double-quoted forms included): PostgreSQL server control (pg_terminate_backend,
-  pg_cancel_backend, pg_reload_conf, pg_switch_wal, ...), statistics resets (pg_stat_reset*), session-level advisory
-  locks (pg_advisory_lock*, pg_try_advisory_lock*), dblink*, server-side files (lo_export, pg_file_*), replication slot
-  functions, and on SQL Server OPENQUERY / OPENROWSET / OPENDATASOURCE and NEXT VALUE FOR. Any other function with side
-  effects (a user-defined function that writes, 
-extval / setval, ...) is not detected; on PostgreSQL and SQLite the database's
-  own read-only context still refuses most of them, on SQL Server nothing but the rolled-back transaction does. Obfuscated
-  forms (dynamic SQL built inside a function, aliases, a function reached through a view) are an accepted gap.
+  when followed by `(` (schema-qualified, double-quoted and comment-separated forms included): PostgreSQL server control
+  (`pg_terminate_backend`, `pg_cancel_backend`, `pg_reload_conf`, `pg_switch_wal`, ...), statistics resets (`pg_stat_reset*`),
+  session-level advisory locks (`pg_advisory_lock*`, `pg_try_advisory_lock*`), `dblink*`, server-side files (`lo_export`,
+  `pg_file_*`), replication slot functions, and on SQL Server `OPENQUERY` / `OPENROWSET` / `OPENDATASOURCE` and `NEXT VALUE FOR`.
+  Any other function with side effects (a user-defined function that writes, `nextval` / `setval`, ...) is not detected; on
+  PostgreSQL and SQLite the database's own read-only context still refuses most of them, on SQL Server nothing but the
+  rolled-back transaction does. Obfuscated forms (dynamic SQL built inside a function, aliases, a function reached through a
+  view) are an accepted gap.
 - No background schema refresh: the schema and the metadata cache behind `Ctrl+Shift+P` are reloaded when a connection is
   (re)opened or on the tree's Refresh action, never while a connection just stays open.
 - SQL Server read-only mode is a statement guard plus a rolled-back transaction, not a database-enforced read-only session.
