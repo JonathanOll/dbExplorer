@@ -50,7 +50,8 @@ jobs:
               run: |
                   dotnet publish src/DbExplorer.App/DbExplorer.App.csproj \
                   -c Release \
-                  -o publish
+                  -o publish \
+                  --self-contained true
             
             - name: Zip
               run: |
