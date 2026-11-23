@@ -1,3 +1,2 @@
 next-version: 1.0.0
-workflow: GithubFlow/v1
 mode: ContinuousDeployment
