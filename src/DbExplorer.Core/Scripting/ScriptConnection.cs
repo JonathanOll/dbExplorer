@@ -63,10 +63,14 @@ public sealed class ScriptConnection : IDisposable
 
     /// <summary>
     /// Best-effort: true when the held connection has a transaction left open by the user's script (so releasing the
-    /// connection will roll it back). Probes with one cheap round trip, never while a run is active and never changing state:
-    /// SQL Server reads <c>@@TRANCOUNT</c>, PostgreSQL compares <c>now()</c> (transaction start) with <c>statement_timestamp()</c>,
-    /// SQLite tries a <c>BEGIN</c> (refused inside a transaction) and rolls it straight back. False when there is no usable
-    /// connection or the probe fails (e.g. a PostgreSQL transaction already aborted): the answer only feeds a status message.
+    /// connection will roll it back). Never changes state and never runs while a script is active (it holds the same
+    /// "running" guard as a run, so a concurrent <see cref="Dispose"/> waits for it to finish before dropping the connection).
+    /// SQL Server reads <c>@@TRANCOUNT</c>. PostgreSQL sends two separate <c>SELECT now()</c> commands: inside a transaction
+    /// both return the transaction's start time (equal), in autocommit each statement is its own transaction (different);
+    /// <c>statement_timestamp()</c> cannot be used, it moves at Bind/Execute under the extended protocol. SQLite tries a
+    /// <c>BEGIN</c> (refused inside a transaction) and rolls it straight back. The failure mode is a false negative: false when
+    /// there is no usable connection, the probe fails (e.g. a PostgreSQL transaction already aborted) or the answer is unclear.
+    /// The answer only feeds a status message.
     /// </summary>
     public async Task<bool> HasOpenTransactionAsync()
     {
@@ -74,34 +78,52 @@ public sealed class ScriptConnection : IDisposable
         lock (_gate)
         {
             if (_disposed || _running) return false;
-            connection = _connection;
+            if (_connection is not { State: ConnectionState.Open } held) return false;
+            connection = held;
+            _running = true;   // a run now throws "already running" (the tab refuses runs while it switches) and Dispose defers the drop
         }
-        if (connection is not { State: ConnectionState.Open }) return false;
 
         try
         {
-            await using var cmd = connection.CreateCommand();
-            cmd.CommandTimeout = 5;
-            switch (Session.Driver.Kind)
-            {
-                case Model.DbKind.SqlServer:
-                    cmd.CommandText = "SELECT @@TRANCOUNT";
-                    return Convert.ToInt32(await cmd.ExecuteScalarAsync().ConfigureAwait(false)) > 0;
-                case Model.DbKind.Postgres:
-                    cmd.CommandText = "SELECT now() <> statement_timestamp()";
-                    return await cmd.ExecuteScalarAsync().ConfigureAwait(false) is true;
-                default:
-                    cmd.CommandText = "BEGIN";
-                    try { await cmd.ExecuteNonQueryAsync().ConfigureAwait(false); }
-                    catch (Exception) { return true; }   // "cannot start a transaction within a transaction"
-                    cmd.CommandText = "ROLLBACK";
-                    await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
-                    return false;
-            }
+            return await ProbeTransactionAsync(connection).ConfigureAwait(false);
         }
         catch (Exception)
         {
             return false;
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                _running = false;
+                if (_disposed || _connection is { State: not ConnectionState.Open }) DropConnection();
+            }
+        }
+    }
+
+    private async Task<bool> ProbeTransactionAsync(DbConnection connection)
+    {
+        await using var cmd = connection.CreateCommand();
+        cmd.CommandTimeout = 5;
+        switch (Session.Driver.Kind)
+        {
+            case Model.DbKind.SqlServer:
+                cmd.CommandText = "SELECT @@TRANCOUNT";
+                return Convert.ToInt32(await cmd.ExecuteScalarAsync().ConfigureAwait(false)) > 0;
+            case Model.DbKind.Postgres:
+            {
+                cmd.CommandText = "SELECT now()";
+                var first = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
+                var second = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
+                return first is not null and not DBNull && first.Equals(second);
+            }
+            default:
+                cmd.CommandText = "BEGIN";
+                try { await cmd.ExecuteNonQueryAsync().ConfigureAwait(false); }
+                catch (Exception e) { return e.Message.Contains("within a transaction", StringComparison.OrdinalIgnoreCase); }
+                cmd.CommandText = "ROLLBACK";
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                return false;
         }
     }
 

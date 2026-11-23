@@ -13,6 +13,8 @@ internal sealed class FakeDbConnection(int affected, Func<DbParameter>? paramete
 
     /// <summary>A snapshot of the commands created so far: a pooled-thread ROLLBACK may still be adding while a test reads.</summary>
     public List<FakeDbCommand> Commands { get { lock (_commands) return [.. _commands]; } }
+    /// <summary>What ExecuteScalar returns for a command text (null when unset).</summary>
+    public Func<string, object?>? Scalars { get; set; }
     public bool Committed { get; set; }
     public bool RolledBack { get; set; }
     public int Affected { get; } = affected;
@@ -64,7 +66,7 @@ internal sealed class FakeDbCommand(FakeDbConnection connection) : DbCommand
     protected override DbTransaction? DbTransaction { get; set; }
     public override void Cancel() { }
     public override int ExecuteNonQuery() => connection.Affected;
-    public override object? ExecuteScalar() => null;
+    public override object? ExecuteScalar() => connection.Scalars?.Invoke(CommandText);
     public override void Prepare() { }
     protected override DbParameter CreateDbParameter() => connection.ParameterFactory();
     protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior) => throw new NotSupportedException();
