@@ -21,6 +21,7 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
 
 - **Connection tree**: folders (one level) > connection > schema > table/view (SQLite has no schema level). Several
   connections stay connected at once, one session each. Drag a connection into a folder; add, rename, edit, delete.
+  A **Groups** section at the top lists the linked database groups (see below).
 - **Import from DBeaver**: folders, connections, credentials and virtual keys (see below).
 - **Table tabs**, labelled `connection · table` with a colour chip per connection, each with two sub-tabs:
   - **Data**: pages of 200 rows (OFFSET paging), total row count only on demand (Count button), column sort,
@@ -47,21 +48,91 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
   temp tables (`#t`), variables and `SET` options survive from one run to the next, and `ROLLBACK`/`COMMIT` in a later run
   works. It is released when the tab closes (a transaction still open is rolled back), on Disconnect, when the connection
   is edited, or when it is found broken; the next run then reconnects and the status bar says the session state was reset.
-- **Run on group** (script tab on a connection that is in a group): `Ctrl+Shift+Enter` (statement under the cursor / selection,
-  same rules as `Ctrl+Enter`) or `Ctrl+Shift+F5` (whole script), or the "Run on group" buttons, run the same text on every
-  database of the group in parallel (4 at a time), each on its own dedicated connection that lives only for that run. It is
-  **read-only for every database whatever its own flag says**: a write statement is refused for all ("Group runs are read-only; run
-  writes on one database at a time") and nothing is contacted. A status panel shows every database (waiting, running, done with rows
-  and time, failed with its error, cancelled) with a cancel button each and "Cancel all"; one unreachable or failing database never
-  blocks the others. Results: one tab per database plus **All** (the rows of every database with a leading `Database` column, merged
-  on the common columns) and a **Differences only** toggle (rows that are not identical in all databases, with the databases that
-  have them). Databases that failed, were cancelled or returned no columns are left out of All and Differences and named in a notice;
-  a result cut at the row limit says so, and warns that differences may then be false. For a whole script, All and Differences compare
-  the last statement that returned rows. An ordinary run, a database switch and a second group run are refused while a group run is
-  active.
+- **Linked database groups**: link databases that share one schema (dev, preprod, customer copies) into a named group, switch
+  a tab between them with one key press, run the same read-only query on all of them at once and see where the results
+  differ, or compare their schemas. Details, shortcuts and limits: [Linked database groups](#linked-database-groups).
 - **Safety**: nothing is written without an explicit save; passwords are stored encrypted with Windows DPAPI (current
   user); SQL Server connections expose `encrypt` and `trustServerCertificate`.
 - Light/dark theme follows Windows.
+
+## Linked database groups
+
+A **group** is a named, ordered list of connections that have the same schema and the **same engine** (all PostgreSQL, all SQL
+Server or all SQLite). It only references connections: credentials and the read-only flag stay on each connection, a
+connection can be in several groups, and deleting a connection removes it from its groups. Groups are stored in `config.json`
+(an older file without groups loads unchanged).
+
+**In the navigator.** The **Groups** section (it appears once a group exists) lists each group with its engine and member
+count; a group expands to its members, which are shortcuts to the real connections (double-click connects one). Create a group
+with the **New group** button of the navigator toolbar or from a group's menu; a connection's menu has **Add to group...**
+(one of the groups it could join, or a new group started with it). A group's menu: **Check schema differences**, **Edit
+group...**, **Rename...**, **Delete group** (the connections are kept) and **New group...**; a member's menu: **Connect** and
+**Remove from group**.
+
+**Group editor.** A name plus two lists: the available connections and the members in order (add, remove, move up / down;
+double-click moves an entry). The first member fixes the engine, and only connections of that engine are offered afterwards.
+Saving is refused for an empty or duplicate name. A group with fewer than two members can be saved (a banner says it needs two
+to switch or compare); it just has no selector and no run on group.
+
+**Schema-difference report** (group menu, **Check schema differences**). Connects to every member (4 at a time, with the
+status-bar spinner and Cancel), reads their schemas and shows, for each database against the rest of the group: missing and
+extra tables / views, missing and extra columns, columns whose data type differs, and an object that is a table in some
+databases and a view in others. Indexes, keys and constraints are not compared. A database that cannot be reached is listed
+in the report and never stops the others. Informational only; the connections it opened stay open in the navigator.
+
+**Switching a tab between members.** A table or script tab whose connection is in a group with other members shows a database
+selector (group icon, previous / next chevrons and a list of the group's databases; a group picker too when the connection is
+in several groups). `Ctrl+Alt+PageDown` / `Ctrl+Alt+PageUp` move to the next / previous database of the group, wrapping around.
+
+- A **table tab** reloads the same table on the other database with the same filters, raw `WHERE` and sort, from page 0.
+  Pending edits go through the usual Save / Discard / Cancel question first. If the other database cannot be reached or has no
+  such table, an error strip says so and the tab stays exactly as it was.
+- A **script tab** keeps its text and its results; the next run uses the other database. Its own dedicated connection to the
+  old database is released at the switch, so a transaction left open there is rolled back (as when the tab closes).
+- A switch is refused while a script or a group run is running in that tab.
+
+**Run on group** (script tab on a connection that is in a group; the "Run on group" and "Script on group" buttons only show
+then). `Ctrl+Shift+Enter` runs the selection or the statement under the cursor (same rules as `Ctrl+Enter`), `Ctrl+Shift+F5`
+the whole script, on every database of the group at the same time (4 at a time, not configurable), with the tab's row limit
+applied per database. A status panel lists every database as waiting, running, done (rows and time), failed (with its error)
+or cancelled, with a Cancel button on each line and **Cancel all** (`Ctrl+Break` too). One slow, unreachable or failing
+database never blocks the others. The results:
+
+- **All**: the rows of every database in one grid with a leading `Database` column, merged on the columns that all databases
+  have (a notice names the columns that were left out).
+- **Differences only** (check box on the All tab): only the rows that are not identical in every database, with a leading
+  `Present in` column naming the databases that have the row (`name×2` when a database has it twice). Rows are compared on all
+  their values, NULLs included; numbers, dates and GUIDs are compared by value across engines.
+- **One tab per database**: that database's own result grid (or its error) for the compared statement.
+- A database that failed, was cancelled or returned no columns is left out of All and Differences and named in a notice. A
+  result cut at the row limit says so, and warns that the differences may then be false.
+
+**Read-only guarantee.** A group run is read and compare only. Every statement goes through the engine-aware read-only guard
+and every database runs in a read-only context, **whatever the read-only flag of each connection says**: a connection that is
+editable on its own is still read-only in a group run. It is exactly as strong as the read-only mode of an ordinary connection
+(see Known limitations: a lexical guard that does not know functions with side effects, plus a database-enforced read-only
+context on PostgreSQL and SQLite and a rolled-back transaction on SQL Server). A write statement (or anything the guard cannot prove to be a read)
+refuses the whole run for all databases with "Group runs are read-only; run writes on one database at a time". This check
+runs first, before the app starts resolving any member's session, and the runner repeats it as its own guard before it opens
+a connection. Other refusals are reported the same way: an empty script, or a run, a switch or a reconnect already in
+progress, are also caught before any session is touched; a group whose databases are of different engines (only possible
+with a hand-edited `config.json`) is refused by the runner, after the app has started resolving the members' sessions
+(connecting the ones that are not connected in the navigator) but before any group connection is opened or any statement runs.
+
+**Limitations.**
+
+- Groups are same-engine only (enforced when editing a group). Changing the engine of a connection that is in a group is
+  refused: remove it from its groups first.
+- The fan-out is read-only: no write, DDL or migration on several databases at once, no data sync, no row-level table diff.
+- Each group run opens **one fresh dedicated connection per database** and closes it when that database is done. It never
+  uses the script tab's own connection, so a `BEGIN TRAN` or a temp table of an ordinary run is neither seen nor disturbed.
+- There is **no automatic timeout** on a statement: a slow query keeps running until it ends or you cancel it (the line's
+  Cancel button, or Cancel all). Only connecting gives up on its own (10 s on PostgreSQL and SQL Server).
+- For a whole script (`Ctrl+Shift+F5`), All and Differences compare only the **last statement that returned rows**, and the
+  per-database tabs show only that same statement (a notice says which of the N statements it is). To compare another
+  statement, run it alone with `Ctrl+Shift+Enter`.
+- While a group run is active, an ordinary run, a database switch and a second group run are refused in that tab.
+- Results are kept in memory: the row limit applies per database (default 1000, up to 100 000).
 
 ## Keyboard shortcuts
 
@@ -75,14 +146,14 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
 | `Ctrl+O` | anywhere | Open a script file in a script tab |
 | `Ctrl+Enter` | script tab | Run the statement under the cursor (ends at `;`, a `GO` line or a blank line) or the selection |
 | `F5` | script tab | Run the whole script; in a table tab: reload the data |
-| `Ctrl+Shift+Enter` | script tab on a connection in a group | Run the statement under the cursor / the selection on **every database of the group** (read-only, see Run on group) |
+| `Ctrl+Shift+Enter` | script tab on a connection in a group | Run the statement under the cursor / the selection on **every database of the group** (read-only, see [Linked database groups](#linked-database-groups)); in a script tab that is not in a group the status bar only says so (no ordinary run) |
 | `Ctrl+Shift+F5` | script tab on a connection in a group | Run the whole script on every database of the group (read-only) |
 | `Ctrl+S` | script tab / table tab | Save the script to a file / review the SQL and apply staged edits |
 | `Ctrl+W` | anywhere | Close the active tab |
 | `Ctrl+Tab` | anywhere | Next tab |
 | `Ctrl+Shift+Tab` | anywhere | Previous tab |
 | `Ctrl+Alt+PageDown` | table / script tab on a connection in a group | Switch the tab to the next database of the group (wraps around) |
-| `Ctrl+Alt+PageUp` | table / script tab on a connection in a group | Switch the tab to the previous database of the group |
+| `Ctrl+Alt+PageUp` | table / script tab on a connection in a group | Switch the tab to the previous database of the group (wraps around; with several groups, the group picked in the selector) |
 | `Esc` | quick open overlay | Close the overlay |
 | `Esc` | table tab | Discard staged edits: specified in the design, **not wired yet** (use the Revert button; in a cell editor Esc cancels that edit) |
 | `Ctrl+0` | table grid, cell selected | Set the cell to NULL (staged) |
@@ -96,7 +167,7 @@ Requirements: Windows 10/11, the .NET 10 SDK, and PowerShell 7 (`pwsh`) to run `
 
 ```powershell
 dotnet build DbExplorer.sln -c Release
-dotnet test  DbExplorer.sln                 # 750+ tests; DB integration tests are skipped unless configured, see below
+dotnet test  DbExplorer.sln                 # 980+ tests; DB integration tests are skipped unless configured, see below
 dotnet run --project src/DbExplorer.App -c Release
 ```
 
@@ -117,7 +188,7 @@ Everything lives in `%APPDATA%\dbExplorer`:
 
 | Path | Content |
 | --- | --- |
-| `config.json` | folders, connections (passwords DPAPI-encrypted for the current Windows user), virtual keys |
+| `config.json` | folders, connections (passwords DPAPI-encrypted for the current Windows user), virtual keys, linked groups |
 | `cache\` | per-connection metadata cache (schema/table/column names) used by `Ctrl+Shift+P` |
 | `scripts\` | unsaved script tabs, restored at the next start |
 | `window.json` | size, position and maximised state of the main window |
@@ -211,11 +282,17 @@ What was tried, and what was kept:
   font or `WithInterFont` (the system font is used).
 - **Provider assemblies:** Npgsql and Microsoft.Data.SqlClient are not loaded at startup (checked from the loaded-assembly
   list); they load on the first connection of that kind.
+- **Linked groups, reopen-closed-tab and fuzzy search: nothing runs before the first paint.** Groups are a few lines of the
+  small `config.json` read on the worker thread; the Groups section of the tree is built in memory from it (no I/O, no
+  database), and the run, switch, schema-check, reopen and quick-open code only runs on a command. A/B of the published exe
+  against the build before this work, interleaved on the same (noisier than above) machine: 316 / 318 ms vs 303 / 323 ms.
 - **Trimming / single-file: not used** (Avalonia bindings and the providers use reflection, and it did not look necessary).
 
 ## Known limitations
 
 - Large object columns (text, binary) are fully materialised for each 200-row page.
+- Linked groups: same-engine only, read-only fan-out, no automatic statement timeout, whole-script runs compare only the last
+  row-returning statement (details in [Linked database groups](#linked-database-groups)).
 - No background schema refresh: the schema and the metadata cache behind `Ctrl+Shift+P` are reloaded when a connection is
   (re)opened or on the tree's Refresh action, never while a connection just stays open.
 - SQL Server read-only mode is a statement guard plus a rolled-back transaction, not a database-enforced read-only session.
