@@ -72,7 +72,9 @@ public class SessionManager(
                 stale = existing;
             }
 
-            if (_pending.TryGetValue(c.Id, out attempt) && (!SameTarget(attempt.Config, c) || attempt.Cts.IsCancellationRequested))
+            // A completed attempt still listed here is stale: a connect that failed fast can finish before its
+            // removal continuation ran (it found nothing to remove). Joining it would rethrow the old failure forever.
+            if (_pending.TryGetValue(c.Id, out attempt) && (!SameTarget(attempt.Config, c) || attempt.Cts.IsCancellationRequested || attempt.Task.IsCompleted))
             {
                 attempt.Cts.Cancel();
                 _pending.Remove(c.Id);
