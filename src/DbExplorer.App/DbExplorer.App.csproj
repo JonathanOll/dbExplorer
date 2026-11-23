@@ -38,6 +38,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="UiShots" />
+    <InternalsVisibleTo Include="DbExplorer.App.Tests" />
   </ItemGroup>
 
   <ItemGroup>

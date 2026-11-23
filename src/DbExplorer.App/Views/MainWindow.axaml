@@ -371,7 +371,7 @@
               <Border BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
                 <StackPanel Spacing="8">
                   <TextBlock Classes="section" Text="KEYBOARD SHORTCUTS" Margin="0" />
-                  <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="7" ColumnSpacing="10">
+                  <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="7" ColumnSpacing="10">
                     <Border Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Shift+T" /></Border>
                     <TextBlock Grid.Column="1" Classes="dim" Text="table in any connection" VerticalAlignment="Center" />
                     <Border Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+L" /></Border>
@@ -401,6 +401,11 @@
                     <TextBlock Grid.Row="5" Grid.Column="1" Classes="dim" Text="next database of the group" VerticalAlignment="Center" />
                     <Border Grid.Row="5" Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Alt+PgUp" /></Border>
                     <TextBlock Grid.Row="5" Grid.Column="3" Classes="dim" Text="previous database" VerticalAlignment="Center" />
+
+                    <Border Grid.Row="6" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Shift+Enter" /></Border>
+                    <TextBlock Grid.Row="6" Grid.Column="1" Classes="dim" Text="run on the whole group" VerticalAlignment="Center" />
+                    <Border Grid.Row="6" Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Shift+F5" /></Border>
+                    <TextBlock Grid.Row="6" Grid.Column="3" Classes="dim" Text="script on the group" VerticalAlignment="Center" />
                   </Grid>
                 </StackPanel>
               </Border>

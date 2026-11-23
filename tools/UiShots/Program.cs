@@ -230,7 +230,7 @@ internal sealed class Demo : IDisposable
     public IEnumerable<ConnectionNodeViewModel> AllConnectionNodes() =>
         Tree.Nodes.SelectMany(n => n is FolderNodeViewModel f ? f.Children : [n]).OfType<ConnectionNodeViewModel>();
 
-    private static void Exec(string file, string sql)
+    public static void Exec(string file, string sql)
     {
         using var c = new SqliteConnection($"Data Source={file};Pooling=False");
         c.Open();
@@ -313,6 +313,8 @@ internal static class Scenes
         ("group-schema-diff", GroupSchemaDiff),
         ("group-switch-table", GroupSwitchTable),
         ("group-switch-script", GroupSwitchScript),
+        ("group-run", GroupRun),
+        ("group-run-differences", GroupRunDifferences),
     ];
 
     private static string Theme = "light";
@@ -595,6 +597,32 @@ internal static class Scenes
         await Settle();
         return null;
     }
+
+    // Run on group: the same SELECT on three databases (Scratch, Notes and a freshly made archive); Notes has one more column.
+    private static Task<Window?> GroupRun(Demo d) => GroupRunCore(d, differences: false);
+
+    private static async Task<Window?> GroupRunCore(Demo d, bool differences)
+    {
+        Demo.Exec(Path.Combine(d.Dir, "archive.db"), """
+            CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT, body TEXT);
+            INSERT INTO notes VALUES (1, 'todo', 'write the report'), (2, 'ideas', 'ship it'), (3, 'old', 'archived');
+            """);
+        Demo.Exec(Path.Combine(d.Dir, "notes.db"), """
+            INSERT INTO notes VALUES (1, 'todo', 'write the report', 0), (2, 'ideas', NULL, 1), (4, 'new', 'fresh', 0);
+            """);
+        await Open(d);
+        d.Tree.SelectedNode = d.AllConnectionNodes().First(n => n.Config == d.Scratch);
+        var script = d.Main.NewScript()!;
+        script.Text = "SELECT id, title, body FROM notes ORDER BY id;";
+        d.Window.Show();
+        Pump();
+        await script.RunStatementOnGroupAsync();
+        if (differences) script.GroupRun!.ShowDifferences = true;
+        await Settle();
+        return null;
+    }
+
+    private static Task<Window?> GroupRunDifferences(Demo d) => GroupRunCore(d, differences: true);
 
     private static async Task<Window?> ConfirmDialog(Demo d)
     {
