@@ -140,6 +140,57 @@ public class ConfigStoreTests : IDisposable
     }
 
     [Fact]
+    public void Load_OldConfigWithoutGroups_HasEmptyGroups()
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(ConfigPath, """{ "Folders": ["A"], "Connections": [], "VirtualKeys": {} }""");
+        var store = new ConfigStore(ConfigPath, new ReversingProtector());
+
+        var result = store.LoadOrRecover();
+
+        Assert.Null(result.Warning);
+        Assert.NotNull(result.Config.Groups);
+        Assert.Empty(result.Config.Groups);
+        Assert.Equal(new[] { "A" }, result.Config.Folders);
+    }
+
+    [Theory]
+    [InlineData("""{ "Folders": [], "Connections": [], "VirtualKeys": {}, "Groups": null }""")]
+    [InlineData("""{ "Folders": [], "Connections": [], "VirtualKeys": {}, "Groups": [null] }""")]
+    public void LoadOrRecover_NullGroups_AreTreatedAsCorrupt(string json)
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(ConfigPath, json);
+        var store = new ConfigStore(ConfigPath, new ReversingProtector());
+
+        var result = store.LoadOrRecover();
+
+        Assert.NotNull(result.Warning);
+        Assert.Single(Directory.GetFiles(_dir, "config.json.bad-*"));
+    }
+
+    [Fact]
+    public void SaveThenLoad_RoundTripsGroups()
+    {
+        var store = new ConfigStore(ConfigPath, new ReversingProtector());
+        var c1 = Guid.NewGuid();
+        var c2 = Guid.NewGuid();
+        var gid = Guid.NewGuid();
+        var config = new AppConfig(new(), new(), new())
+        {
+            Groups = new() { new ConnectionGroup(gid, "Tenants", new() { c1, c2 }) }
+        };
+
+        store.Save(config);
+        var loaded = store.Load();
+
+        var g = Assert.Single(loaded.Groups);
+        Assert.Equal(gid, g.Id);
+        Assert.Equal("Tenants", g.Name);
+        Assert.Equal(new[] { c1, c2 }, g.ConnectionIds);
+    }
+
+    [Fact]
     [SupportedOSPlatform("windows")]
     public void DpapiProtector_RoundTrips()
     {

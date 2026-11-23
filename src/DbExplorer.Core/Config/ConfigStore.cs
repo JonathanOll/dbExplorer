@@ -26,8 +26,15 @@ public class ConfigStore(string path, ISecretProtector protector)
         var config = JsonSerializer.Deserialize<AppConfig>(json, Options);
         if (config is null) return AppConfig.Empty();
         // A hand-edited file may contain explicit nulls, which the record constructor does not reject.
-        var normalized = new AppConfig(config.Folders ?? new(), config.Connections ?? new(), config.VirtualKeys ?? new());
-        if (normalized.Folders.Any(f => f is null)
+        // An explicit "Groups": null is treated as corrupt (a missing property keeps the init default).
+        if (config.Groups is null)
+            throw new JsonException("The config contains null entries.");
+        var normalized = new AppConfig(config.Folders ?? new(), config.Connections ?? new(), config.VirtualKeys ?? new())
+        {
+            Groups = config.Groups
+        };
+        if (normalized.Groups.Any(g => g is null || g.Name is null || g.ConnectionIds is null)
+            || normalized.Folders.Any(f => f is null)
             || normalized.Connections.Any(c => c is null || c.Name is null || c.Database is null)
             || normalized.VirtualKeys.Values.Any(v => v is null))
             throw new JsonException("The config contains null entries.");
