@@ -250,10 +250,25 @@ public partial class MainWindow : Window
     }
 
     private void OnTreeDragOver(object? sender, DragEventArgs e) =>
-        e.DragEffects = e.DataTransfer.Contains(ConnectionFormat) ? DragDropEffects.Move : DragDropEffects.None;
+        e.DragEffects = e.DataTransfer.Contains(ConnectionFormat) && !IsInGroupsSection(e.Source) ? DragDropEffects.Move : DragDropEffects.None;
+
+    /// <summary>True over the Groups section (header, group or member): a drop there must not move the connection to the root.</summary>
+    private static bool IsInGroupsSection(object? source)
+    {
+        for (var item = (source as Visual)?.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+             item is not null;
+             item = item.FindAncestorOfType<TreeViewItem>())
+            if (item.DataContext is GroupsSectionNodeViewModel or GroupNodeViewModel or GroupMemberNodeViewModel) return true;
+        return false;
+    }
 
     private void OnTreeDrop(object? sender, DragEventArgs e)
     {
+        if (IsInGroupsSection(e.Source))
+        {
+            e.Handled = true;
+            return;
+        }
         if (Tree is not { } tree || e.DataTransfer.TryGetValue(ConnectionFormat) is not { } text || !Guid.TryParse(text, out var id)) return;
         var connection = tree.Config.Connections.FirstOrDefault(c => c.Id == id);
         if (connection is null) return;

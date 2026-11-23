@@ -302,7 +302,7 @@ public class GroupTreeTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteGroup_Persists_AfterConfirmation()
+    public async Task DeleteGroup_Persists()
     {
         var a = Conn("A");
         var g1 = Group("One", a);
