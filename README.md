@@ -86,7 +86,7 @@ in several groups). `Ctrl+Alt+PageDown` / `Ctrl+Alt+PageUp` move to the next / p
 
 - A **table tab** reloads the same table on the other database with the same filters, raw `WHERE` and sort, from page 0.
   Pending edits go through the usual Save / Discard / Cancel question first. If the other database cannot be reached or has no
-  such table, an error strip says so and the tab stays exactly as it was.
+  such table, an error strip says so and the tab stays exactly as it was (edits you chose to discard stay discarded).
 - A **script tab** keeps its text and its results; the next run uses the other database. Its own dedicated connection to the
   old database is released at the switch, so a transaction left open there is rolled back (as when the tab closes).
 - A switch is refused while a script or a group run is running in that tab.
@@ -293,6 +293,16 @@ What was tried, and what was kept:
 - Large object columns (text, binary) are fully materialised for each 200-row page.
 - Linked groups: same-engine only, read-only fan-out, no automatic statement timeout, whole-script runs compare only the last
   row-returning statement (details in [Linked database groups](#linked-database-groups)).
+- A lexical guard that does not know functions with side effects: the read-only guard (ordinary read-only connections, the raw
+  WHERE box and group runs) looks at tokens, not at what a function does. It refuses a fixed deny-list, matched by exact name
+  when followed by ( (schema-qualified and double-quoted forms included): PostgreSQL server control (pg_terminate_backend,
+  pg_cancel_backend, pg_reload_conf, pg_switch_wal, ...), statistics resets (pg_stat_reset*), session-level advisory
+  locks (pg_advisory_lock*, pg_try_advisory_lock*), dblink*, server-side files (lo_export, pg_file_*), replication slot
+  functions, and on SQL Server OPENQUERY / OPENROWSET / OPENDATASOURCE and NEXT VALUE FOR. Any other function with side
+  effects (a user-defined function that writes, 
+extval / setval, ...) is not detected; on PostgreSQL and SQLite the database's
+  own read-only context still refuses most of them, on SQL Server nothing but the rolled-back transaction does. Obfuscated
+  forms (dynamic SQL built inside a function, aliases, a function reached through a view) are an accepted gap.
 - No background schema refresh: the schema and the metadata cache behind `Ctrl+Shift+P` are reloaded when a connection is
   (re)opened or on the tree's Refresh action, never while a connection just stays open.
 - SQL Server read-only mode is a statement guard plus a rolled-back transaction, not a database-enforced read-only session.
