@@ -100,7 +100,7 @@
 
       <Grid>
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="280" MinWidth="190" MaxWidth="560" />
+          <ColumnDefinition Width="304" MinWidth="190" MaxWidth="560" />
           <ColumnDefinition Width="5" />
           <ColumnDefinition Width="*" MinWidth="320" />
         </Grid.ColumnDefinitions>
@@ -112,7 +112,7 @@
               <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
                   <PathIcon Classes="dim" Data="{StaticResource IconDatabase}" />
-                  <TextBlock Text="CONNECTIONS" FontSize="11.5" FontWeight="SemiBold" LetterSpacing="0.5"
+                  <TextBlock Text="CONNECTIONS" FontSize="11.5" FontWeight="SemiBold" LetterSpacing="0.5" TextTrimming="CharacterEllipsis"
                              Foreground="{DynamicResource DbxTextDim}" VerticalAlignment="Center" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="1" VerticalAlignment="Center">
@@ -120,6 +120,8 @@
                           MinWidth="26" Padding="4,0" ToolTip.Tip="New connection…" />
                   <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconFolderAdd}" Command="{Binding Tree.AddFolderCommand}"
                           MinWidth="26" Padding="4,0" ToolTip.Tip="New folder…" />
+                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconGroupAdd}" Command="{Binding Tree.NewGroupCommand}"
+                          MinWidth="26" Padding="4,0" ToolTip.Tip="New group of databases that share one schema…" />
                   <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconImport}" Command="{Binding Tree.ImportFromDBeaverCommand}"
                           MinWidth="26" Padding="4,0" ToolTip.Tip="Import connections from the DBeaver workspace" />
                   <Border Classes="vsep" Margin="3,7" />
@@ -183,10 +185,77 @@
                         <MenuItem Header="Disconnect" Command="{Binding Tree.DisconnectNodeCommand}" CommandParameter="{Binding}" />
                         <MenuItem Header="Refresh schema" Command="{Binding Tree.RefreshCommand}" CommandParameter="{Binding}" />
                         <Separator />
+                        <MenuItem Header="Add to group…" Command="{Binding Tree.AddToGroupCommand}" CommandParameter="{Binding}">
+                          <MenuItem.Icon><PathIcon Data="{StaticResource IconGroup}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <Separator />
                         <MenuItem Header="Read-only" ToggleType="CheckBox" IsChecked="{Binding IsReadOnly, Mode=OneWay}"
                                   Command="{Binding Tree.ToggleReadOnlyCommand}" CommandParameter="{Binding}" />
                         <MenuItem Header="Edit..." Command="{Binding Tree.EditConnectionCommand}" CommandParameter="{Binding}" />
                         <MenuItem Header="Delete" Command="{Binding Tree.DeleteConnectionCommand}" CommandParameter="{Binding}" />
+                      </ContextMenu>
+                    </StackPanel.ContextMenu>
+                  </StackPanel>
+                </TreeDataTemplate>
+
+                <!-- Groups: a section header, then one node per group, then shortcuts to the member connections -->
+                <TreeDataTemplate DataType="vm:GroupsSectionNodeViewModel" ItemsSource="{Binding Children}">
+                  <StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent">
+                    <PathIcon Data="{StaticResource IconGroup}" Width="15" Height="15" Foreground="{DynamicResource DbxAccent}" />
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Classes="faint small" VerticalAlignment="Center"
+                               Text="{Binding Children.Count, Converter={x:Static views:Icons.CountInParens}}" />
+                    <StackPanel.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="New group…" Command="{Binding Tree.NewGroupCommand}" />
+                      </ContextMenu>
+                    </StackPanel.ContextMenu>
+                  </StackPanel>
+                </TreeDataTemplate>
+
+                <TreeDataTemplate DataType="vm:GroupNodeViewModel" ItemsSource="{Binding Children}">
+                  <StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent">
+                    <PathIcon Data="{StaticResource IconGroup}" Width="14" Height="14" Foreground="{DynamicResource DbxAccent}" />
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Classes="faint small" Text="{Binding Summary}" VerticalAlignment="Center" />
+                    <PathIcon Data="{StaticResource IconWarning}" Width="12" Height="12" Foreground="{DynamicResource DbxWarn}"
+                              IsVisible="{Binding IsUnderPopulated}"
+                              ToolTip.Tip="A group needs at least 2 databases to switch between them or compare them" />
+                    <StackPanel.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Check schema differences" Command="{Binding Tree.CheckSchemaDifferencesCommand}" CommandParameter="{Binding Group}">
+                          <MenuItem.Icon><PathIcon Data="{StaticResource IconSchema}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <Separator />
+                        <MenuItem Header="Edit group…" Command="{Binding Tree.EditGroupCommand}" CommandParameter="{Binding Group}" />
+                        <MenuItem Header="Rename…" Command="{Binding Tree.RenameGroupCommand}" CommandParameter="{Binding Group}" />
+                        <MenuItem Header="Delete group" Command="{Binding Tree.DeleteGroupCommand}" CommandParameter="{Binding Group}" />
+                        <Separator />
+                        <MenuItem Header="New group…" Command="{Binding Tree.NewGroupCommand}" />
+                      </ContextMenu>
+                    </StackPanel.ContextMenu>
+                  </StackPanel>
+                </TreeDataTemplate>
+
+                <TreeDataTemplate DataType="vm:GroupMemberNodeViewModel">
+                  <StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent">
+                    <Border Width="3" Height="14" CornerRadius="2" Background="{Binding Target.ChipColor}" VerticalAlignment="Center" />
+                    <views:EngineIcon Kind="{Binding Target.Config.Kind}" Width="15" Height="15" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Target.Title}" Classes.connected="{Binding Target.IsConnected}" VerticalAlignment="Center" />
+                    <Ellipse Width="7" Height="7" Fill="{DynamicResource DbxSuccess}" VerticalAlignment="Center"
+                             IsVisible="{Binding Target.IsConnected}" ToolTip.Tip="Connected" />
+                    <PathIcon Data="{StaticResource IconLock}" Width="11" Height="11" Foreground="{DynamicResource DbxWarn}"
+                              IsVisible="{Binding Target.IsReadOnly}" ToolTip.Tip="Read-only connection" />
+                    <TextBlock Classes="faint small" Text="connecting…" VerticalAlignment="Center" IsVisible="{Binding Target.IsConnecting}" />
+                    <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center" IsVisible="{Binding Target.HasError}"
+                                ToolTip.Tip="{Binding Target.ErrorMessage}">
+                      <PathIcon Data="{StaticResource IconError}" Width="12" Height="12" Foreground="{DynamicResource DbxError}" />
+                      <TextBlock Text="failed" FontSize="11" Foreground="{DynamicResource DbxError}" />
+                    </StackPanel>
+                    <StackPanel.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Connect" Command="{Binding Tree.OpenGroupMemberCommand}" CommandParameter="{Binding}" />
+                        <MenuItem Header="Remove from group" Command="{Binding Tree.RemoveMemberCommand}" CommandParameter="{Binding}" />
                       </ContextMenu>
                     </StackPanel.ContextMenu>
                   </StackPanel>

@@ -1,0 +1,121 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbExplorer.App.ViewModels"
+        xmlns:views="using:DbExplorer.App.Views"
+        xmlns:model="using:DbExplorer.Core.Model"
+        x:Class="DbExplorer.App.Views.GroupEditorDialog"
+        x:DataType="vm:GroupEditorViewModel"
+        Title="{Binding Title}"
+        Width="660" Height="540" MinWidth="560" MinHeight="440"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel>
+    <!-- Footer: the dialog's verdict -->
+    <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxWindowBg}" BorderBrush="{DynamicResource DbxBorder}"
+            BorderThickness="0,1,0,0" Padding="20,12">
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Content="OK" Classes="accent" IsDefault="True" Click="OnOkClick" MinWidth="88" HorizontalContentAlignment="Center" />
+        <Button Content="Cancel" IsCancel="True" Click="OnCancelClick" MinWidth="88" HorizontalContentAlignment="Center" />
+      </StackPanel>
+    </Border>
+
+    <!-- Header -->
+    <Border DockPanel.Dock="Top" Background="{DynamicResource DbxPanelHeaderBg}" BorderBrush="{DynamicResource DbxBorder}"
+            BorderThickness="0,0,0,1" Padding="20,14">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <PathIcon Data="{StaticResource IconGroup}" Width="30" Height="30" Foreground="{DynamicResource DbxAccent}" />
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" />
+          <TextBlock Classes="dim small" Text="Databases that share one schema: switch between them and compare them, read-only." />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Messages: what the group can contain, why it cannot be saved yet -->
+    <StackPanel DockPanel.Dock="Bottom" Background="{DynamicResource DbxContentBg}">
+      <Border Classes="banner error" Padding="20,8" IsVisible="{Binding HasError}">
+        <Grid ColumnDefinitions="Auto,*">
+          <PathIcon Classes="bi" Data="{StaticResource IconError}" VerticalAlignment="Top" Margin="0,1,8,0" />
+          <TextBlock Grid.Column="1" Text="{Binding Error}" TextWrapping="Wrap" />
+        </Grid>
+      </Border>
+      <Border Classes="banner warn" Padding="20,8" IsVisible="{Binding Warning, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <Grid ColumnDefinitions="Auto,*">
+          <PathIcon Classes="bi" Data="{StaticResource IconWarning}" VerticalAlignment="Top" Margin="0,1,8,0" />
+          <TextBlock Grid.Column="1" Text="{Binding Warning}" TextWrapping="Wrap" />
+        </Grid>
+      </Border>
+    </StackPanel>
+
+    <Grid Background="{DynamicResource DbxContentBg}" RowDefinitions="Auto,Auto,*" Margin="20,16,20,16">
+      <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,12">
+        <TextBlock Classes="dim" Text="Name" VerticalAlignment="Center" Margin="0,0,16,0" />
+        <TextBox Grid.Column="1" x:Name="NameBox" Text="{Binding Name}" Watermark="e.g. Resto (dev, preprod, customer copies)" />
+      </Grid>
+
+      <Border Grid.Row="1" Classes="banner info" CornerRadius="4" BorderThickness="1" Margin="0,0,0,10"
+              IsVisible="{Binding Kind, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <PathIcon Classes="bi" Data="{StaticResource IconInfo}" VerticalAlignment="Center" />
+          <TextBlock VerticalAlignment="Center" TextWrapping="Wrap"
+                     Text="All members use one engine: only connections of the first member's engine are offered." />
+        </StackPanel>
+      </Border>
+
+      <Grid Grid.Row="2" ColumnDefinitions="*,Auto,*" RowDefinitions="Auto,*">
+        <TextBlock Classes="section" Text="AVAILABLE CONNECTIONS" Margin="0,0,0,4" />
+        <TextBlock Grid.Column="2" Classes="section" Text="MEMBERS (IN ORDER)" Margin="0,0,0,4" />
+
+        <Border Grid.Row="1" Background="{DynamicResource DbxInputBg}" BorderBrush="{DynamicResource DbxBorderSubtle}"
+                BorderThickness="1" CornerRadius="4">
+          <ListBox x:Name="CandidateList" ItemsSource="{Binding Candidates}" Background="Transparent" DoubleTapped="OnCandidateDoubleTapped">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="model:ConnectionConfig">
+                <StackPanel Orientation="Horizontal" Spacing="8" Background="Transparent">
+                  <views:EngineIcon Kind="{Binding Kind}" Width="15" Height="15" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                  <TextBlock Classes="faint small" Text="{Binding Folder}" VerticalAlignment="Center"
+                             IsVisible="{Binding Folder, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+
+        <StackPanel Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Spacing="6" Margin="10,0">
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconChevronRight}" HorizontalAlignment="Center"
+                  BorderBrush="{DynamicResource DbxBorder}" Command="{Binding AddCommand}"
+                  CommandParameter="{Binding #CandidateList.SelectedItem}" ToolTip.Tip="Add the selected connection to the group" />
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconChevronLeft}" HorizontalAlignment="Center"
+                  BorderBrush="{DynamicResource DbxBorder}" Command="{Binding RemoveCommand}"
+                  CommandParameter="{Binding #MemberList.SelectedItem}" ToolTip.Tip="Remove the selected member" />
+          <Border Height="1" Margin="2,4" Background="{DynamicResource DbxBorderSubtle}" />
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconSortUp}" HorizontalAlignment="Center"
+                  BorderBrush="{DynamicResource DbxBorder}" Command="{Binding MoveUpCommand}"
+                  CommandParameter="{Binding #MemberList.SelectedItem}" ToolTip.Tip="Move the selected member up" />
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconSortDown}" HorizontalAlignment="Center"
+                  BorderBrush="{DynamicResource DbxBorder}" Command="{Binding MoveDownCommand}"
+                  CommandParameter="{Binding #MemberList.SelectedItem}" ToolTip.Tip="Move the selected member down" />
+        </StackPanel>
+
+        <Border Grid.Row="1" Grid.Column="2" Background="{DynamicResource DbxInputBg}" BorderBrush="{DynamicResource DbxBorderSubtle}"
+                BorderThickness="1" CornerRadius="4">
+          <Panel>
+            <ListBox x:Name="MemberList" ItemsSource="{Binding Selected}" Background="Transparent" DoubleTapped="OnMemberDoubleTapped">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="model:ConnectionConfig">
+                  <StackPanel Orientation="Horizontal" Spacing="8" Background="Transparent">
+                    <views:EngineIcon Kind="{Binding Kind}" Width="15" Height="15" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                    <PathIcon Data="{StaticResource IconLock}" Width="11" Height="11" Foreground="{DynamicResource DbxWarn}"
+                              IsVisible="{Binding ReadOnly}" ToolTip.Tip="Read-only connection" />
+                  </StackPanel>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </Panel>
+        </Border>
+      </Grid>
+    </Grid>
+  </DockPanel>
+</Window>

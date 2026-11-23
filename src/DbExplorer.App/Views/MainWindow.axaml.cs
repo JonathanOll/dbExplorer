@@ -206,6 +206,9 @@ public partial class MainWindow : Window
             case ConnectionNodeViewModel connection:
                 await tree.ConnectAsync(connection);
                 break;
+            case GroupMemberNodeViewModel member:
+                await tree.OpenGroupMemberAsync(member);
+                break;
         }
     }
 

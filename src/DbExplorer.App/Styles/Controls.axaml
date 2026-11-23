@@ -1,7 +1,7 @@
 <!--
   Control themes and style classes of dbExplorer (see docs/ui/README.md for the vocabulary).
   Themes (apply with Theme="{StaticResource ...}"):   DbxToolButton, DbxDocTabControl + DbxDocTabItem, DbxSubTabControl + DbxSubTabItem
-  Classes:  Border.banner (+ error / warn / info), Border.panelHeader, Border.badge (+ warn / ok), Border.vsep, Border.kbd,
+  Classes:  Border.banner (+ error / warn / info), Border.panelHeader, Border.badge (+ error / warn / ok or info), Border.vsep, Border.kbd,
             TextBlock.dim / faint / small / title / section
 -->
 <Styles xmlns="https://github.com/avaloniaui"
@@ -239,7 +239,12 @@
     <Setter Property="BorderBrush" Value="{DynamicResource DbxWarnBorder}" />
     <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxWarnText}" />
   </Style>
-  <Style Selector="Border.badge.ok">
+  <Style Selector="Border.badge.error">
+    <Setter Property="Background" Value="{DynamicResource DbxErrorBg}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxErrorBorder}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxErrorText}" />
+  </Style>
+  <Style Selector="Border.badge.ok, Border.badge.info">
     <Setter Property="Background" Value="{DynamicResource DbxInfoBg}" />
     <Setter Property="BorderBrush" Value="{DynamicResource DbxInfoBorder}" />
     <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxInfoText}" />

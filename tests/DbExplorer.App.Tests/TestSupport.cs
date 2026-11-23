@@ -30,6 +30,32 @@ internal sealed class FakeDialogs : IDialogService
     public Task<string?> PromptTextAsync(string title, string label, string initial) => Task.FromResult(PromptResult);
 
     public Task<bool> ConfirmAsync(string title, string message) => Task.FromResult(ConfirmResult);
+
+    // ---- groups ----
+    public bool GroupEditorResult { get; set; } = true;
+    public Action<GroupEditorViewModel>? OnGroupEditor { get; set; }
+    public List<SchemaDiffViewModel> SchemaReports { get; } = [];
+    public int? ChooseResult { get; set; }
+    public List<IReadOnlyList<string>> ChooseOptions { get; } = [];
+
+    public Task<bool> ShowGroupEditorAsync(GroupEditorViewModel viewModel)
+    {
+        OnGroupEditor?.Invoke(viewModel);
+        // Like the real dialog: OK validates and builds the result.
+        return Task.FromResult(GroupEditorResult && viewModel.TryConfirm());
+    }
+
+    public Task ShowSchemaDiffAsync(SchemaDiffViewModel viewModel)
+    {
+        SchemaReports.Add(viewModel);
+        return Task.CompletedTask;
+    }
+
+    public Task<int?> ChooseAsync(string title, string label, IReadOnlyList<string> options)
+    {
+        ChooseOptions.Add(options);
+        return Task.FromResult(ChooseResult);
+    }
 }
 
 /// <summary>A temp config dir with a real ConfigStore, SessionManager and tree view model.</summary>
@@ -67,6 +93,18 @@ internal sealed class TreeFixture : IDisposable
             cmd.ExecuteNonQuery();
         }
 
+        return file;
+    }
+
+    /// <summary>A SQLite file with the given schema script (e.g. to make group members that differ).</summary>
+    public string CreateSqliteFileWith(string name, string sql)
+    {
+        var file = Path.Combine(Dir, name);
+        using var c = new SqliteConnection($"Data Source={file};Pooling=False");
+        c.Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = sql;
+        cmd.ExecuteNonQuery();
         return file;
     }
 

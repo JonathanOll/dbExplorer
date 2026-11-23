@@ -114,9 +114,19 @@ internal sealed class PlainProtector : ISecretProtector
 
 internal sealed class QuietDialogs : IDialogService
 {
+    /// <summary>The report the last "Check schema differences" produced (the scenes show it in a real dialog).</summary>
+    public SchemaDiffViewModel? LastReport { get; private set; }
+
     public Task<bool> ShowConnectionDialogAsync(ConnectionDialogViewModel viewModel) => Task.FromResult(false);
     public Task<string?> PromptTextAsync(string title, string label, string initial) => Task.FromResult<string?>(null);
     public Task<bool> ConfirmAsync(string title, string message) => Task.FromResult(false);
+    public Task<bool> ShowGroupEditorAsync(GroupEditorViewModel viewModel) => Task.FromResult(false);
+    public Task ShowSchemaDiffAsync(SchemaDiffViewModel viewModel)
+    {
+        LastReport = viewModel;
+        return Task.CompletedTask;
+    }
+    public Task<int?> ChooseAsync(string title, string label, IReadOnlyList<string> options) => Task.FromResult<int?>(null);
 }
 
 internal sealed class NoFiles : IScriptFiles
@@ -142,8 +152,12 @@ internal sealed class Demo : IDisposable
     public ConnectionTreeViewModel Tree { get; }
     public SessionManager Sessions { get; }
     public MainWindow Window { get; }
+    public QuietDialogs Dialogs { get; } = new();
+    public ConnectionConfig Notes { get; }
+    public ConnectionConfig NotesArchive { get; }
 
-    public Demo(bool emptyConfig = false)
+    /// <param name="withGroups">Adds the linked-group scenes' data: three SQLite "notes" databases (one file missing) and two engine groups.</param>
+    public Demo(bool emptyConfig = false, bool withGroups = false)
     {
         Directory.CreateDirectory(Dir);
         var shopFile = Path.Combine(Dir, "shop.db");
@@ -156,20 +170,40 @@ internal sealed class Demo : IDisposable
 
         Shop = C("Shop (local)", DbKind.Sqlite, "Production", shopFile);
         Scratch = C("Scratch", DbKind.Sqlite, "Staging", scratchFile);
+        Notes = C("Notes", DbKind.Sqlite, null, Path.Combine(Dir, "notes.db"));
+        NotesArchive = C("Notes archive", DbKind.Sqlite, null, Path.Combine(Dir, "archive.db"));   // never created: unreachable
+        if (withGroups) Exec(Path.Combine(Dir, "notes.db"), """
+            CREATE TABLE notes (id INTEGER PRIMARY KEY, title TEXT, body TEXT, pinned INTEGER);
+            CREATE TABLE tags (id INTEGER PRIMARY KEY, label TEXT);
+            """);
+        var billing = C("Billing", DbKind.Postgres, "Production", "billing");
+        var stagingBilling = C("Staging billing", DbKind.Postgres, "Staging", "billing_stg");
+        var reports = C("Reports", DbKind.SqlServer, "Staging", "reports");
         var config = emptyConfig
             ? AppConfig.Empty()
             : new AppConfig(
                 ["Production", "Staging"],
                 [
                     Shop,
-                    C("Billing", DbKind.Postgres, "Production", "billing"),
+                    billing,
                     C("ERP", DbKind.SqlServer, "Production", "erp", ro: true),
                     Scratch,
-                    C("Staging billing", DbKind.Postgres, "Staging", "billing_stg"),
-                    C("Reports", DbKind.SqlServer, "Staging", "reports"),
-                    C("Notes", DbKind.Sqlite, null, Path.Combine(Dir, "notes.db")),
+                    stagingBilling,
+                    reports,
+                    Notes,
+                    .. withGroups ? [NotesArchive] : Array.Empty<ConnectionConfig>(),
                 ],
-                new());
+                new())
+            {
+                Groups = withGroups
+                    ?
+                    [
+                        new ConnectionGroup(Det("group:Notes"), "Notes databases", [Scratch.Id, Notes.Id, NotesArchive.Id]),
+                        new ConnectionGroup(Det("group:Billing"), "Billing", [billing.Id, stagingBilling.Id]),
+                        new ConnectionGroup(Det("group:Draft"), "Reports (draft)", [reports.Id]),
+                    ]
+                    : [],
+            };
 
         var protector = new PlainProtector();
         var store = new ConfigStore(Path.Combine(Dir, "config.json"), protector);
@@ -177,7 +211,7 @@ internal sealed class Demo : IDisposable
         Sessions = new SessionManager(store, cache, protector);
         var status = new StatusModel();
         Window = new MainWindow { Width = 1280, Height = 800 };
-        var dialogs = new QuietDialogs();
+        var dialogs = Dialogs;
         Tree = new ConnectionTreeViewModel(store, config, Sessions, status, dialogs, Path.Combine(Dir, "dbeaver"));
         Main = new MainViewModel(Tree, status, cache);
         Main.UseTableTabs(Sessions, new QuietEditDialogs());
@@ -189,7 +223,7 @@ internal sealed class Demo : IDisposable
 
     public async Task ConnectAsync()
     {
-        foreach (var node in AllConnectionNodes().Where(n => n.Config.Kind == DbKind.Sqlite && n.Config.Name != "Notes"))
+        foreach (var node in AllConnectionNodes().Where(n => n.Config.Kind == DbKind.Sqlite && !n.Config.Name.StartsWith("Notes")))
             await Tree.ConnectAsync(node);
     }
 
@@ -273,6 +307,10 @@ internal static class Scenes
         ("confirm-dialog", ConfirmDialog),
         ("live-theme-switch", LiveThemeSwitch),
         ("main-table-125", MainTable125),
+        ("groups-tree", GroupsTree),
+        ("group-editor", GroupEditor),
+        ("group-editor-warning", GroupEditorWarning),
+        ("group-schema-diff", GroupSchemaDiff),
     ];
 
     private static string Theme = "light";
@@ -284,7 +322,7 @@ internal static class Scenes
         foreach (var (name, run) in All)
         {
             if (only is not null && !only.Contains(name)) continue;
-            using var demo = new Demo(emptyConfig: false);
+            using var demo = new Demo(emptyConfig: false, withGroups: name.StartsWith("group"));
             try
             {
                 var window = await run(demo);
@@ -484,6 +522,51 @@ internal static class Scenes
         d.Window.Width = 1024;
         d.Window.Height = 640;
         return await MainTable(d);
+    }
+
+    // The navigator with the Groups section: three groups (one with an unreachable member, one under-populated), expanded.
+    private static async Task<Window?> GroupsTree(Demo d)
+    {
+        await Open(d);
+        foreach (var group in d.Tree.Nodes.OfType<GroupsSectionNodeViewModel>().SelectMany(s => s.Children)) group.IsExpanded = true;
+        d.Tree.SelectedNode = d.Tree.Nodes.OfType<GroupsSectionNodeViewModel>().First().Children[0].Children[0];
+        await Settle();
+        return null;
+    }
+
+    private static async Task<Window?> GroupEditor(Demo d)
+    {
+        await Open(d);
+        var vm = new GroupEditorViewModel(d.Tree.Config, null) { Name = "Notes databases" };
+        vm.Add(d.Scratch);
+        vm.Add(d.Notes);
+        var dialog = new GroupEditorDialog { DataContext = vm };
+        dialog.Show(d.Window);
+        await Settle();
+        return dialog;
+    }
+
+    // A group of one database, saved with a clash on the name: the warning and the error band.
+    private static async Task<Window?> GroupEditorWarning(Demo d)
+    {
+        await Open(d);
+        var vm = new GroupEditorViewModel(d.Tree.Config, null) { Name = "billing" };
+        vm.Add(d.Scratch);
+        vm.TryConfirm();
+        var dialog = new GroupEditorDialog { DataContext = vm };
+        dialog.Show(d.Window);
+        await Settle();
+        return dialog;
+    }
+
+    private static async Task<Window?> GroupSchemaDiff(Demo d)
+    {
+        await Open(d);
+        await d.Tree.CheckSchemaDifferencesAsync(d.Tree.Config.Groups[0]);
+        var dialog = new SchemaDiffDialog { DataContext = d.Dialogs.LastReport ?? throw new InvalidOperationException("no report") };
+        dialog.Show(d.Window);
+        await Settle();
+        return dialog;
     }
 
     private static async Task<Window?> ConfirmDialog(Demo d)

@@ -29,6 +29,33 @@ public sealed class DialogService(Window owner) : IDialogService
         return await window.ShowDialog<string?>(owner);
     }
 
+    public async Task<bool> ShowGroupEditorAsync(GroupEditorViewModel viewModel)
+    {
+        var dialog = new GroupEditorDialog { DataContext = viewModel };
+        return await dialog.ShowDialog<bool>(owner);
+    }
+
+    public async Task ShowSchemaDiffAsync(SchemaDiffViewModel viewModel)
+    {
+        var dialog = new SchemaDiffDialog { DataContext = viewModel };
+        await dialog.ShowDialog(owner);
+    }
+
+    public async Task<int?> ChooseAsync(string title, string label, IReadOnlyList<string> options)
+    {
+        var heading = new TextBlock { Text = label, Margin = new Thickness(0, 0, 0, 8), TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+        heading.Classes.Add("dim");
+        var list = new ListBox { ItemsSource = options, SelectedIndex = 0, MinWidth = 300, MaxHeight = 240 };
+        var ok = DialogShell.Button("OK", isDefault: true, primary: true);
+        var cancel = DialogShell.Button("Cancel", isCancel: true);
+        var window = DialogShell.Create(title, "IconGroup", new StackPanel { Children = { heading, list } }, [ok, cancel]);
+        ok.Click += (_, _) => window.Close(list.SelectedIndex >= 0 ? list.SelectedIndex : null);
+        cancel.Click += (_, _) => window.Close(null);
+        list.DoubleTapped += (_, _) => { if (list.SelectedIndex >= 0) window.Close(list.SelectedIndex); };
+        window.Opened += (_, _) => list.Focus();
+        return await window.ShowDialog<int?>(owner);
+    }
+
     public async Task<bool> ConfirmAsync(string title, string message)
     {
         var yes = DialogShell.Button("Yes", isDefault: true, primary: true);
