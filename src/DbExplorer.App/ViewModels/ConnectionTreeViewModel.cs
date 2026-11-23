@@ -202,9 +202,9 @@ public partial class ConnectionTreeViewModel : ObservableObject
 
             var members = GroupRules.MembersOf(Config, group);
             node.Kind = members.Count > 0 ? members[0].Kind : null;
-            node.Refresh();
             node.Children = new ObservableCollection<TreeNodeViewModel>(
                 members.Select(m => (TreeNodeViewModel)new GroupMemberNodeViewModel(_connectionNodes[m.Id], group) { Tree = this }));
+            node.Refresh();   // after the children: the counts are those of the resolved members
             groupNodes.Add(node);
         }
 
@@ -318,6 +318,15 @@ public partial class ConnectionTreeViewModel : ObservableObject
         var index = Config.Connections.FindIndex(c => c.Id == updated.Id);
         if (index < 0) return;
         var old = Config.Connections[index];
+
+        // All members of a group share one engine: changing it would leave a mixed group that no later group edit accepts.
+        if (old.Kind != updated.Kind && GroupRules.GroupsOf(Config, old.Id) is { Count: > 0 } groups)
+        {
+            Fail($"Cannot change the engine of '{old.Name}': it belongs to group {string.Join(", ", groups.Select(g => $"'{g.Name}'"))}. " +
+                 $"Remove it from {(groups.Count == 1 ? "that group" : "those groups")} first.");
+            return;
+        }
+
         Config.Connections[index] = updated;
 
         // Name, folder and read-only flag do not affect the connection itself; anything else invalidates a live
@@ -664,7 +673,8 @@ public partial class ConnectionTreeViewModel : ObservableObject
         if (member is not null) await ConnectAsync(member.Target);
     }
 
-    private sealed record MemberLoad(ConnectionConfig Config, Session? Session, IReadOnlyList<TableInfo>? Schema, string? Error);
+    /// <param name="NewlyOpened">The session was opened by this check (not already open): it is closed again when the check does not complete.</param>
+    private sealed record MemberLoad(ConnectionConfig Config, Session? Session, IReadOnlyList<TableInfo>? Schema, string? Error, bool NewlyOpened = false);
 
     /// <summary>Members loaded at the same time by <see cref="CheckSchemaDifferencesAsync"/> (as for a group run).</summary>
     private const int SchemaCheckParallelism = 4;
@@ -693,16 +703,26 @@ public partial class ConnectionTreeViewModel : ObservableObject
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         _schemaCheck = cts;
         SchemaDiffViewModel report;
+        var adopted = false;
         try
         {
             using (_status.Busy($"Checking schema differences of {current.Name}..."))
             {
                 _status.Info($"Loading the schemas of the {members.Count} databases of '{current.Name}'...");
                 using var gate = new SemaphoreSlim(SchemaCheckParallelism);
+                // Members never throw (a cancellation is a result), so every call is accounted for even when one of them was cancelled.
                 var loads = await Task.WhenAll(members.Select(m => LoadMemberSchemaAsync(m, gate, cts.Token)));
-                cts.Token.ThrowIfCancellationRequested();
-
-                foreach (var load in loads.Where(l => l.Session is not null)) AdoptSession(load.Session!);
+                try
+                {
+                    cts.Token.ThrowIfCancellationRequested();
+                    foreach (var load in loads.Where(l => l.Session is not null)) AdoptSession(load.Session!);
+                    adopted = true;
+                }
+                finally
+                {
+                    // Cancelled (or failed) before the sessions reached the tree: release the ones THIS check opened, never one that was already open.
+                    if (!adopted) CloseNewlyOpened(loads);
+                }
                 var loaded = loads.Where(l => l.Schema is not null).ToList();
                 var diffs = SchemaComparer.Compare(loaded.Select(l => new SchemaMember(l.Config.Name, l.Schema!)).ToList());
                 var unreachable = loads.Where(l => l.Error is not null).Select(l => new UnreachableMember(l.Config.Name, l.Error!)).ToList();
@@ -736,11 +756,16 @@ public partial class ConnectionTreeViewModel : ObservableObject
     /// </summary>
     private async Task<MemberLoad> LoadMemberSchemaAsync(ConnectionConfig member, SemaphoreSlim gate, CancellationToken ct)
     {
-        await gate.WaitAsync(ct);
+        Session? opened = null;   // the session this call opened (null when it was already open or never opened)
+        var acquired = false;
+        var wasOpen = false;
         try
         {
-            var wasOpen = _sessions.Find(member.Id) is not null;
+            await gate.WaitAsync(ct);
+            acquired = true;
+            wasOpen = _sessions.Find(member.Id) is not null;
             var session = await _sessions.GetOrOpenAsync(member, ct);
+            if (!wasOpen) opened = session;
             var schema = wasOpen
                 ? await Task.Run(async () =>
                 {
@@ -748,11 +773,13 @@ public partial class ConnectionTreeViewModel : ObservableObject
                     return await session.Driver.LoadSchemaAsync(connection, ct);
                 }, ct)
                 : session.Schema;
-            return new MemberLoad(member, session, schema, null);
+            return new MemberLoad(member, session, schema, null, opened is not null);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            throw;
+            // A connect that finished just as the cancel arrived may have registered a session we never received.
+            if (acquired && !wasOpen && opened is null) opened = _sessions.Find(member.Id);
+            return new MemberLoad(member, opened, null, null, opened is not null);
         }
         catch (Exception e)
         {
@@ -760,10 +787,21 @@ public partial class ConnectionTreeViewModel : ObservableObject
         }
         finally
         {
-            gate.Release();
+            if (acquired) gate.Release();
         }
     }
 
+    /// <summary>Closes the sessions a schema check opened itself and did not hand to the tree. A node connected meanwhile keeps its session.</summary>
+    private void CloseNewlyOpened(IEnumerable<MemberLoad> loads)
+    {
+        foreach (var load in loads.Where(l => l.NewlyOpened && l.Session is not null))
+        {
+            var id = load.Config.Id;
+            if (_sessions.Find(id) != load.Session) continue;
+            if (_connectionNodes.TryGetValue(id, out var node) && node.State is ConnectionState.Connected or ConnectionState.Connecting) continue;
+            _sessions.Close(id);
+        }
+    }
     /// <summary>Shows a session opened behind the tree's back (the schema check) as a connected node.</summary>
     private void AdoptSession(Session session)
     {

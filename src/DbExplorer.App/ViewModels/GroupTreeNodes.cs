@@ -26,7 +26,8 @@ public sealed partial class GroupNodeViewModel(ConnectionGroup group) : TreeNode
 
     public override string Title => Group.Name;
 
-    public int MemberCount => Group.ConnectionIds.Count;
+    /// <summary>Members that resolve to a connection (the child nodes); an id of a deleted connection is not counted.</summary>
+    public int MemberCount => Children.Count;
 
     /// <summary>A group of fewer than two databases is allowed, but there is nothing to switch to or compare.</summary>
     public bool IsUnderPopulated => MemberCount < 2;

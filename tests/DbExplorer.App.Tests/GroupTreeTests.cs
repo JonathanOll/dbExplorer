@@ -435,6 +435,71 @@ public class GroupTreeTests : IDisposable
         Assert.Contains("NOT saved", _fx.Status.Message);
     }
 
+    [Fact]
+    public void Tree_DanglingMember_IsNotCounted()
+    {
+        var a = Conn("A");
+        var group = new ConnectionGroup(Guid.NewGuid(), "G", [a.Id, Guid.NewGuid()]);
+        var tree = _fx.CreateTree(Config([a], group));
+
+        var node = Section(tree).Children.OfType<GroupNodeViewModel>().Single();
+
+        Assert.Single(node.Children);
+        Assert.Equal(1, node.MemberCount);
+        Assert.True(node.IsUnderPopulated);
+        Assert.Equal("SQLite · 1", node.Summary);
+    }
+
+    [Fact]
+    public async Task EditGroup_SavingWithTheNameUnchanged_Passes()
+    {
+        var a = Conn("A");
+        var b = Conn("B");
+        var group = Group("Same name", a);
+        var tree = _fx.CreateTree(Config([a, b], group));
+        _fx.Dialogs.OnGroupEditor = vm => vm.Add(b);   // only the members change
+
+        await tree.EditGroupCommand.ExecuteAsync(group);
+
+        Assert.False(_fx.Status.IsError);
+        var saved = Assert.Single(_fx.Store.Load().Groups);
+        Assert.Equal("Same name", saved.Name);
+        Assert.Equal([a.Id, b.Id], saved.ConnectionIds);
+        Assert.True(tree.RenameGroup(tree.Config.Groups.Single(), "Same name"));   // and renaming to the same name is fine
+    }
+
+    // ---- the engine of a group member cannot change ----
+
+    [Fact]
+    public void UpdateConnection_ChangingTheEngineOfAGroupMember_IsRefused()
+    {
+        var a = Conn("A");
+        var b = Conn("B");
+        var loose = Conn("Loose");
+        var tree = _fx.CreateTree(Config([a, b, loose], Group("Pair", a, b), Group("Other", a)));
+
+        tree.UpdateConnection(a with { Kind = DbKind.Postgres, Host = "h" });
+
+        Assert.Equal(DbKind.Sqlite, tree.Config.Connections.Single(c => c.Id == a.Id).Kind);
+        Assert.True(_fx.Status.IsError);
+        Assert.Contains("'Pair'", _fx.Status.Message);
+        Assert.Contains("'Other'", _fx.Status.Message);
+        Assert.Contains("Remove it", _fx.Status.Message);
+        Assert.False(File.Exists(_fx.ConfigPath));   // nothing saved
+
+        // other edits of a member are fine, and a connection outside any group may change engine
+        tree.UpdateConnection(a with { Name = "A renamed" });
+        Assert.Equal("A renamed", _fx.Store.Load().Connections.Single(c => c.Id == a.Id).Name);
+        tree.UpdateConnection(loose with { Kind = DbKind.Postgres, Host = "h" });
+        Assert.Equal(DbKind.Postgres, _fx.Store.Load().Connections.Single(c => c.Id == loose.Id).Kind);
+
+        // once removed from its groups the engine can change
+        tree.RemoveFromGroup(tree.Config.Connections.Single(c => c.Id == a.Id), tree.Config.Groups[0]);
+        tree.RemoveFromGroup(tree.Config.Connections.Single(c => c.Id == a.Id), tree.Config.Groups[1]);
+        tree.UpdateConnection(tree.Config.Connections.Single(c => c.Id == a.Id) with { Kind = DbKind.Postgres, Host = "h" });
+        Assert.Equal(DbKind.Postgres, _fx.Store.Load().Connections.Single(c => c.Id == a.Id).Kind);
+    }
+
     // ---- DBeaver import must not drop the groups ----
 
     [Fact]
@@ -574,6 +639,46 @@ public class GroupTreeTests : IDisposable
     }
 
     [Fact]
+    public async Task CheckSchemaDifferences_CancelledMidRun_ClosesSessionsItOpened_AndKeepsAlreadyOpenOnes()
+    {
+        var driver = new HangingSqliteDriver("slow.db");
+        var sessions = new DbExplorer.Core.Sessions.SessionManager(_fx.Store, _fx.Cache, _fx.Protector, _ => driver);
+        var open = Db("Open", "CREATE TABLE t (id INTEGER PRIMARY KEY);");
+        var fast = Db("Fast", "CREATE TABLE t (id INTEGER PRIMARY KEY);");
+        var slow = Db("Slow", "CREATE TABLE t (id INTEGER PRIMARY KEY);");   // file name "Slow.db": the driver hangs while loading it
+        driver.HangOn = "Slow.db";
+        var group = Group("G", open, fast, slow);
+        var tree = new ConnectionTreeViewModel(_fx.Store, Config([open, fast, slow], group), sessions, _fx.Status, _fx.Dialogs, _fx.DBeaverDir);
+        try
+        {
+            await tree.ConnectAsync(tree.Nodes.OfType<ConnectionNodeViewModel>().Single(n => n.Title == "Open"));
+            Assert.NotNull(sessions.Find(open.Id));
+
+            var running = tree.CheckSchemaDifferencesCommand.ExecuteAsync(group);
+            await driver.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));       // the slow member is mid-load
+            for (var i = 0; i < 500 && sessions.Find(fast.Id) is null; i++) await Task.Delay(10);
+            Assert.NotNull(sessions.Find(fast.Id));                               // the fast one finished opening
+            tree.CancelConnectCommand.Execute(null);                              // the status bar Cancel
+            await running.WaitAsync(TimeSpan.FromSeconds(10));
+
+            Assert.Empty(_fx.Dialogs.SchemaReports);
+            Assert.False(_fx.Status.IsError);
+            Assert.False(_fx.Status.IsBusy);
+            Assert.Null(sessions.Find(fast.Id));     // opened by the check: released
+            Assert.Null(sessions.Find(slow.Id));
+            Assert.NotNull(sessions.Find(open.Id));  // was already open: untouched
+            var nodes = tree.Nodes.OfType<ConnectionNodeViewModel>().ToDictionary(n => n.Title);
+            Assert.Equal(ConnectionState.Connected, nodes["Open"].State);
+            Assert.Equal(ConnectionState.Disconnected, nodes["Fast"].State);
+            Assert.Equal(ConnectionState.Disconnected, nodes["Slow"].State);
+        }
+        finally
+        {
+            foreach (var c in new[] { open, fast, slow }) sessions.Close(c.Id);
+        }
+    }
+
+    [Fact]
     public async Task CheckSchemaDifferences_Cancelled_ShowsNoReport_AndIsNotAnError()
     {
         var a = Db("A", "CREATE TABLE users (id INTEGER PRIMARY KEY);");
@@ -589,5 +694,32 @@ public class GroupTreeTests : IDisposable
         Assert.False(_fx.Status.IsError);
         Assert.False(_fx.Status.IsBusy);
         Assert.Contains("cancel", _fx.Status.Message, StringComparison.OrdinalIgnoreCase);
+    }
+}
+
+/// <summary>A SQLite driver whose schema load hangs (until cancelled) for the database file named <see cref="HangOn"/>.</summary>
+internal sealed class HangingSqliteDriver(string _) : DbExplorer.Core.Drivers.IDbDriver
+{
+    private readonly DbExplorer.Core.Drivers.SqliteDriver _inner = new();
+    public string? HangOn { get; set; }
+    public TaskCompletionSource Entered { get; } = new();
+
+    public DbKind Kind => _inner.Kind;
+    public string ParamPrefix => _inner.ParamPrefix;
+    public string Quote(string identifier) => _inner.Quote(identifier);
+    public string QuoteTable(TableRef t) => _inner.QuoteTable(t);
+    public string CastToText(string quotedColumn) => _inner.CastToText(quotedColumn);
+    public string EscapeLike(string text) => _inner.EscapeLike(text);
+    public string PageSql(string selectSql, string orderBy, int offset, int limit) => _inner.PageSql(selectSql, orderBy, offset, limit);
+    public System.Data.Common.DbConnection CreateConnection(ConnectionConfig cfg, string? plainPassword) => _inner.CreateConnection(cfg, plainPassword);
+
+    public async Task<IReadOnlyList<TableInfo>> LoadSchemaAsync(System.Data.Common.DbConnection c, CancellationToken ct)
+    {
+        if (HangOn is not null && c.DataSource.EndsWith(HangOn, StringComparison.OrdinalIgnoreCase))
+        {
+            Entered.TrySetResult();
+            await Task.Delay(Timeout.Infinite, ct);
+        }
+        return await _inner.LoadSchemaAsync(c, ct);
     }
 }
