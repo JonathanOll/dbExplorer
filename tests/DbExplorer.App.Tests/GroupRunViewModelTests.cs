@@ -632,14 +632,16 @@ public class GroupRunViewModelTests : IDisposable
     }
 
     [Fact]
-    public void SafeProgress_NeverThrows_WhateverTheHandlerDoes()
+    public async Task SafeProgress_NeverThrows_WhateverTheHandlerDoes()
     {
         var progress = new SafeProgress<int>(_ => throw new InvalidOperationException("boom"));
         progress.Report(1);   // would escape the runner's RunAsync if it propagated
 
+        // with a synchronization context (a test thread may have one) the handler runs later, on that context
         var seen = new List<int>();
-        var ok = new SafeProgress<int>(seen.Add);
+        var ok = new SafeProgress<int>(v => { lock (seen) seen.Add(v); });
         ok.Report(7);
+        await Eventually(() => { lock (seen) return seen.Count == 1; }, "the report to be handled");
         Assert.Equal([7], seen);
     }
 
