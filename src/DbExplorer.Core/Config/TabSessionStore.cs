@@ -26,8 +26,11 @@ public sealed record SavedTab(
 /// <summary>The open tabs in order; <see cref="ActiveIndex"/> is the active one in <see cref="Tabs"/> (-1: none).</summary>
 public sealed record SavedTabs(int ActiveIndex, List<SavedTab> Tabs);
 
-/// <summary>Result of <see cref="TabSessionStore.Load"/>: no session (missing or unusable file), or the tabs; a notice when the file had to be set aside.</summary>
-public sealed record TabSessionLoad(SavedTabs? Session, string? Notice);
+/// <summary>
+/// Result of <see cref="TabSessionStore.Load"/>: no session (missing or unusable file), or the tabs; a notice when the file had to be set aside.
+/// <see cref="Unreadable"/> is true when the file exists but could not be read (locked): unlike a missing file, it must not be overwritten.
+/// </summary>
+public sealed record TabSessionLoad(SavedTabs? Session, string? Notice, bool Unreadable = false);
 
 /// <summary>
 /// The tabs that were open when the app closed, in one small JSON file (<c>session.json</c>) next to the config. Same
@@ -63,7 +66,7 @@ public sealed class TabSessionStore(string path)
         }
         catch (Exception)
         {
-            return new TabSessionLoad(null, null);   // locked or unreadable: start without a session, leave the file alone
+            return new TabSessionLoad(null, null, Unreadable: true);   // locked: start without a session and leave the file alone, always
         }
     }
 

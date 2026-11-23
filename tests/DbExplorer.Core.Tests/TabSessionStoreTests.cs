@@ -85,7 +85,16 @@ public class TabSessionStoreTests : IDisposable
         var loaded = new TabSessionStore(File_).Load();
 
         Assert.Null(loaded.Session);
+        Assert.True(loaded.Unreadable);   // not the same as "no file": the caller must not overwrite it
         Assert.Empty(Directory.GetFiles(_dir, "session.json.bad-*"));
+    }
+
+    [Fact]
+    public void Load_MissingOrCorruptFile_IsNotFlaggedUnreadable()
+    {
+        Assert.False(new TabSessionStore(File_).Load().Unreadable);
+        File.WriteAllText(File_, "{ broken");
+        Assert.False(new TabSessionStore(File_).Load().Unreadable);   // moved aside: the path is free to write again
     }
 
     [Fact]

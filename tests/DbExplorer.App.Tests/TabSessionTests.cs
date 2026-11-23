@@ -399,19 +399,19 @@ public class TabSessionTests : ShellTestBase
     }
 
     [Fact]
-    public void Restore_WithASession_DoesNotDuplicateScripts_AndKeepsOrphanedUnsavedCopies()
+    public void Restore_WithASession_DoesNotDuplicateScripts_AndLeavesUnreferencedStoreCopiesOnDisk()
     {
         var first = Saving();
         var inSession = AddScript(first, "in session");
         first.PersistSession();
-        var orphan = Guid.NewGuid();   // an autosave copy written after the last session save (e.g. a crash)
-        Store.Save(orphan, T.Config.Id, "orphan text", null);
+        var stray = Guid.NewGuid();   // an autosave copy the session does not reference
+        Store.Save(stray, T.Config.Id, "stray text", null);
 
         var main = Restarted();
-        Assert.Equal(2, main.RestoreTabs());
+        Assert.Equal(1, main.RestoreTabs());
 
-        Assert.Equal([inSession.Id, orphan], main.Tabs.OfType<ScriptTabViewModel>().Select(s => s.Id));
-        Assert.Same(main.Tabs[0], main.ActiveTab);
+        Assert.Equal([inSession.Id], main.Tabs.OfType<ScriptTabViewModel>().Select(s => s.Id));   // the session is the only source
+        Assert.Contains(Store.LoadAll(), s => s.TabId == stray);   // untouched on disk
     }
 
     [Fact]

@@ -14,8 +14,9 @@ internal static class SessionStartup
 
     /// <summary>
     /// Hands the session to the shell and restores. In read-only-config mode (<see cref="StartupConfig.PersistenceEnabled"/>
-    /// false) the session file is neither read nor written: only the unsaved scripts come back, as before. A file that is
-    /// missing or unusable also means "unsaved scripts only". Never throws.
+    /// false) the session file is neither read nor written: only the unsaved scripts come back, as before; the same when
+    /// the file exists but cannot be read. A missing or corrupt (moved aside) file means "unsaved scripts only", and a new
+    /// session is written from then on. Never throws.
     /// </summary>
     internal static void Restore(MainViewModel main, StartupConfig startup, TabSessionStore store, Func<TabSessionLoad> load)
     {
@@ -26,7 +27,9 @@ internal static class SessionStartup
             {
                 var loaded = load();
                 notice = loaded.Notice;
-                main.UseTabSession(store, loaded.Session);
+                // A file that exists but could not be read (locked for a moment) must not be replaced by a near-empty session:
+                // this run neither restores from it nor writes it (same rule as the config).
+                if (!loaded.Unreadable) main.UseTabSession(store, loaded.Session);
             }
         }
         catch (Exception)

@@ -86,6 +86,26 @@ public class TabSessionStartupTests : ShellTestBase
         Assert.Equal(before, File.ReadAllText(SessionFile));
     }
 
+    [AvaloniaFact]
+    public async Task Window_SessionFileLockedAtStart_IsNotOverwrittenOnceItIsReleased()
+    {
+        SessionStore.Save(new SavedTabs(0, [new SavedTab(SavedTabKind.Table, T.Config.Id, null, "customers")]));
+        var before = File.ReadAllText(SessionFile);
+        var (window, main) = Start();
+        main.SessionSaveDelay = TimeSpan.FromMilliseconds(40);
+
+        var locked = new FileStream(SessionFile, FileMode.Open, FileAccess.Read, FileShare.None);   // e.g. an antivirus scan
+        window.Show();
+        await Pump();
+        locked.Dispose();
+        await Task.Delay(300);   // longer than the save delay: a wrongly scheduled write would have landed
+
+        Assert.Empty(main.Tabs);   // could not be read: unsaved scripts only
+        Assert.Equal(before, File.ReadAllText(SessionFile));
+        window.Close();
+        Assert.Equal(before, File.ReadAllText(SessionFile));   // not even on close
+    }
+
     private static async Task Pump()
     {
         for (var i = 0; i < 8; i++)

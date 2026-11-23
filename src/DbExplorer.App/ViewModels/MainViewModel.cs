@@ -206,17 +206,14 @@ public partial class MainViewModel : ObservableObject
     /// Brings back the unsaved scripts of the last run whose connection still exists (the others stay in the store).
     /// They are not connected: a restored tab connects when it first runs. Returns how many were restored.
     /// </summary>
-    public int RestoreScripts() => _scriptStore is { } store ? RestoreUnsaved(store.LoadAll, null) : 0;
-
-    /// <summary>Opens the unsaved scripts <paramref name="load"/> returns, except those of <paramref name="skip"/> (already open).</summary>
-    private int RestoreUnsaved(Func<IEnumerable<SavedScript>> load, ISet<Guid>? skip)
+    public int RestoreScripts()
     {
+        if (_scriptStore is not { } store) return 0;
         var restored = 0;
         try
         {
-            foreach (var saved in load())
+            foreach (var saved in store.LoadAll())
             {
-                if (skip is not null && skip.Contains(saved.TabId)) continue;
                 var config = Tree.Config.Connections.FirstOrDefault(c => c.Id == saved.ConnectionId);
                 if (config is null) continue;
                 var tab = CreateScriptTab(config, saved);
@@ -355,10 +352,7 @@ public partial class MainViewModel : ObservableObject
         // Only the active tab loads now (the others when first selected).
         if (ActiveTab is TableTabViewModel { IsDeferred: true } current) _ = current.EnsureLoadedAsync();
 
-        // Unsaved copies the session does not know (written after its last save, e.g. a crash) must not be lost: keep them too.
-        var known = saved.Tabs.Where(t => t.ScriptId is not null).Select(t => t.ScriptId!.Value).ToHashSet();
-        RestoreUnsaved(() => unsaved, known);
-
+        // Copies in the script store that the session does not reference stay on disk, untouched (the session is the only source).
         _sessionRestored = true;
         if (skipped > 0)
         {
