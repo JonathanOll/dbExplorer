@@ -1,0 +1,56 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="DbExplorer.App.Views.VirtualKeyDialog"
+        Title="Define key"
+        Width="500" Height="560" MinWidth="400" MinHeight="360"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel>
+    <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxWindowBg}" BorderBrush="{DynamicResource DbxBorder}"
+            BorderThickness="0,1,0,0" Padding="20,12">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+          <Button Content="OK" Classes="accent" IsDefault="True" MinWidth="88" HorizontalContentAlignment="Center" Click="OnOkClick" />
+          <Button Content="Cancel" IsCancel="True" MinWidth="88" HorizontalContentAlignment="Center" Click="OnCancelClick" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,12,0">
+          <PathIcon x:Name="ErrorIcon" Data="{StaticResource IconError}" Foreground="{DynamicResource DbxError}" IsVisible="False" />
+          <TextBlock x:Name="ErrorText" Foreground="{DynamicResource DbxError}" TextWrapping="Wrap" IsVisible="False" MaxWidth="260" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Top" Background="{DynamicResource DbxPanelHeaderBg}" BorderBrush="{DynamicResource DbxBorder}"
+            BorderThickness="0,0,0,1" Padding="20,14">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <PathIcon Data="{StaticResource IconKey}" Width="26" Height="26" Foreground="{DynamicResource DbxIconKey}" />
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="Define a key" FontSize="17" FontWeight="SemiBold" />
+          <TextBlock x:Name="Heading" Classes="dim" TextWrapping="Wrap" MaxWidth="400" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Top" Classes="banner warn" Padding="20,8">
+      <Grid ColumnDefinitions="Auto,*">
+        <PathIcon Classes="bi" Data="{StaticResource IconWarning}" VerticalAlignment="Top" Margin="0,1,8,0" />
+        <TextBlock x:Name="WarningText" Grid.Column="1" TextWrapping="Wrap" FontSize="12" />
+      </Grid>
+    </Border>
+
+    <Border DockPanel.Dock="Top" Background="{DynamicResource DbxContentBg}" Padding="20,12,20,6">
+      <StackPanel Spacing="6">
+        <TextBlock x:Name="ExcludedText" TextWrapping="Wrap" Classes="dim small" IsVisible="False" />
+        <CheckBox x:Name="AllColumns" Content="Use all columns" Click="OnAllColumnsClick" />
+      </StackPanel>
+    </Border>
+
+    <Border Background="{DynamicResource DbxContentBg}" Padding="20,0,20,16">
+      <Border BorderBrush="{DynamicResource DbxBorder}" BorderThickness="1" CornerRadius="4" Background="{DynamicResource DbxInputBg}">
+        <ScrollViewer>
+          <StackPanel x:Name="ColumnList" Margin="10,8" Spacing="2" />
+        </ScrollViewer>
+      </Border>
+    </Border>
+  </DockPanel>
+</Window>

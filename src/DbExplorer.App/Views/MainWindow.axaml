@@ -1,0 +1,348 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbExplorer.App.ViewModels"
+        xmlns:views="using:DbExplorer.App.Views"
+        xmlns:model="using:DbExplorer.Core.Model"
+        x:Class="DbExplorer.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="dbExplorer"
+        Width="1280" Height="800" MinWidth="720" MinHeight="420">
+
+  <Window.Styles>
+    <!-- tab close button: only drawn (and clickable) on the hovered or the selected tab -->
+    <Style Selector="TabItem Button.close">
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="IsHitTestVisible" Value="False" />
+    </Style>
+    <Style Selector="TabItem:pointerover Button.close, TabItem:selected Button.close">
+      <Setter Property="Opacity" Value="1" />
+      <Setter Property="IsHitTestVisible" Value="True" />
+    </Style>
+    <Style Selector="TextBlock.connected"><Setter Property="FontWeight" Value="SemiBold" /></Style>
+    <Style Selector="PathIcon.view"><Setter Property="Foreground" Value="{DynamicResource DbxIconView}" /></Style>
+    <Style Selector="PathIcon.status"><Setter Property="Foreground" Value="{DynamicResource DbxInfo}" /></Style>
+    <Style Selector="PathIcon.status.error"><Setter Property="Foreground" Value="{DynamicResource DbxError}" /></Style>
+    <Style Selector="TextBlock.statusText.error"><Setter Property="Foreground" Value="{DynamicResource DbxError}" /></Style>
+    <!-- welcome panel actions -->
+    <Style Selector="Button.card">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Padding" Value="12,10" />
+      <Setter Property="Background" Value="{DynamicResource DbxToolbarBg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxBorderSubtle}" />
+      <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <Style Selector="Button.card:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource DbxAccentSoft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" />
+    </Style>
+  </Window.Styles>
+
+  <Grid>
+    <DockPanel>
+      <!-- Config problem (read-only config mode): always visible, above everything -->
+      <Border DockPanel.Dock="Top" Classes="banner error"
+              IsVisible="{Binding Banner, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <PathIcon Classes="bi" Data="{StaticResource IconError}" />
+          <TextBlock Text="{Binding Banner}" TextWrapping="Wrap" VerticalAlignment="Center" />
+        </StackPanel>
+      </Border>
+
+      <!-- Status bar: message (left), busy + cancel (middle), active connection and shortcuts (right) -->
+      <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxPanelHeaderBg}" BorderBrush="{DynamicResource DbxBorder}"
+              BorderThickness="0,1,0,0" MinHeight="26" Padding="10,0,8,0">
+        <Grid ColumnDefinitions="*,Auto,Auto">
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center"
+                      IsVisible="{Binding Status.Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <PathIcon Classes="status" Classes.error="{Binding Status.IsError}" Width="13" Height="13"
+                      Data="{Binding Status.IsError, Converter={x:Static views:Icons.StatusIcon}}" />
+            <TextBlock Classes="statusText" Classes.error="{Binding Status.IsError}" Text="{Binding Status.Message}"
+                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="12"
+                       ToolTip.Tip="{Binding Status.Message}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="10,0" VerticalAlignment="Center"
+                      IsVisible="{Binding Status.IsBusy}">
+            <ProgressBar IsIndeterminate="{Binding Status.IsBusy}" Width="90" Height="4" VerticalAlignment="Center" />
+            <TextBlock Classes="dim small" Text="{Binding Status.BusyText}" VerticalAlignment="Center" />
+            <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}" Content="Cancel"
+                    Command="{Binding Tree.CancelConnectCommand}" ToolTip.Tip="Cancel the connection attempt" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" x:DataType="model:ConnectionConfig"
+                        DataContext="{Binding CurrentConnection}"
+                        IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <views:EngineIcon Kind="{Binding Kind}" Width="13" Height="13" />
+              <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <TextBlock Classes="dim" FontSize="12" VerticalAlignment="Center"
+                         Text="{Binding Kind, Converter={x:Static views:Icons.EngineName}}" />
+              <Border Classes="badge warn" IsVisible="{Binding ReadOnly}"
+                      ToolTip.Tip="This connection is read-only: no editing, scripts refuse writes">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <PathIcon Data="{StaticResource IconLock}" Width="10" Height="10" />
+                  <TextBlock Text="read-only" FontSize="11" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" Opacity="0.9">
+              <Border Classes="kbd"><TextBlock Text="Ctrl+T" /></Border>
+              <TextBlock Classes="dim small" Text="tables" VerticalAlignment="Center" />
+              <Border Classes="kbd" Margin="4,0,0,0"><TextBlock Text="Ctrl+Shift+T" /></Border>
+              <TextBlock Classes="dim small" Text="all" VerticalAlignment="Center" />
+              <Border Classes="kbd" Margin="4,0,0,0"><TextBlock Text="Ctrl+N" /></Border>
+              <TextBlock Classes="dim small" Text="script" VerticalAlignment="Center" />
+            </StackPanel>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="280" MinWidth="190" MaxWidth="560" />
+          <ColumnDefinition Width="5" />
+          <ColumnDefinition Width="*" MinWidth="320" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Navigator: tinted panel with a title strip and its own toolbar -->
+        <Border Grid.Column="0" Background="{DynamicResource DbxNavBg}">
+          <DockPanel>
+            <Border DockPanel.Dock="Top" Classes="panelHeader">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                  <PathIcon Classes="dim" Data="{StaticResource IconDatabase}" />
+                  <TextBlock Text="CONNECTIONS" FontSize="11.5" FontWeight="SemiBold" LetterSpacing="0.5"
+                             Foreground="{DynamicResource DbxTextDim}" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="1" VerticalAlignment="Center">
+                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconDatabaseAdd}" Command="{Binding Tree.AddConnectionCommand}"
+                          MinWidth="26" Padding="4,0" ToolTip.Tip="New connection…" />
+                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconFolderAdd}" Command="{Binding Tree.AddFolderCommand}"
+                          MinWidth="26" Padding="4,0" ToolTip.Tip="New folder…" />
+                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconImport}" Command="{Binding Tree.ImportFromDBeaverCommand}"
+                          MinWidth="26" Padding="4,0" ToolTip.Tip="Import connections from the DBeaver workspace" />
+                  <Border Classes="vsep" Margin="3,7" />
+                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRefresh}" Command="{Binding Tree.RefreshSelectedCommand}"
+                          MinWidth="26" Padding="4,0" ToolTip.Tip="Refresh the schema of the selected connection" />
+                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconCollapseAll}" Command="{Binding Tree.CollapseAllCommand}"
+                          MinWidth="26" Padding="4,0" ToolTip.Tip="Collapse all" />
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <TreeView x:Name="ConnectionTree" ItemsSource="{Binding Tree.Nodes}"
+                      SelectedItem="{Binding Tree.SelectedNode, Mode=TwoWay}"
+                      DragDrop.AllowDrop="True" Background="Transparent" Padding="2,4">
+              <TreeView.Styles>
+                <Style Selector="TreeViewItem" x:DataType="vm:TreeNodeViewModel">
+                  <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                </Style>
+              </TreeView.Styles>
+
+              <TreeView.DataTemplates>
+                <TreeDataTemplate DataType="vm:FolderNodeViewModel" ItemsSource="{Binding Children}">
+                  <StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent">
+                    <Panel Width="16" Height="16" VerticalAlignment="Center">
+                      <PathIcon Data="{StaticResource IconFolder}" Width="15" Height="15" Foreground="{DynamicResource DbxIconFolder}"
+                                IsVisible="{Binding !IsExpanded}" />
+                      <PathIcon Data="{StaticResource IconFolderOpen}" Width="15" Height="15" Foreground="{DynamicResource DbxIconFolder}"
+                                IsVisible="{Binding IsExpanded}" />
+                    </Panel>
+                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <TextBlock Classes="faint small" VerticalAlignment="Center"
+                               Text="{Binding Children.Count, Converter={x:Static views:Icons.CountInParens}}" />
+                    <StackPanel.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Rename..." Command="{Binding Tree.RenameFolderCommand}" CommandParameter="{Binding}" />
+                        <MenuItem Header="Delete" Command="{Binding Tree.DeleteFolderCommand}" CommandParameter="{Binding}" />
+                      </ContextMenu>
+                    </StackPanel.ContextMenu>
+                  </StackPanel>
+                </TreeDataTemplate>
+
+                <TreeDataTemplate DataType="vm:ConnectionNodeViewModel" ItemsSource="{Binding Children}">
+                  <StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent">
+                    <Border Width="3" Height="14" CornerRadius="2" Background="{Binding ChipColor}" VerticalAlignment="Center"
+                            ToolTip.Tip="Colour of this connection (also shown on its tabs)" />
+                    <views:EngineIcon Kind="{Binding Config.Kind}" Width="15" Height="15" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding Title}" Classes.connected="{Binding IsConnected}" VerticalAlignment="Center" />
+                    <Ellipse Width="7" Height="7" Fill="{DynamicResource DbxSuccess}" VerticalAlignment="Center"
+                             IsVisible="{Binding IsConnected}" ToolTip.Tip="Connected" />
+                    <PathIcon Data="{StaticResource IconLock}" Width="11" Height="11" Foreground="{DynamicResource DbxWarn}"
+                              IsVisible="{Binding IsReadOnly}" ToolTip.Tip="Read-only connection" />
+                    <TextBlock Classes="faint small" Text="connecting…" VerticalAlignment="Center" IsVisible="{Binding IsConnecting}" />
+                    <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center" IsVisible="{Binding HasError}"
+                                ToolTip.Tip="{Binding ErrorMessage}">
+                      <PathIcon Data="{StaticResource IconError}" Width="12" Height="12" Foreground="{DynamicResource DbxError}" />
+                      <TextBlock Text="failed" FontSize="11" Foreground="{DynamicResource DbxError}" />
+                    </StackPanel>
+                    <StackPanel.ContextMenu>
+                      <ContextMenu>
+                        <MenuItem Header="Connect" Command="{Binding Tree.ConnectCommand}" CommandParameter="{Binding}" />
+                        <MenuItem Header="Disconnect" Command="{Binding Tree.DisconnectNodeCommand}" CommandParameter="{Binding}" />
+                        <MenuItem Header="Refresh schema" Command="{Binding Tree.RefreshCommand}" CommandParameter="{Binding}" />
+                        <Separator />
+                        <MenuItem Header="Read-only" ToggleType="CheckBox" IsChecked="{Binding IsReadOnly, Mode=OneWay}"
+                                  Command="{Binding Tree.ToggleReadOnlyCommand}" CommandParameter="{Binding}" />
+                        <MenuItem Header="Edit..." Command="{Binding Tree.EditConnectionCommand}" CommandParameter="{Binding}" />
+                        <MenuItem Header="Delete" Command="{Binding Tree.DeleteConnectionCommand}" CommandParameter="{Binding}" />
+                      </ContextMenu>
+                    </StackPanel.ContextMenu>
+                  </StackPanel>
+                </TreeDataTemplate>
+
+                <TreeDataTemplate DataType="vm:SchemaNodeViewModel" ItemsSource="{Binding Children}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Classes="dim" Data="{StaticResource IconSchema}" Width="13" Height="13" />
+                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                    <TextBlock Classes="faint small" Text="{Binding TableCount}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </TreeDataTemplate>
+
+                <TreeDataTemplate DataType="vm:PlaceholderNodeViewModel">
+                  <TextBlock Classes="faint" Text="{Binding Title}" />
+                </TreeDataTemplate>
+
+                <TreeDataTemplate DataType="vm:TableNodeViewModel">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Classes.view="{Binding IsView}" Foreground="{DynamicResource DbxIconTable}" Width="13" Height="13"
+                              Data="{Binding IsView, Converter={x:Static views:Icons.TableOrView}}" />
+                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </TreeDataTemplate>
+              </TreeView.DataTemplates>
+            </TreeView>
+          </DockPanel>
+        </Border>
+
+        <!-- visible, grabbable divider -->
+        <GridSplitter Grid.Column="1" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Width="5" />
+
+        <!-- Editor area: document tabs, or the welcome panel while nothing is open -->
+        <Grid Grid.Column="2" Background="{DynamicResource DbxContentBg}">
+          <TabControl Theme="{StaticResource DbxDocTabControl}" ItemContainerTheme="{StaticResource DbxDocTabItem}" ItemsSource="{Binding Tabs}" SelectedItem="{Binding ActiveTab}"
+                      IsVisible="{Binding !IsEmptyState}">
+            <TabControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:TabViewModel">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" Margin="10,0,4,0" Background="Transparent"
+                      ToolTip.Tip="{Binding Title, Converter={x:Static views:Icons.WithoutBullet}}">
+                  <Border Grid.Column="0" Width="4" Height="16" CornerRadius="2" Background="{Binding ChipColor}" Margin="0,0,8,0"
+                          VerticalAlignment="Center" />
+                  <PathIcon Grid.Column="1" Classes="dim" Width="13" Height="13" Margin="0,0,6,0"
+                            Data="{Binding IconKey, Converter={x:Static views:Icons.ByKey}}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Title, Converter={x:Static views:Icons.WithoutBullet}}"
+                             TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  <Ellipse Grid.Column="3" Width="8" Height="8" Margin="7,1,0,0" Fill="{DynamicResource DbxAccent}"
+                           VerticalAlignment="Center" IsVisible="{Binding HasUnsavedWork}" ToolTip.Tip="Unsaved changes" />
+                  <PathIcon Grid.Column="4" Data="{StaticResource IconLock}" Width="11" Height="11" Margin="7,0,0,0"
+                            Foreground="{DynamicResource DbxWarn}" VerticalAlignment="Center"
+                            IsVisible="{Binding Badge, Converter={x:Static ObjectConverters.IsNotNull}}"
+                            ToolTip.Tip="{Binding Badge}" />
+                  <Button Grid.Column="5" Classes="close" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}"
+                          MinWidth="22" MinHeight="22" Padding="4" Margin="6,0,0,0"
+                          Command="{Binding $parent[TabControl].((vm:MainViewModel)DataContext).CloseTabCommand}"
+                          CommandParameter="{Binding}" ToolTip.Tip="Close (Ctrl+W)" />
+                </Grid>
+              </DataTemplate>
+            </TabControl.ItemTemplate>
+          </TabControl>
+
+          <!-- Welcome panel (no tab open) -->
+          <ScrollViewer IsVisible="{Binding IsEmptyState}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel MaxWidth="560" Margin="24,48,24,32" Spacing="22" HorizontalAlignment="Center">
+              <StackPanel Spacing="4" HorizontalAlignment="Center">
+                <PathIcon Data="{StaticResource IconDatabase}" Width="44" Height="44" Foreground="{DynamicResource DbxAccent}"
+                          HorizontalAlignment="Center" />
+                <TextBlock Text="dbExplorer" FontSize="28" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,6,0,0" />
+                <TextBlock Classes="dim" Text="Explore and edit your databases, fast." FontSize="14" HorizontalAlignment="Center" />
+              </StackPanel>
+
+              <StackPanel Spacing="8">
+                <Button Classes="card" Command="{Binding ShowTablePickerCommand}">
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <PathIcon Data="{StaticResource IconTable}" Width="20" Height="20" Foreground="{DynamicResource DbxIconTable}" Margin="0,0,12,0" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                      <TextBlock Text="Open a table" FontWeight="SemiBold" />
+                      <TextBlock Classes="dim small" Text="Search tables and views of the selected connection" />
+                    </StackPanel>
+                    <Border Grid.Column="2" Classes="kbd"><TextBlock Text="Ctrl+T" /></Border>
+                  </Grid>
+                </Button>
+                <Button Classes="card" Command="{Binding NewScriptTabCommand}">
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <PathIcon Data="{StaticResource IconScript}" Width="20" Height="20" Foreground="{DynamicResource DbxIcon}" Margin="0,0,12,0" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                      <TextBlock Text="New SQL script" FontWeight="SemiBold" />
+                      <TextBlock Classes="dim small" Text="An editor on the selected connection" />
+                    </StackPanel>
+                    <Border Grid.Column="2" Classes="kbd"><TextBlock Text="Ctrl+N" /></Border>
+                  </Grid>
+                </Button>
+                <Button Classes="card" Command="{Binding Tree.AddConnectionCommand}">
+                  <Grid ColumnDefinitions="Auto,*">
+                    <PathIcon Data="{StaticResource IconDatabaseAdd}" Width="20" Height="20" Foreground="{DynamicResource DbxAccent}" Margin="0,0,12,0" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                      <TextBlock Text="Add a connection" FontWeight="SemiBold" />
+                      <TextBlock Classes="dim small" Text="PostgreSQL, SQL Server or a SQLite file" />
+                    </StackPanel>
+                  </Grid>
+                </Button>
+                <Button Classes="card" Command="{Binding Tree.ImportFromDBeaverCommand}">
+                  <Grid ColumnDefinitions="Auto,*">
+                    <PathIcon Data="{StaticResource IconImport}" Width="20" Height="20" Foreground="{DynamicResource DbxIcon}" Margin="0,0,12,0" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                      <TextBlock Text="Import from DBeaver" FontWeight="SemiBold" />
+                      <TextBlock Classes="dim small" Text="Folders, connections and credentials" />
+                    </StackPanel>
+                  </Grid>
+                </Button>
+              </StackPanel>
+
+              <Border BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
+                <StackPanel Spacing="8">
+                  <TextBlock Classes="section" Text="KEYBOARD SHORTCUTS" Margin="0" />
+                  <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="7" ColumnSpacing="10">
+                    <Border Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Shift+T" /></Border>
+                    <TextBlock Grid.Column="1" Classes="dim" Text="table in any connection" VerticalAlignment="Center" />
+                    <Border Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+L" /></Border>
+                    <TextBlock Grid.Column="3" Classes="dim" Text="jump to a column" VerticalAlignment="Center" />
+
+                    <Border Grid.Row="1" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+O" /></Border>
+                    <TextBlock Grid.Row="1" Grid.Column="1" Classes="dim" Text="open a script file" VerticalAlignment="Center" />
+                    <Border Grid.Row="1" Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Enter" /></Border>
+                    <TextBlock Grid.Row="1" Grid.Column="3" Classes="dim" Text="run statement" VerticalAlignment="Center" />
+
+                    <Border Grid.Row="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="F5" /></Border>
+                    <TextBlock Grid.Row="2" Grid.Column="1" Classes="dim" Text="run script / reload" VerticalAlignment="Center" />
+                    <Border Grid.Row="2" Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+S" /></Border>
+                    <TextBlock Grid.Row="2" Grid.Column="3" Classes="dim" Text="save / review changes" VerticalAlignment="Center" />
+
+                    <Border Grid.Row="3" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+W" /></Border>
+                    <TextBlock Grid.Row="3" Grid.Column="1" Classes="dim" Text="close tab" VerticalAlignment="Center" />
+                    <Border Grid.Row="3" Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Tab" /></Border>
+                    <TextBlock Grid.Row="3" Grid.Column="3" Classes="dim" Text="next tab" VerticalAlignment="Center" />
+
+                    <Border Grid.Row="4" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="F2" /></Border>
+                    <TextBlock Grid.Row="4" Grid.Column="1" Classes="dim" Text="edit a cell" VerticalAlignment="Center" />
+                    <Border Grid.Row="4" Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+0" /></Border>
+                    <TextBlock Grid.Row="4" Grid.Column="3" Classes="dim" Text="set a cell to NULL" VerticalAlignment="Center" />
+                  </Grid>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </Grid>
+      </Grid>
+    </DockPanel>
+
+    <!-- Quick-open overlay: created on demand, nothing when closed -->
+    <ContentControl Content="{Binding QuickOpen}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+      <ContentControl.DataTemplates>
+        <DataTemplate DataType="vm:QuickOpenViewModel">
+          <views:QuickOpenOverlay />
+        </DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
+  </Grid>
+</Window>

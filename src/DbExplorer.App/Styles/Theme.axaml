@@ -1,0 +1,319 @@
+<!--
+  Design tokens of dbExplorer (see docs/ui/README.md). Every colour of the UI comes from here: views and styles refer to the
+  Dbx* brushes (DynamicResource, so a live Windows light/dark switch repaints them), never to a hex value.
+  The block at the end of each theme dictionary re-points the Fluent theme's own control brushes (buttons, text boxes, tree,
+  grid) to the tokens, so stock controls follow the palette without re-templating them.
+-->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- ===== Sizes, fonts: theme independent ===== -->
+  <x:Double x:Key="ControlContentThemeFontSize">13</x:Double>
+  <x:Double x:Key="DbxFontSize">13</x:Double>
+  <x:Double x:Key="DbxSmallFontSize">11.5</x:Double>
+  <x:Double x:Key="DbxGridFontSize">12.5</x:Double>
+  <x:Double x:Key="DbxRowHeight">24</x:Double>
+  <x:Double x:Key="DbxToolbarHeight">34</x:Double>
+  <x:Double x:Key="DbxTabHeight">34</x:Double>
+  <CornerRadius x:Key="ControlCornerRadius">3</CornerRadius>
+  <CornerRadius x:Key="DbxRadius">3</CornerRadius>
+  <CornerRadius x:Key="DbxCardRadius">8</CornerRadius>
+  <Thickness x:Key="ButtonPadding">12,5,12,5</Thickness>
+  <x:Double x:Key="TreeViewItemMinHeight">24</x:Double>
+  <x:Double x:Key="TreeViewItemIndent">14</x:Double>
+  <x:Double x:Key="TreeViewItemExpandCollapseChevronSize">9</x:Double>
+  <Thickness x:Key="TreeViewItemExpandCollapseChevronMargin">6,0,2,0</Thickness>
+  <!-- one family on purpose: a FontFamily element takes a comma list as a single family name -->
+  <FontFamily x:Key="DbxMonoFont">Consolas</FontFamily>
+  <BoxShadows x:Key="DbxCardShadow">0 10 28 0 #48000000</BoxShadows>
+
+  <ResourceDictionary.ThemeDictionaries>
+
+    <!-- ===================== LIGHT ===================== -->
+    <ResourceDictionary x:Key="Light">
+      <!-- Regions: each part of the window has its own tone -->
+      <SolidColorBrush x:Key="DbxWindowBg" Color="#E6EBF1" />          <!-- window / status bar / dialogs chrome -->
+      <SolidColorBrush x:Key="DbxNavBg" Color="#EEF2F7" />             <!-- navigator (tinted) -->
+      <SolidColorBrush x:Key="DbxPanelHeaderBg" Color="#DDE4ED" />     <!-- panel title strips -->
+      <SolidColorBrush x:Key="DbxTabStripBg" Color="#D3DBE6" />        <!-- document tab strip, darker than content -->
+      <SolidColorBrush x:Key="DbxContentBg" Color="#FFFFFF" />         <!-- editor / grid area -->
+      <SolidColorBrush x:Key="DbxToolbarBg" Color="#F5F7FA" />
+      <SolidColorBrush x:Key="DbxInputBg" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="DbxScrim" Color="#66101820" />
+      <SolidColorBrush x:Key="DbxBorder" Color="#BCC6D3" />
+      <SolidColorBrush x:Key="DbxBorderSubtle" Color="#DAE0E8" />
+      <SolidColorBrush x:Key="DbxSplitter" Color="#C9D1DC" />
+      <!-- Text -->
+      <SolidColorBrush x:Key="DbxText" Color="#1B2430" />
+      <SolidColorBrush x:Key="DbxTextDim" Color="#566272" />
+      <SolidColorBrush x:Key="DbxTextFaint" Color="#7F8B9B" />
+      <!-- Accent and states -->
+      <SolidColorBrush x:Key="DbxAccent" Color="#3B6EA5" />
+      <SolidColorBrush x:Key="DbxAccentStrong" Color="#2D5887" />
+      <SolidColorBrush x:Key="DbxAccentButtonBg" Color="#3B6EA5" />
+      <SolidColorBrush x:Key="DbxAccentButtonHover" Color="#2F5E92" />
+      <SolidColorBrush x:Key="DbxOnAccent" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="DbxAccentSoft" Color="#D2E2F4" />        <!-- selected row of the navigator -->
+      <SolidColorBrush x:Key="DbxAccentSoftHover" Color="#C3D8EE" />
+      <SolidColorBrush x:Key="DbxHover" Color="#E0E6EE" />
+      <SolidColorBrush x:Key="DbxPressed" Color="#CFD8E3" />
+      <SolidColorBrush x:Key="DbxButtonBg" Color="#F7F9FB" />
+      <SolidColorBrush x:Key="DbxLink" Color="#2B63A8" />
+      <!-- Data grid -->
+      <SolidColorBrush x:Key="DbxGridHeaderBg" Color="#E2E8F0" />
+      <SolidColorBrush x:Key="DbxGridFilterBg" Color="#F6F8FB" />
+      <SolidColorBrush x:Key="DbxGridLine" Color="#E7EBF1" />
+      <SolidColorBrush x:Key="DbxGridZebra" Color="#F4F7FB" />
+      <SolidColorBrush x:Key="DbxRowHover" Color="#EDF2F8" />
+      <SolidColorBrush x:Key="DbxRowSelected" Color="#CCDFF4" />
+      <SolidColorBrush x:Key="DbxRowSelectedInactive" Color="#DCE6F1" />
+      <!-- Status colours: banners are bg + border + text; icons use the strong colour -->
+      <SolidColorBrush x:Key="DbxError" Color="#C62828" />
+      <SolidColorBrush x:Key="DbxErrorBg" Color="#FDECEA" />
+      <SolidColorBrush x:Key="DbxErrorBorder" Color="#F0B4AF" />
+      <SolidColorBrush x:Key="DbxErrorText" Color="#8A1C1C" />
+      <SolidColorBrush x:Key="DbxWarn" Color="#B26A00" />
+      <SolidColorBrush x:Key="DbxWarnBg" Color="#FFF3D6" />
+      <SolidColorBrush x:Key="DbxWarnBorder" Color="#EBCE87" />
+      <SolidColorBrush x:Key="DbxWarnText" Color="#664000" />
+      <SolidColorBrush x:Key="DbxInfo" Color="#2467A8" />
+      <SolidColorBrush x:Key="DbxInfoBg" Color="#E4EFFB" />
+      <SolidColorBrush x:Key="DbxInfoBorder" Color="#B3D1EF" />
+      <SolidColorBrush x:Key="DbxInfoText" Color="#163F69" />
+      <SolidColorBrush x:Key="DbxSuccess" Color="#2A8C4C" />
+      <!-- Icon colours -->
+      <SolidColorBrush x:Key="DbxIcon" Color="#5B6B7E" />
+      <SolidColorBrush x:Key="DbxIconFolder" Color="#D69E2E" />
+      <SolidColorBrush x:Key="DbxIconTable" Color="#4C739E" />
+      <SolidColorBrush x:Key="DbxIconView" Color="#8A64B8" />
+      <SolidColorBrush x:Key="DbxIconKey" Color="#C7971A" />
+      <SolidColorBrush x:Key="DbxEnginePostgres" Color="#336FA8" />
+      <SolidColorBrush x:Key="DbxEngineSqlServer" Color="#A02A30" />
+      <SolidColorBrush x:Key="DbxEngineSqlite" Color="#14907F" />
+      <SolidColorBrush x:Key="DbxRun" Color="#2A8C4C" />
+      <SolidColorBrush x:Key="DbxStop" Color="#C62828" />
+
+      <!-- Fluent re-pointing -->
+      <StaticResource x:Key="ButtonBackground" ResourceKey="DbxButtonBg" />
+      <StaticResource x:Key="ButtonBackgroundPointerOver" ResourceKey="DbxHover" />
+      <StaticResource x:Key="ButtonBackgroundPressed" ResourceKey="DbxPressed" />
+      <StaticResource x:Key="ButtonBackgroundDisabled" ResourceKey="DbxButtonBg" />
+      <StaticResource x:Key="ButtonForeground" ResourceKey="DbxText" />
+      <StaticResource x:Key="ButtonForegroundPointerOver" ResourceKey="DbxText" />
+      <StaticResource x:Key="ButtonForegroundPressed" ResourceKey="DbxText" />
+      <StaticResource x:Key="ButtonForegroundDisabled" ResourceKey="DbxTextFaint" />
+      <StaticResource x:Key="ButtonBorderBrush" ResourceKey="DbxBorder" />
+      <StaticResource x:Key="ButtonBorderBrushPointerOver" ResourceKey="DbxBorder" />
+      <StaticResource x:Key="ButtonBorderBrushPressed" ResourceKey="DbxBorder" />
+      <StaticResource x:Key="ButtonBorderBrushDisabled" ResourceKey="DbxBorderSubtle" />
+      <StaticResource x:Key="AccentButtonBackground" ResourceKey="DbxAccentButtonBg" />
+      <StaticResource x:Key="AccentButtonBackgroundPointerOver" ResourceKey="DbxAccentButtonHover" />
+      <StaticResource x:Key="AccentButtonBackgroundPressed" ResourceKey="DbxAccentStrong" />
+      <StaticResource x:Key="AccentButtonBackgroundDisabled" ResourceKey="DbxHover" />
+      <StaticResource x:Key="AccentButtonForeground" ResourceKey="DbxOnAccent" />
+      <StaticResource x:Key="AccentButtonForegroundPointerOver" ResourceKey="DbxOnAccent" />
+      <StaticResource x:Key="AccentButtonForegroundPressed" ResourceKey="DbxOnAccent" />
+      <StaticResource x:Key="AccentButtonBorderBrush" ResourceKey="DbxAccentStrong" />
+      <StaticResource x:Key="AccentButtonBorderBrushPointerOver" ResourceKey="DbxAccentStrong" />
+      <StaticResource x:Key="AccentButtonBorderBrushPressed" ResourceKey="DbxAccentStrong" />
+      <StaticResource x:Key="TextControlBackground" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="TextControlBackgroundPointerOver" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="TextControlBackgroundFocused" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="TextControlBorderBrush" ResourceKey="DbxBorder" />
+      <StaticResource x:Key="TextControlBorderBrushPointerOver" ResourceKey="DbxTextFaint" />
+      <StaticResource x:Key="TextControlBorderBrushFocused" ResourceKey="DbxAccent" />
+      <StaticResource x:Key="TextControlForeground" ResourceKey="DbxText" />
+      <StaticResource x:Key="TextControlForegroundPointerOver" ResourceKey="DbxText" />
+      <StaticResource x:Key="TextControlForegroundFocused" ResourceKey="DbxText" />
+      <StaticResource x:Key="TextControlPlaceholderForeground" ResourceKey="DbxTextFaint" />
+      <StaticResource x:Key="TextControlPlaceholderForegroundPointerOver" ResourceKey="DbxTextFaint" />
+      <StaticResource x:Key="TextControlPlaceholderForegroundFocused" ResourceKey="DbxTextFaint" />
+      <StaticResource x:Key="ComboBoxBackground" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="ComboBoxBackgroundPointerOver" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="ComboBoxBackgroundPressed" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="ComboBoxBackgroundUnfocused" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="ComboBoxBorderBrush" ResourceKey="DbxBorder" />
+      <StaticResource x:Key="ComboBoxBorderBrushPointerOver" ResourceKey="DbxTextFaint" />
+      <StaticResource x:Key="ComboBoxBorderBrushPressed" ResourceKey="DbxAccent" />
+      <SolidColorBrush x:Key="TreeViewItemBackground" Color="Transparent" />
+      <StaticResource x:Key="TreeViewItemBackgroundPointerOver" ResourceKey="DbxHover" />
+      <StaticResource x:Key="TreeViewItemBackgroundPressed" ResourceKey="DbxPressed" />
+      <StaticResource x:Key="TreeViewItemBackgroundSelected" ResourceKey="DbxAccentSoft" />
+      <StaticResource x:Key="TreeViewItemBackgroundSelectedPointerOver" ResourceKey="DbxAccentSoftHover" />
+      <StaticResource x:Key="TreeViewItemBackgroundSelectedPressed" ResourceKey="DbxAccentSoftHover" />
+      <StaticResource x:Key="TreeViewItemForeground" ResourceKey="DbxText" />
+      <StaticResource x:Key="TreeViewItemForegroundPointerOver" ResourceKey="DbxText" />
+      <StaticResource x:Key="TreeViewItemForegroundPressed" ResourceKey="DbxText" />
+      <StaticResource x:Key="TreeViewItemForegroundSelected" ResourceKey="DbxText" />
+      <StaticResource x:Key="TreeViewItemForegroundSelectedPointerOver" ResourceKey="DbxText" />
+      <StaticResource x:Key="TreeViewItemForegroundSelectedPressed" ResourceKey="DbxText" />
+      <StaticResource x:Key="ToolTipBackground" ResourceKey="DbxToolbarBg" />
+      <StaticResource x:Key="ToolTipBorderBrush" ResourceKey="DbxBorder" />
+      <StaticResource x:Key="ToolTipForeground" ResourceKey="DbxText" />
+      <StaticResource x:Key="MenuFlyoutPresenterBackground" ResourceKey="DbxToolbarBg" />
+      <StaticResource x:Key="MenuFlyoutPresenterBorderBrush" ResourceKey="DbxBorder" />
+      <StaticResource x:Key="SystemControlHighlightListLowBrush" ResourceKey="DbxHover" />
+      <StaticResource x:Key="SystemControlHighlightListMediumBrush" ResourceKey="DbxPressed" />
+      <StaticResource x:Key="SystemControlHighlightListAccentLowBrush" ResourceKey="DbxAccentSoft" />
+      <StaticResource x:Key="SystemControlHighlightListAccentMediumBrush" ResourceKey="DbxAccentSoftHover" />
+      <StaticResource x:Key="SystemControlHighlightListAccentHighBrush" ResourceKey="DbxAccentSoftHover" />
+      <StaticResource x:Key="SystemControlHighlightAltBaseHighBrush" ResourceKey="DbxText" />
+      <!-- DataGrid (Fluent keys) -->
+      <StaticResource x:Key="DataGridColumnHeaderBackgroundBrush" ResourceKey="DbxGridHeaderBg" />
+      <StaticResource x:Key="DataGridColumnHeaderForegroundBrush" ResourceKey="DbxText" />
+      <StaticResource x:Key="DataGridColumnHeaderHoveredBackgroundBrush" ResourceKey="DbxPressed" />
+      <StaticResource x:Key="DataGridColumnHeaderPressedBackgroundBrush" ResourceKey="DbxPressed" />
+      <StaticResource x:Key="DataGridGridLinesBrush" ResourceKey="DbxGridLine" />
+      <StaticResource x:Key="DataGridRowHoveredBackgroundColor" ResourceKey="DbxRowHover" />
+      <StaticResource x:Key="DataGridRowSelectedBackgroundBrush" ResourceKey="DbxRowSelected" />
+      <StaticResource x:Key="DataGridRowSelectedHoveredBackgroundBrush" ResourceKey="DbxRowSelected" />
+      <StaticResource x:Key="DataGridRowSelectedUnfocusedBackgroundBrush" ResourceKey="DbxRowSelectedInactive" />
+      <StaticResource x:Key="DataGridRowSelectedHoveredUnfocusedBackgroundBrush" ResourceKey="DbxRowSelectedInactive" />
+      <StaticResource x:Key="DataGridCellFocusVisualPrimaryBrush" ResourceKey="DbxAccent" />
+      <StaticResource x:Key="DataGridCellFocusVisualSecondaryBrush" ResourceKey="DbxContentBg" />
+    </ResourceDictionary>
+
+    <!-- ===================== DARK ===================== -->
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="DbxWindowBg" Color="#1A1D21" />
+      <SolidColorBrush x:Key="DbxNavBg" Color="#21252B" />
+      <SolidColorBrush x:Key="DbxPanelHeaderBg" Color="#2B3038" />
+      <SolidColorBrush x:Key="DbxTabStripBg" Color="#14161A" />
+      <SolidColorBrush x:Key="DbxContentBg" Color="#272B31" />
+      <SolidColorBrush x:Key="DbxToolbarBg" Color="#2E333A" />
+      <SolidColorBrush x:Key="DbxInputBg" Color="#1E2126" />
+      <SolidColorBrush x:Key="DbxScrim" Color="#A0000000" />
+      <SolidColorBrush x:Key="DbxBorder" Color="#444B55" />
+      <SolidColorBrush x:Key="DbxBorderSubtle" Color="#343A43" />
+      <SolidColorBrush x:Key="DbxSplitter" Color="#3C434D" />
+      <SolidColorBrush x:Key="DbxText" Color="#E3E8EE" />
+      <SolidColorBrush x:Key="DbxTextDim" Color="#A0AAB8" />
+      <SolidColorBrush x:Key="DbxTextFaint" Color="#76828F" />
+      <SolidColorBrush x:Key="DbxAccent" Color="#4F8FD0" />
+      <SolidColorBrush x:Key="DbxAccentStrong" Color="#74A9E2" />
+      <SolidColorBrush x:Key="DbxAccentButtonBg" Color="#3A78BB" />
+      <SolidColorBrush x:Key="DbxAccentButtonHover" Color="#4688CD" />
+      <SolidColorBrush x:Key="DbxOnAccent" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="DbxAccentSoft" Color="#2D4A6B" />
+      <SolidColorBrush x:Key="DbxAccentSoftHover" Color="#345680" />
+      <SolidColorBrush x:Key="DbxHover" Color="#323841" />
+      <SolidColorBrush x:Key="DbxPressed" Color="#3C434E" />
+      <SolidColorBrush x:Key="DbxButtonBg" Color="#353B44" />
+      <SolidColorBrush x:Key="DbxLink" Color="#6FAAE8" />
+      <SolidColorBrush x:Key="DbxGridHeaderBg" Color="#2F353D" />
+      <SolidColorBrush x:Key="DbxGridFilterBg" Color="#23272D" />
+      <SolidColorBrush x:Key="DbxGridLine" Color="#333941" />
+      <SolidColorBrush x:Key="DbxGridZebra" Color="#2C3137" />
+      <SolidColorBrush x:Key="DbxRowHover" Color="#30363E" />
+      <SolidColorBrush x:Key="DbxRowSelected" Color="#2E4C72" />
+      <SolidColorBrush x:Key="DbxRowSelectedInactive" Color="#303F52" />
+      <SolidColorBrush x:Key="DbxError" Color="#F2766E" />
+      <SolidColorBrush x:Key="DbxErrorBg" Color="#43231F" />
+      <SolidColorBrush x:Key="DbxErrorBorder" Color="#7C3B37" />
+      <SolidColorBrush x:Key="DbxErrorText" Color="#FFB8B2" />
+      <SolidColorBrush x:Key="DbxWarn" Color="#E8B04C" />
+      <SolidColorBrush x:Key="DbxWarnBg" Color="#40351A" />
+      <SolidColorBrush x:Key="DbxWarnBorder" Color="#7A6530" />
+      <SolidColorBrush x:Key="DbxWarnText" Color="#F5D78F" />
+      <SolidColorBrush x:Key="DbxInfo" Color="#7DB4EC" />
+      <SolidColorBrush x:Key="DbxInfoBg" Color="#1F3249" />
+      <SolidColorBrush x:Key="DbxInfoBorder" Color="#3B5F88" />
+      <SolidColorBrush x:Key="DbxInfoText" Color="#B9D7F6" />
+      <SolidColorBrush x:Key="DbxSuccess" Color="#4CC27A" />
+      <SolidColorBrush x:Key="DbxIcon" Color="#9AA6B5" />
+      <SolidColorBrush x:Key="DbxIconFolder" Color="#E2B24F" />
+      <SolidColorBrush x:Key="DbxIconTable" Color="#7FA3CC" />
+      <SolidColorBrush x:Key="DbxIconView" Color="#B49BE0" />
+      <SolidColorBrush x:Key="DbxIconKey" Color="#E0BD4A" />
+      <SolidColorBrush x:Key="DbxEnginePostgres" Color="#5B9BD5" />
+      <SolidColorBrush x:Key="DbxEngineSqlServer" Color="#E26D6D" />
+      <SolidColorBrush x:Key="DbxEngineSqlite" Color="#3FC1B0" />
+      <SolidColorBrush x:Key="DbxRun" Color="#4CC27A" />
+      <SolidColorBrush x:Key="DbxStop" Color="#F2766E" />
+
+      <StaticResource x:Key="ButtonBackground" ResourceKey="DbxButtonBg" />
+      <StaticResource x:Key="ButtonBackgroundPointerOver" ResourceKey="DbxHover" />
+      <StaticResource x:Key="ButtonBackgroundPressed" ResourceKey="DbxPressed" />
+      <StaticResource x:Key="ButtonBackgroundDisabled" ResourceKey="DbxButtonBg" />
+      <StaticResource x:Key="ButtonForeground" ResourceKey="DbxText" />
+      <StaticResource x:Key="ButtonForegroundPointerOver" ResourceKey="DbxText" />
+      <StaticResource x:Key="ButtonForegroundPressed" ResourceKey="DbxText" />
+      <StaticResource x:Key="ButtonForegroundDisabled" ResourceKey="DbxTextFaint" />
+      <StaticResource x:Key="ButtonBorderBrush" ResourceKey="DbxBorder" />
+      <StaticResource x:Key="ButtonBorderBrushPointerOver" ResourceKey="DbxBorder" />
+      <StaticResource x:Key="ButtonBorderBrushPressed" ResourceKey="DbxBorder" />
+      <StaticResource x:Key="ButtonBorderBrushDisabled" ResourceKey="DbxBorderSubtle" />
+      <StaticResource x:Key="AccentButtonBackground" ResourceKey="DbxAccentButtonBg" />
+      <StaticResource x:Key="AccentButtonBackgroundPointerOver" ResourceKey="DbxAccentButtonHover" />
+      <StaticResource x:Key="AccentButtonBackgroundPressed" ResourceKey="DbxAccent" />
+      <StaticResource x:Key="AccentButtonBackgroundDisabled" ResourceKey="DbxHover" />
+      <StaticResource x:Key="AccentButtonForeground" ResourceKey="DbxOnAccent" />
+      <StaticResource x:Key="AccentButtonForegroundPointerOver" ResourceKey="DbxOnAccent" />
+      <StaticResource x:Key="AccentButtonForegroundPressed" ResourceKey="DbxOnAccent" />
+      <StaticResource x:Key="AccentButtonBorderBrush" ResourceKey="DbxAccent" />
+      <StaticResource x:Key="AccentButtonBorderBrushPointerOver" ResourceKey="DbxAccent" />
+      <StaticResource x:Key="AccentButtonBorderBrushPressed" ResourceKey="DbxAccent" />
+      <StaticResource x:Key="TextControlBackground" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="TextControlBackgroundPointerOver" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="TextControlBackgroundFocused" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="TextControlBorderBrush" ResourceKey="DbxBorder" />
+      <StaticResource x:Key="TextControlBorderBrushPointerOver" ResourceKey="DbxTextFaint" />
+      <StaticResource x:Key="TextControlBorderBrushFocused" ResourceKey="DbxAccent" />
+      <StaticResource x:Key="TextControlForeground" ResourceKey="DbxText" />
+      <StaticResource x:Key="TextControlForegroundPointerOver" ResourceKey="DbxText" />
+      <StaticResource x:Key="TextControlForegroundFocused" ResourceKey="DbxText" />
+      <StaticResource x:Key="TextControlPlaceholderForeground" ResourceKey="DbxTextFaint" />
+      <StaticResource x:Key="TextControlPlaceholderForegroundPointerOver" ResourceKey="DbxTextFaint" />
+      <StaticResource x:Key="TextControlPlaceholderForegroundFocused" ResourceKey="DbxTextFaint" />
+      <StaticResource x:Key="ComboBoxBackground" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="ComboBoxBackgroundPointerOver" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="ComboBoxBackgroundPressed" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="ComboBoxBackgroundUnfocused" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="ComboBoxBorderBrush" ResourceKey="DbxBorder" />
+      <StaticResource x:Key="ComboBoxBorderBrushPointerOver" ResourceKey="DbxTextFaint" />
+      <StaticResource x:Key="ComboBoxBorderBrushPressed" ResourceKey="DbxAccent" />
+      <SolidColorBrush x:Key="TreeViewItemBackground" Color="Transparent" />
+      <StaticResource x:Key="TreeViewItemBackgroundPointerOver" ResourceKey="DbxHover" />
+      <StaticResource x:Key="TreeViewItemBackgroundPressed" ResourceKey="DbxPressed" />
+      <StaticResource x:Key="TreeViewItemBackgroundSelected" ResourceKey="DbxAccentSoft" />
+      <StaticResource x:Key="TreeViewItemBackgroundSelectedPointerOver" ResourceKey="DbxAccentSoftHover" />
+      <StaticResource x:Key="TreeViewItemBackgroundSelectedPressed" ResourceKey="DbxAccentSoftHover" />
+      <StaticResource x:Key="TreeViewItemForeground" ResourceKey="DbxText" />
+      <StaticResource x:Key="TreeViewItemForegroundPointerOver" ResourceKey="DbxText" />
+      <StaticResource x:Key="TreeViewItemForegroundPressed" ResourceKey="DbxText" />
+      <StaticResource x:Key="TreeViewItemForegroundSelected" ResourceKey="DbxText" />
+      <StaticResource x:Key="TreeViewItemForegroundSelectedPointerOver" ResourceKey="DbxText" />
+      <StaticResource x:Key="TreeViewItemForegroundSelectedPressed" ResourceKey="DbxText" />
+      <StaticResource x:Key="ToolTipBackground" ResourceKey="DbxToolbarBg" />
+      <StaticResource x:Key="ToolTipBorderBrush" ResourceKey="DbxBorder" />
+      <StaticResource x:Key="ToolTipForeground" ResourceKey="DbxText" />
+      <StaticResource x:Key="MenuFlyoutPresenterBackground" ResourceKey="DbxToolbarBg" />
+      <StaticResource x:Key="MenuFlyoutPresenterBorderBrush" ResourceKey="DbxBorder" />
+      <StaticResource x:Key="SystemControlHighlightListLowBrush" ResourceKey="DbxHover" />
+      <StaticResource x:Key="SystemControlHighlightListMediumBrush" ResourceKey="DbxPressed" />
+      <StaticResource x:Key="SystemControlHighlightListAccentLowBrush" ResourceKey="DbxAccentSoft" />
+      <StaticResource x:Key="SystemControlHighlightListAccentMediumBrush" ResourceKey="DbxAccentSoftHover" />
+      <StaticResource x:Key="SystemControlHighlightListAccentHighBrush" ResourceKey="DbxAccentSoftHover" />
+      <StaticResource x:Key="SystemControlHighlightAltBaseHighBrush" ResourceKey="DbxText" />
+      <StaticResource x:Key="DataGridColumnHeaderBackgroundBrush" ResourceKey="DbxGridHeaderBg" />
+      <StaticResource x:Key="DataGridColumnHeaderForegroundBrush" ResourceKey="DbxText" />
+      <StaticResource x:Key="DataGridColumnHeaderHoveredBackgroundBrush" ResourceKey="DbxPressed" />
+      <StaticResource x:Key="DataGridColumnHeaderPressedBackgroundBrush" ResourceKey="DbxPressed" />
+      <StaticResource x:Key="DataGridGridLinesBrush" ResourceKey="DbxGridLine" />
+      <StaticResource x:Key="DataGridRowHoveredBackgroundColor" ResourceKey="DbxRowHover" />
+      <StaticResource x:Key="DataGridRowSelectedBackgroundBrush" ResourceKey="DbxRowSelected" />
+      <StaticResource x:Key="DataGridRowSelectedHoveredBackgroundBrush" ResourceKey="DbxRowSelected" />
+      <StaticResource x:Key="DataGridRowSelectedUnfocusedBackgroundBrush" ResourceKey="DbxRowSelectedInactive" />
+      <StaticResource x:Key="DataGridRowSelectedHoveredUnfocusedBackgroundBrush" ResourceKey="DbxRowSelectedInactive" />
+      <StaticResource x:Key="DataGridCellFocusVisualPrimaryBrush" ResourceKey="DbxAccent" />
+      <StaticResource x:Key="DataGridCellFocusVisualSecondaryBrush" ResourceKey="DbxContentBg" />
+    </ResourceDictionary>
+
+  </ResourceDictionary.ThemeDictionaries>
+
+  <!-- Selected rows of the data grid keep full strength: the Fluent opacity resources would wash the tokens out -->
+  <x:Double x:Key="DataGridRowSelectedBackgroundOpacity">1</x:Double>
+  <x:Double x:Key="DataGridRowSelectedHoveredBackgroundOpacity">1</x:Double>
+  <x:Double x:Key="DataGridRowSelectedUnfocusedBackgroundOpacity">1</x:Double>
+  <x:Double x:Key="DataGridRowSelectedHoveredUnfocusedBackgroundOpacity">1</x:Double>
+</ResourceDictionary>

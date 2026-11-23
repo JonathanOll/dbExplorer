@@ -1,0 +1,229 @@
+{
+	"folders": {
+		"Admin": {},
+		"Acme": {},
+		"Globex": {},
+		"Translate": {}
+	},
+	"connections": {
+		"sqlite_jdbc-1a05beeb3ce-6d10609e056619c7": {
+			"provider": "sqlite",
+			"driver": "sqlite_jdbc",
+			"name": "Admin SQLite",
+			"save-password": true,
+			"folder": "Admin",
+			"configuration": {
+				"database": "C:\\Temp\\_Acme\\adminDB.db",
+				"url": "jdbc:sqlite:C:\\Temp\\_Acme\\adminDB.db",
+				"configurationType": "MANUAL",
+				"type": "dev",
+				"closeIdleConnection": false
+			}
+		},
+		"postgres-jdbc-1a05bf09a7b-353403f0debe63b4": {
+			"provider": "postgresql",
+			"driver": "postgres-jdbc",
+			"name": "Admin Postgre",
+			"save-password": true,
+			"folder": "Admin",
+			"configuration": {
+				"host": "localhost",
+				"port": "5432",
+				"database": "backoffice",
+				"url": "jdbc:postgresql://localhost:5432/backoffice",
+				"configurationType": "MANUAL",
+				"type": "dev",
+				"closeIdleConnection": false,
+				"provider-properties": {
+					"@dbeaver-show-non-default-db@": "false"
+				},
+				"auth-model": "native"
+			}
+		},
+		"microsoft-1a05bf273cf-1a6d26bd70a9b734": {
+			"provider": "sqlserver",
+			"driver": "microsoft",
+			"name": "Acme local",
+			"save-password": true,
+			"folder": "Acme",
+			"configuration": {
+				"host": "127.0.0.1",
+				"port": "1433",
+				"database": "acme",
+				"url": "jdbc:sqlserver://;serverName\u003d127.0.0.1;databaseName\u003dacme",
+				"configurationType": "MANUAL",
+				"type": "dev",
+				"closeIdleConnection": false,
+				"provider-properties": {
+					"@dbeaver-show-all-schemas@": "false",
+					"sslTrustServerCertificate": "true"
+				},
+				"auth-model": "sqlserver_database"
+			}
+		},
+		"microsoft-1a05bf3407a-f4902502410943f": {
+			"provider": "sqlserver",
+			"driver": "microsoft",
+			"name": "Acme resto ano",
+			"save-password": true,
+			"folder": "Acme",
+			"configuration": {
+				"host": "devsql.example.test",
+				"port": "1433",
+				"database": "acmeResto",
+				"url": "jdbc:sqlserver://;serverName\u003ddevsql.example.test;databaseName\u003dacmeResto",
+				"configurationType": "MANUAL",
+				"type": "dev",
+				"closeIdleConnection": false,
+				"provider-properties": {
+					"@dbeaver-show-all-schemas@": "false",
+					"sslTrustServerCertificate": "false"
+				},
+				"auth-model": "sqlserver_database"
+			}
+		},
+		"microsoft-1a05bf56182-30022e6b735a4d8": {
+			"provider": "sqlserver",
+			"driver": "microsoft",
+			"name": "Acme resto ano 2",
+			"save-password": true,
+			"folder": "Acme",
+			"configuration": {
+				"host": "devsql.example.test",
+				"port": "1433",
+				"database": "acmeResto2",
+				"url": "jdbc:sqlserver://;serverName\u003ddevsql.example.test;databaseName\u003dacmeResto2",
+				"configurationType": "MANUAL",
+				"type": "dev",
+				"closeIdleConnection": false,
+				"provider-properties": {
+					"@dbeaver-show-all-schemas@": "false",
+					"sslTrustServerCertificate": "false"
+				},
+				"auth-model": "sqlserver_database"
+			}
+		},
+		"microsoft-1a0678770f6-4b3c76423cea2a0c": {
+			"provider": "sqlserver",
+			"driver": "microsoft",
+			"name": "Translate dev",
+			"save-password": true,
+			"folder": "Translate",
+			"configuration": {
+				"host": "devsql.example.test",
+				"port": "1433",
+				"database": "Translation",
+				"url": "jdbc:sqlserver://;serverName\u003ddevsql.example.test;databaseName\u003dTranslation",
+				"configurationType": "MANUAL",
+				"type": "dev",
+				"closeIdleConnection": false,
+				"provider-properties": {
+					"@dbeaver-show-all-schemas@": "false",
+					"sslTrustServerCertificate": "false"
+				},
+				"auth-model": "sqlserver_database"
+			},
+			"custom-properties": {
+				"valueManager.[Translation].dbo.Projects:ExportParams": "json"
+			}
+		},
+		"postgres-jdbc-1a0f6668b80-6dcbdf8868a578d3": {
+			"provider": "postgresql",
+			"driver": "postgres-jdbc",
+			"name": "GlobexAuth",
+			"save-password": true,
+			"configuration": {
+				"host": "localhost",
+				"port": "5454",
+				"database": "appdb",
+				"url": "jdbc:postgresql://localhost:5454/appdb",
+				"configurationType": "MANUAL",
+				"home": "postgresql_client",
+				"type": "dev",
+				"closeIdleConnection": false,
+				"properties": {
+					"connectTimeout": "20",
+					"loginTimeout": "20",
+					"escapeSyntaxCallMode": "callIfNoReturn"
+				},
+				"provider-properties": {
+					"@dbeaver-chosen-role@": "",
+					"@dbeaver-show-template-db@": "false",
+					"@dbeaver-show-unavailable-db@": "false",
+					"show-database-statistics": "false",
+					"@dbeaver-read-all-data-types-db@": "false",
+					"read-keys-with-columns": "false",
+					"replace-legacy-timezone": "false",
+					"@dbeaver-use-prepared-statements-db@": "false",
+					"postgresql.dd.plain.string": "false",
+					"postgresql.dd.tag.string": "false",
+					"@dbeaver-show-non-default-db@": "false"
+				},
+				"auth-model": "native"
+			}
+		},
+		"microsoft-1a12ee38a8d-44b27a66a6a34144": {
+			"provider": "sqlserver",
+			"driver": "microsoft",
+			"name": "Translate local",
+			"save-password": true,
+			"folder": "Translate",
+			"configuration": {
+				"host": "localhost",
+				"port": "1533",
+				"database": "master",
+				"url": "jdbc:sqlserver://;serverName\u003dlocalhost;port\u003d1533;databaseName\u003dmaster",
+				"configurationType": "MANUAL",
+				"type": "dev",
+				"closeIdleConnection": false,
+				"provider-properties": {
+					"@dbeaver-show-all-schemas@": "false",
+					"sslTrustServerCertificate": "false"
+				},
+				"auth-model": "sqlserver_database"
+			}
+		},
+		"microsoft-1a1a103bde0-2acad44991fa9b4d": {
+			"provider": "sqlserver",
+			"driver": "microsoft",
+			"name": "Resto",
+			"save-password": true,
+			"folder": "Globex",
+			"configuration": {
+				"host": "devsql.example.test",
+				"port": "1433",
+				"database": "SirhResto",
+				"url": "jdbc:sqlserver://;serverName\u003ddevsql.example.test;databaseName\u003dSirhResto",
+				"configurationType": "MANUAL",
+				"type": "dev",
+				"closeIdleConnection": false,
+				"provider-properties": {
+					"@dbeaver-show-all-schemas@": "false",
+					"sslTrustServerCertificate": "false"
+				},
+				"auth-model": "sqlserver_database"
+			}
+		}
+	},
+	"virtual-models": {"microsoft-1a05bf273cf-1a6d26bd70a9b734":{"acme":{"liquibase":{":DATABASECHANGELOG":{"constraints":{"VIRTUAL_PK":{"type":"vpk","useAllColumns":true}}}}}}},
+	"connection-types": {
+		"dev": {
+			"name": "Development",
+			"color": "255,255,255",
+			"colorDark": "255,255,255",
+			"description": "Regular development database",
+			"auto-commit": true,
+			"confirm-execute": false,
+			"confirm-data-change": false,
+			"smart-commit": false,
+			"smart-commit-recover": true,
+			"auto-close-transactions": true,
+			"close-transactions-period": 1800,
+			"auto-close-connections": true,
+			"close-connections-period": 14400,
+			"security": {
+				"permission-restrictions": []
+			}
+		}
+	}
+}

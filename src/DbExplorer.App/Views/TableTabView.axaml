@@ -1,0 +1,213 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DbExplorer.App.ViewModels"
+             xmlns:views="using:DbExplorer.App.Views"
+             x:Class="DbExplorer.App.Views.TableTabView"
+             x:DataType="vm:TableTabViewModel">
+  <UserControl.Styles>
+    <Style Selector="DataGrid.structure">
+      <Setter Property="IsReadOnly" Value="True" />
+      <Setter Property="AutoGenerateColumns" Value="False" />
+      <Setter Property="GridLinesVisibility" Value="Horizontal" />
+      <Setter Property="CanUserResizeColumns" Value="True" />
+      <Setter Property="FontSize" Value="12.5" />
+      <Setter Property="RowBackground" Value="Transparent" />
+      <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
+      <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+    </Style>
+    <Style Selector="DataGrid.structure DataGridColumnHeader">
+      <Setter Property="Padding" Value="10,0,6,0" />
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="DataGrid.structure DataGridRow"><Setter Property="MinHeight" Value="26" /></Style>
+    <Style Selector="DataGrid.structure DataGridCell"><Setter Property="MinHeight" Value="26" /><Setter Property="FontSize" Value="12.5" /></Style>
+    <Style Selector="DataGrid.structure TextBlock"><Setter Property="Margin" Value="10,0" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
+    <Style Selector="Button.link"><Setter Property="Foreground" Value="{DynamicResource DbxLink}" /></Style>
+    <Style Selector="Border.structCard">
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel>
+    <!-- Error strip: the previous rows stay visible underneath -->
+    <Border DockPanel.Dock="Top" Classes="banner error"
+            IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+        <PathIcon Classes="bi" Data="{StaticResource IconError}" Margin="0,0,8,0" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding ErrorMessage}" TextWrapping="Wrap" VerticalAlignment="Center" />
+        <Button Grid.Column="2" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRefresh}" Content="Reload" Margin="8,0,0,0"
+                Command="{Binding ReloadCommand}" IsVisible="{Binding NeedsReload}" />
+        <Button Grid.Column="3" Classes="close" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}" Margin="4,0,0,0"
+                Command="{Binding DismissErrorCommand}" ToolTip.Tip="Dismiss" />
+      </Grid>
+    </Border>
+    <!-- Cell rejected by validation -->
+    <Border DockPanel.Dock="Top" Classes="banner warn"
+            IsVisible="{Binding CellError, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <PathIcon Classes="bi" Data="{StaticResource IconWarning}" Margin="0,0,8,0" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding CellError}" TextWrapping="Wrap" VerticalAlignment="Center" />
+        <Button Grid.Column="2" Classes="close" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}" Margin="4,0,0,0"
+                Command="{Binding DismissCellErrorCommand}" ToolTip.Tip="Dismiss" />
+      </Grid>
+    </Border>
+    <!-- Informational notice -->
+    <Border DockPanel.Dock="Top" Classes="banner info"
+            IsVisible="{Binding Notice, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <PathIcon Classes="bi" Data="{StaticResource IconInfo}" Margin="0,0,8,0" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding Notice}" TextWrapping="Wrap" VerticalAlignment="Center" />
+        <Button Grid.Column="2" Classes="close" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}" Margin="4,0,0,0"
+                Command="{Binding DismissNoticeCommand}" ToolTip.Tip="Dismiss" />
+      </Grid>
+    </Border>
+    <!-- IsIndeterminate follows IsLoading: a hidden-but-indeterminate bar keeps its animation (and the whole view) alive -->
+    <ProgressBar DockPanel.Dock="Top" IsIndeterminate="{Binding IsLoading}" Height="3" IsVisible="{Binding IsLoading}" />
+
+    <TabControl x:Name="SubTabs" Theme="{StaticResource DbxSubTabControl}" ItemContainerTheme="{StaticResource DbxSubTabItem}">
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconTable}" Width="13" Height="13" />
+            <TextBlock Text="Data" />
+          </StackPanel>
+        </TabItem.Header>
+        <DockPanel>
+          <!-- Toolbar: reload and paging | count | editing | key and read-only state. Edits are only staged; Save shows the SQL first. -->
+          <Border DockPanel.Dock="Top" Classes="toolbar">
+            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRefresh}" Command="{Binding RefreshCommand}"
+                      ToolTip.Tip="Reload this page (F5)" />
+              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconChevronLeft}" Command="{Binding PrevPageCommand}"
+                      IsEnabled="{Binding !!PageIndex}" ToolTip.Tip="Previous page" />
+              <TextBlock Text="{Binding RangeText}" MinWidth="104" TextAlignment="Center" VerticalAlignment="Center" Margin="2,0"
+                         FontWeight="SemiBold" FontSize="12.5" />
+              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconChevronRight}" Command="{Binding NextPageCommand}"
+                      IsEnabled="{Binding HasNextPage}" ToolTip.Tip="Next page" />
+              <Border Classes="vsep" />
+              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconCount}" Content="Count" Command="{Binding CountCommand}"
+                      ToolTip.Tip="Count all matching rows (runs only when clicked)" />
+              <TextBlock Classes="dim small" Text="{Binding ElapsedText}" VerticalAlignment="Center" Margin="4,0,0,0" />
+              <Border Classes="vsep" />
+              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconAdd}" Content="+ Row" Click="OnAddRowClick"
+                      IsEnabled="{Binding CanInsert}" ToolTip.Tip="{Binding AddRowTip}" ToolTip.ShowOnDisabled="True" />
+              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconDelete}" Content="Delete row" Click="OnDeleteRowsClick"
+                      IsEnabled="{Binding CanEdit}" ToolTip.Tip="{Binding DeleteRowTip}" ToolTip.ShowOnDisabled="True" />
+              <Button Theme="{StaticResource DbxToolButton}" Classes="tint" Tag="{StaticResource IconSave}" Content="Save"
+                      Command="{Binding ReviewAndSaveCommand}" IsEnabled="{Binding HasPendingEdits}"
+                      ToolTip.Tip="Review the SQL, then apply all pending changes in one transaction (Ctrl+S)" />
+              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconUndo}" Content="Revert" Command="{Binding RevertCommand}"
+                      IsEnabled="{Binding HasPendingEdits}" ToolTip.Tip="Discard all pending changes" />
+              <TextBlock Text="{Binding PendingText}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="6,0,0,0"
+                         Foreground="{DynamicResource DbxAccent}" />
+              <Border Classes="vsep" IsVisible="{Binding CanDefineKey}" />
+              <Button Theme="{StaticResource DbxToolButton}" Classes="tint" Tag="{StaticResource IconKey}" Content="Define key…"
+                      Command="{Binding DefineKeyCommand}" IsVisible="{Binding CanDefineKey}"
+                      ToolTip.Tip="Choose the columns that identify a row, so this table can be edited" />
+              <Border Classes="badge warn" Margin="8,0,0,0" IsVisible="{Binding EditBadge, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <PathIcon Data="{StaticResource IconLock}" Width="10" Height="10" />
+                  <TextBlock Text="{Binding EditBadge}" FontSize="11.5" />
+                </StackPanel>
+              </Border>
+            </WrapPanel>
+          </Border>
+
+          <!-- Raw WHERE: appended to the column filters with AND -->
+          <Border DockPanel.Dock="Top" Background="{DynamicResource DbxContentBg}" BorderBrush="{DynamicResource DbxBorderSubtle}"
+                  BorderThickness="0,0,0,1" Padding="8,5">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,8,0" VerticalAlignment="Center">
+                <PathIcon Classes="dim" Data="{StaticResource IconFilter}" />
+                <TextBlock Classes="dim" Text="WHERE" FontWeight="SemiBold" FontSize="12" />
+              </StackPanel>
+              <TextBox Grid.Column="1" Text="{Binding RawWhere}" FontFamily="{DynamicResource DbxMonoFont}"
+                       Watermark="WHERE clause, e.g. status = 'A' AND id > 10"
+                       ToolTip.Tip="One SQL condition, appended to the filters with AND. Statement separators and write statements are refused.">
+                <TextBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding ApplyFiltersCommand}" />
+                </TextBox.KeyBindings>
+              </TextBox>
+              <Button Grid.Column="2" Theme="{StaticResource DbxToolButton}" Classes="accent" Tag="{StaticResource IconPlay}" Content="Apply"
+                      Margin="6,0,0,0" MinHeight="28" Command="{Binding ApplyFiltersCommand}"
+                      ToolTip.Tip="Apply the column filters and the WHERE clause (Enter)" />
+            </Grid>
+          </Border>
+
+          <views:ResultGrid x:Name="DataGridView" Columns="{Binding GridColumns}" ItemsSource="{Binding Rows}"
+                            Features="{Binding}" Editing="{Binding}" />
+        </DockPanel>
+      </TabItem>
+
+      <TabItem>
+        <TabItem.Header>
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconSchema}" Width="13" Height="13" />
+            <TextBlock Text="Structure" />
+          </StackPanel>
+        </TabItem.Header>
+        <ScrollViewer>
+          <StackPanel Spacing="16" Margin="14" DataContext="{Binding Structure}" x:DataType="vm:StructureViewModel">
+            <StackPanel Spacing="6">
+              <TextBlock Classes="section" Text="COLUMNS" Margin="0" />
+              <Border Classes="structCard">
+                <DataGrid Classes="structure" ItemsSource="{Binding Columns}">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="#" Binding="{Binding Ordinal}" />
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" />
+                    <DataGridTextColumn Header="Type" Binding="{Binding DataType}" />
+                    <DataGridTextColumn Header="Null" Binding="{Binding NullText}" />
+                    <DataGridTextColumn Header="Key" Binding="{Binding Key}" />
+                    <DataGridTemplateColumn Header="References">
+                      <DataTemplate x:DataType="vm:StructureColumn">
+                        <Button Theme="{StaticResource DbxToolButton}" Classes="link" Tag="{StaticResource IconLink}"
+                                Content="{Binding References}" Command="{Binding OpenCommand}" IsVisible="{Binding HasReference}"
+                                Foreground="{DynamicResource DbxLink}" ToolTip.Tip="Open the referenced table" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn>
+                  </DataGrid.Columns>
+                </DataGrid>
+              </Border>
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+              <TextBlock Classes="section" Text="FOREIGN KEYS" Margin="0" />
+              <Border Classes="structCard">
+                <DataGrid Classes="structure" ItemsSource="{Binding ForeignKeys}">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" />
+                    <DataGridTextColumn Header="Columns" Binding="{Binding Columns}" />
+                    <DataGridTemplateColumn Header="References">
+                      <DataTemplate x:DataType="vm:StructureForeignKey">
+                        <Button Theme="{StaticResource DbxToolButton}" Classes="link" Tag="{StaticResource IconLink}"
+                                Content="{Binding Target}" Command="{Binding OpenCommand}"
+                                Foreground="{DynamicResource DbxLink}" ToolTip.Tip="Open the referenced table" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn>
+                  </DataGrid.Columns>
+                </DataGrid>
+              </Border>
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+              <TextBlock Classes="section" Text="INDEXES" Margin="0" />
+              <Border Classes="structCard">
+                <DataGrid Classes="structure" ItemsSource="{Binding Indexes}">
+                  <DataGrid.Columns>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" />
+                    <DataGridCheckBoxColumn Header="Unique" Binding="{Binding Unique}" />
+                    <DataGridTextColumn Header="Columns" Binding="{Binding Columns}" />
+                  </DataGrid.Columns>
+                </DataGrid>
+              </Border>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+  </DockPanel>
+</UserControl>

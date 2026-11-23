@@ -1,0 +1,62 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="DbExplorer.App.Views.SqlPreviewDialog"
+        Title="Review changes"
+        Width="780" Height="520" MinWidth="460" MinHeight="300"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel>
+    <!-- Footer: Cancel is the default and focused button (a stray Enter must never run writes); Apply is a deliberate click -->
+    <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxWindowBg}" BorderBrush="{DynamicResource DbxBorder}"
+            BorderThickness="0,1,0,0" Padding="20,12">
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button x:Name="ApplyButton" Content="Apply changes" Classes="accent" MinWidth="110" HorizontalContentAlignment="Center"
+                Click="OnApplyClick" />
+        <Button x:Name="CancelButton" Content="Cancel" IsDefault="True" IsCancel="True" MinWidth="90" HorizontalContentAlignment="Center"
+                Click="OnCancelClick" />
+      </StackPanel>
+    </Border>
+
+    <!-- Header: what will run, and where -->
+    <Border DockPanel.Dock="Top" Background="{DynamicResource DbxPanelHeaderBg}" BorderBrush="{DynamicResource DbxBorder}"
+            BorderThickness="0,0,0,1" Padding="20,14">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <PathIcon Data="{StaticResource IconSave}" Width="26" Height="26" Foreground="{DynamicResource DbxAccent}" Margin="0,0,12,0" />
+        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+          <TextBlock Text="Review changes" FontSize="17" FontWeight="SemiBold" />
+          <TextBlock x:Name="Summary" Classes="dim" />
+        </StackPanel>
+        <Border Grid.Column="2" Classes="badge" VerticalAlignment="Center" Padding="9,3" Margin="12,0,0,0">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconDatabase}" Width="13" Height="13" Foreground="{DynamicResource DbxAccent}" />
+            <TextBlock x:Name="Target" FontWeight="SemiBold" FontSize="12" />
+          </StackPanel>
+        </Border>
+      </Grid>
+    </Border>
+
+    <Border DockPanel.Dock="Top" Classes="banner info" Padding="20,8">
+      <Grid ColumnDefinitions="Auto,*">
+        <PathIcon Classes="bi" Data="{StaticResource IconInfo}" VerticalAlignment="Top" Margin="0,1,8,0" />
+        <TextBlock Grid.Column="1" TextWrapping="Wrap" FontSize="12"
+                   Text="Display only: values are shown inline here, the real statements run with bound parameters. Everything runs in one transaction; any failure rolls it all back." />
+      </Grid>
+    </Border>
+
+    <Border Background="{DynamicResource DbxContentBg}">
+      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+        <ItemsControl x:Name="Statements" Margin="20,14">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <Border Background="{DynamicResource DbxInputBg}" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="1"
+                      CornerRadius="4" Margin="0,0,0,8" Padding="4">
+                <TextBox Text="{Binding Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent"
+                         FontFamily="{DynamicResource DbxMonoFont}" FontSize="13" MinHeight="0" />
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+  </DockPanel>
+</Window>

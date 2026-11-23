@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Dev tool, not part of DbExplorer.sln: renders every screen of the app in-process (Avalonia headless + Skia, no real
+       window, no input, synthetic data in a temp folder) to PNG files. Run it with dotnet run on this project, output folder as first argument. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" Version="11.3.23" />
+    <PackageReference Include="Avalonia.Skia" Version="11.3.23" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DbExplorer.App\DbExplorer.App.csproj" />
+  </ItemGroup>
+
+</Project>

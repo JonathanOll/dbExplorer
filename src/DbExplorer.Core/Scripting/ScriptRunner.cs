@@ -1,0 +1,171 @@
+using System.Data.Common;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
+using DbExplorer.Core.Model;
+using DbExplorer.Core.Sessions;
+
+namespace DbExplorer.Core.Scripting;
+
+public sealed record ResultSet(IReadOnlyList<string> Columns, IReadOnlyList<object?[]> Rows, bool Truncated);
+
+/// <param name="Sets">Result sets returned by the statement; empty for statements that return no columns.</param>
+/// <param name="RowsAffected">Null when the provider reports none (SELECT, DDL).</param>
+/// <param name="Error">Null on success; the failure message otherwise.</param>
+public sealed record StatementResult(
+    ScriptStatement Statement,
+    IReadOnlyList<ResultSet> Sets,
+    int? RowsAffected,
+    TimeSpan Duration,
+    string? Error);
+
+/// <param name="Kind">Database kind of the connection, when known; lets the read-only guard lex like that database.
+/// Null makes the guard use its most conservative, kind-agnostic check.</param>
+public sealed record ScriptOptions(int MaxRows = 1000, bool ReadOnly = false, DbKind? Kind = null);
+
+public static class ScriptRunner
+{
+    /// <summary>
+    /// Runs the statements in order on an open connection. A failing or refused statement yields a result with
+    /// <see cref="StatementResult.Error"/> set and ends the script. Cancelling cancels the running command and ends
+    /// the enumeration quietly: no result is yielded for the interrupted statement and nothing is thrown.
+    /// </summary>
+    public static async IAsyncEnumerable<StatementResult> RunAsync(
+        DbConnection c,
+        IReadOnlyList<ScriptStatement> stmts,
+        ScriptOptions o,
+        [EnumeratorCancellation] CancellationToken ct,
+        DbTransaction? transaction = null)
+    {
+        foreach (var stmt in stmts)
+        {
+            if (ct.IsCancellationRequested) yield break;
+
+            var result = o.ReadOnly && IsRefused(stmt, o)
+                ? new StatementResult(stmt, [], null, TimeSpan.Zero, "Refused: this connection is read-only, write statements are not allowed.")
+                : await ExecuteAsync(c, transaction, stmt, o, ct);
+
+            if (result is null) yield break;   // cancelled
+            yield return result;
+            if (result.Error is not null) yield break;
+        }
+    }
+
+    /// <summary>
+    /// Opens a connection of the session for the duration of the enumeration and runs the statements on it. When
+    /// <see cref="ScriptOptions.ReadOnly"/> is set the connection is also put in a read-only context
+    /// (<see cref="Querying.TableDataLoader.BeginReadOnlyContextAsync"/>) as defence in depth behind the lexical guard.
+    /// Throws what opening the connection throws (<see cref="ObjectDisposedException"/> for a closed session);
+    /// cancelling ends the enumeration quietly or throws <see cref="OperationCanceledException"/> while connecting.
+    /// </summary>
+    public static async IAsyncEnumerable<StatementResult> RunAsync(
+        Session session,
+        IReadOnlyList<ScriptStatement> stmts,
+        ScriptOptions o,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        await using var connection = await session.OpenConnectionAsync(ct).ConfigureAwait(false);
+        var tx = o.ReadOnly
+            ? await Querying.TableDataLoader.BeginReadOnlyContextAsync(connection, session.Driver.Kind, ct).ConfigureAwait(false)
+            : null;
+        try
+        {
+            await foreach (var result in RunAsync(connection, stmts, o, ct, tx).ConfigureAwait(false))
+                yield return result;
+        }
+        finally
+        {
+            if (tx is not null)
+            {
+                try { await tx.RollbackAsync(CancellationToken.None).ConfigureAwait(false); }
+                catch (Exception) { /* nothing was committed; the connection is about to be closed */ }
+                await tx.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    private static bool IsRefused(ScriptStatement stmt, ScriptOptions o) =>
+        o.Kind is { } kind ? ReadOnlyGuard.IsWrite(stmt.Text, kind) : ReadOnlyGuard.IsWrite(stmt.Text);
+
+    /// <summary>Runs one statement. Returns null when it was interrupted by cancellation.</summary>
+    private static async Task<StatementResult?> ExecuteAsync(
+        DbConnection c, DbTransaction? transaction, ScriptStatement stmt, ScriptOptions o, CancellationToken ct)
+    {
+        var watch = Stopwatch.StartNew();
+        try
+        {
+            await using var cmd = c.CreateCommand();
+            cmd.Transaction = transaction;
+            cmd.CommandText = stmt.Text;
+            using var cancelRegistration = ct.Register(() => TryCancel(cmd));
+
+            var sets = new List<ResultSet>();
+            int affected;
+            await using (var reader = await cmd.ExecuteReaderAsync(ct))
+            {
+                do
+                {
+                    ct.ThrowIfCancellationRequested();
+                    if (reader.FieldCount == 0) continue;
+
+                    var set = await ReadSetAsync(reader, o.MaxRows, ct);
+                    sets.Add(set);
+                    if (set.Truncated)
+                    {
+                        // Do not drain the remaining rows (possibly millions): abort the command instead.
+                        TryCancel(cmd);
+                        break;
+                    }
+                } while (await reader.NextResultAsync(ct));
+
+                await reader.CloseAsync();
+                affected = reader.RecordsAffected;
+            }
+
+            return new StatementResult(stmt, sets, affected >= 0 ? affected : null, watch.Elapsed, null);
+        }
+        catch (Exception) when (ct.IsCancellationRequested)
+        {
+            return null;
+        }
+        catch (Exception ex)
+        {
+            return new StatementResult(stmt, [], null, watch.Elapsed, ex.Message);
+        }
+    }
+
+    private static async Task<ResultSet> ReadSetAsync(DbDataReader reader, int maxRows, CancellationToken ct)
+    {
+        var columns = new string[reader.FieldCount];
+        for (var i = 0; i < columns.Length; i++) columns[i] = reader.GetName(i);
+
+        var rows = new List<object?[]>();
+        var truncated = false;
+        while (await reader.ReadAsync(ct))
+        {
+            if (rows.Count >= maxRows)
+            {
+                truncated = true;
+                break;
+            }
+            var values = new object[reader.FieldCount];
+            reader.GetValues(values);
+            rows.Add(Array.ConvertAll(values, v => v is DBNull ? null : v));
+        }
+        return new ResultSet(columns, rows, truncated);
+    }
+
+    private static void TryCancel(DbCommand cmd)
+    {
+        try { cmd.Cancel(); }
+        catch (Exception) { /* cancellation is best effort; the command may already be finished or disposed */ }
+
+        // Microsoft.Data.Sqlite's Cancel() cannot stop a statement that is already running inside sqlite3_step (a
+        // slow query that returns no row yet would keep going for ever); interrupting the connection does.
+        try
+        {
+            if (cmd.Connection is Microsoft.Data.Sqlite.SqliteConnection { Handle: { IsInvalid: false } handle })
+                SQLitePCL.raw.sqlite3_interrupt(handle);
+        }
+        catch (Exception) { /* same: best effort */ }
+    }
+}

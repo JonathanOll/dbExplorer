@@ -1,0 +1,119 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbExplorer.App.ViewModels"
+        xmlns:views="using:DbExplorer.App.Views"
+        xmlns:model="using:DbExplorer.Core.Model"
+        x:Class="DbExplorer.App.Views.ConnectionDialog"
+        x:DataType="vm:ConnectionDialogViewModel"
+        Title="{Binding Title}"
+        Width="540" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel>
+    <!-- Footer: the dialog's verdict -->
+    <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxWindowBg}" BorderBrush="{DynamicResource DbxBorder}"
+            BorderThickness="0,1,0,0" Padding="20,12">
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Content="OK" Classes="accent" IsDefault="True" Click="OnOkClick" MinWidth="88" HorizontalContentAlignment="Center" />
+        <Button Content="Cancel" IsCancel="True" Click="OnCancelClick" MinWidth="88" HorizontalContentAlignment="Center" />
+      </StackPanel>
+    </Border>
+
+    <!-- Header -->
+    <Border DockPanel.Dock="Top" Background="{DynamicResource DbxPanelHeaderBg}" BorderBrush="{DynamicResource DbxBorder}"
+            BorderThickness="0,0,0,1" Padding="20,14">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <PathIcon Data="{StaticResource IconDatabase}" Width="30" Height="30" Foreground="{DynamicResource DbxAccent}" />
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" />
+          <TextBlock Classes="dim small" Text="Passwords are stored encrypted for your Windows user." />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <StackPanel Background="{DynamicResource DbxContentBg}" Margin="0" Spacing="0">
+      <StackPanel Margin="20,16,20,4" Spacing="4">
+        <TextBlock Classes="section" Text="GENERAL" Margin="0,0,0,2" />
+        <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+          <TextBlock Grid.Row="0" Classes="dim" Text="Name" VerticalAlignment="Center" />
+          <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Name}" />
+
+          <TextBlock Grid.Row="1" Classes="dim" Text="Engine" VerticalAlignment="Center" />
+          <ComboBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch"
+                    ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="model:DbKind">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <views:EngineIcon Kind="{Binding .}" Width="14" Height="14" />
+                  <TextBlock Text="{Binding ., Converter={x:Static views:Icons.EngineName}}" />
+                </StackPanel>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+
+          <TextBlock Grid.Row="2" Classes="dim" Text="Folder" VerticalAlignment="Center" />
+          <ComboBox Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch"
+                    ItemsSource="{Binding FolderChoices}" SelectedItem="{Binding SelectedFolderChoice}" />
+        </Grid>
+      </StackPanel>
+
+      <StackPanel Margin="20,10,20,4" Spacing="4">
+        <TextBlock Classes="section" Text="CONNECTION" Margin="0,0,0,2" />
+        <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+          <TextBlock Grid.Row="0" Classes="dim" Text="Host" VerticalAlignment="Center" IsVisible="{Binding IsNetwork}" />
+          <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,90" IsVisible="{Binding IsNetwork}">
+            <TextBox Text="{Binding Host}" />
+            <TextBlock Grid.Column="1" Classes="dim" Text="Port" Margin="12,0" VerticalAlignment="Center" />
+            <TextBox Grid.Column="2" Text="{Binding PortText}" />
+          </Grid>
+
+          <TextBlock Grid.Row="1" Classes="dim" Text="{Binding DatabaseLabel}" VerticalAlignment="Center" />
+          <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto">
+            <TextBox Text="{Binding Database}" />
+            <Button Grid.Column="1" Content="Browse…" Margin="6,0,0,0" IsVisible="{Binding IsSqlite}" Click="OnBrowseClick" />
+          </Grid>
+
+          <TextBlock Grid.Row="2" Classes="dim" Text="User" VerticalAlignment="Center" IsVisible="{Binding IsNetwork}" />
+          <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding User}" IsVisible="{Binding IsNetwork}" />
+
+          <TextBlock Grid.Row="3" Classes="dim" Text="Password" VerticalAlignment="Center" IsVisible="{Binding IsNetwork}" />
+          <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Password}" PasswordChar="*" IsVisible="{Binding IsNetwork}"
+                   Watermark="{Binding PasswordHint}" />
+        </Grid>
+      </StackPanel>
+
+      <StackPanel Margin="20,10,20,4" Spacing="4">
+        <TextBlock Classes="section" Text="OPTIONS" Margin="0,0,0,2" />
+        <CheckBox Content="Encrypt connection" IsChecked="{Binding Encrypt}" IsVisible="{Binding IsSqlServer}" />
+        <CheckBox Content="Trust server certificate" IsChecked="{Binding TrustServerCertificate}" IsVisible="{Binding IsSqlServer}" />
+        <CheckBox Content="Read-only (no editing, scripts refuse writes)" IsChecked="{Binding ReadOnly}" />
+      </StackPanel>
+
+      <!-- Test connection -->
+      <StackPanel Margin="20,10,20,0" Spacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconPlay}" Classes="run" Content="Test connection"
+                  Command="{Binding TestConnectionCommand}" BorderBrush="{DynamicResource DbxBorder}" Padding="10,0" />
+          <Button Content="Cancel test" Command="{Binding CancelTestCommand}" IsVisible="{Binding IsTesting}" />
+          <ProgressBar IsIndeterminate="{Binding IsTesting}" Width="70" Height="4" VerticalAlignment="Center" IsVisible="{Binding IsTesting}" />
+        </StackPanel>
+        <Border Classes="banner" CornerRadius="4" BorderThickness="1" Classes.info="{Binding TestSucceeded}" Classes.error="{Binding !TestSucceeded}"
+                IsVisible="{Binding TestMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <PathIcon Classes="bi" Data="{StaticResource IconCheck}" IsVisible="{Binding TestSucceeded}" VerticalAlignment="Top" />
+            <PathIcon Classes="bi" Data="{StaticResource IconError}" IsVisible="{Binding !TestSucceeded}" VerticalAlignment="Top" />
+            <TextBlock Text="{Binding TestMessage}" TextWrapping="Wrap" MaxWidth="440" />
+          </StackPanel>
+        </Border>
+        <Border Classes="banner error" CornerRadius="4" BorderThickness="1"
+                IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <PathIcon Classes="bi" Data="{StaticResource IconError}" VerticalAlignment="Top" />
+            <TextBlock Text="{Binding Error}" TextWrapping="Wrap" MaxWidth="440" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+      <Border Height="16" />
+    </StackPanel>
+  </DockPanel>
+</Window>

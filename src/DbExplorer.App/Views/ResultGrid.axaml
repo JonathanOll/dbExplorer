@@ -1,0 +1,65 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="DbExplorer.App.Views.ResultGrid">
+  <UserControl.Styles>
+    <!-- Compact rows: more data on screen, fewer pixels to paint -->
+    <Style Selector="DataGridCell">
+      <Setter Property="MinHeight" Value="24" />
+      <Setter Property="FontSize" Value="{DynamicResource DbxGridFontSize}" />
+    </Style>
+    <Style Selector="DataGridRow"><Setter Property="MinHeight" Value="24" /></Style>
+    <!-- zebra stripes: the grid marks every second realised row with the class "odd" -->
+    <Style Selector="DataGridRow.odd"><Setter Property="Background" Value="{DynamicResource DbxGridZebra}" /></Style>
+    <!-- Header cell: no padding of its own, the header content (name band + filter band) fills it -->
+    <Style Selector="DataGridColumnHeader">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Stretch" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxBorder}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+    <Style Selector="Border.nameBand">
+      <Setter Property="Padding" Value="8,5,6,5" />
+    </Style>
+    <Style Selector="Border.filterBand">
+      <Setter Property="Background" Value="{DynamicResource DbxGridFilterBg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxBorderSubtle}" />
+      <Setter Property="BorderThickness" Value="0,1,0,0" />
+      <Setter Property="Padding" Value="4,3" />
+    </Style>
+    <Style Selector="Border.filterBand TextBox">
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Padding" Value="5,1" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontFamily" Value="{DynamicResource DbxMonoFont}" />
+    </Style>
+    <Style Selector="PathIcon.pk"><Setter Property="Foreground" Value="{DynamicResource DbxIconKey}" /></Style>
+    <Style Selector="PathIcon.fk"><Setter Property="Foreground" Value="{DynamicResource DbxLink}" /></Style>
+    <Style Selector="PathIcon.sortGlyph"><Setter Property="Foreground" Value="{DynamicResource DbxAccent}" /></Style>
+    <Style Selector="DataGridRowHeader">
+      <Setter Property="Width" Value="38" />
+    </Style>
+    <Style Selector="TextBlock.rowNumber">
+      <Setter Property="Foreground" Value="{DynamicResource DbxTextFaint}" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontFamily" Value="{DynamicResource DbxMonoFont}" />
+    </Style>
+  </UserControl.Styles>
+  <!-- Columns, headers and cells are generated in code (ResultGrid.axaml.cs): 20+ columns x 200 rows must stay cheap. -->
+  <DataGrid x:Name="Grid"
+            IsReadOnly="True"
+            CanUserSortColumns="False"
+            CanUserResizeColumns="True"
+            CanUserReorderColumns="False"
+            AutoGenerateColumns="False"
+            SelectionMode="Extended"
+            GridLinesVisibility="Horizontal"
+            HorizontalScrollBarVisibility="Auto"
+            VerticalScrollBarVisibility="Auto"
+            Background="{DynamicResource DbxContentBg}"
+            RowBackground="Transparent"
+            FontFamily="{DynamicResource DbxMonoFont}"
+            FontSize="{DynamicResource DbxGridFontSize}" />
+</UserControl>

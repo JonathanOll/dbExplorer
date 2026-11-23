@@ -1,0 +1,45 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DbExplorer.App.ViewModels"
+             xmlns:views="using:DbExplorer.App.Views"
+             x:Class="DbExplorer.App.App"
+             RequestedThemeVariant="Default">
+  <!-- "Default" follows the system light/dark setting. Tokens, icons and control styles: Styles/ (see docs/ui/README.md). -->
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://DbExplorer/Styles/Theme.axaml" />
+        <ResourceInclude Source="avares://DbExplorer/Styles/Icons.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Light" Accent="#3B6EA5" />
+        <ColorPaletteResources x:Key="Dark" Accent="#4F8FD0" />
+      </FluentTheme.Palettes>
+    </FluentTheme>
+    <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
+    <StyleInclude Source="avares://DbExplorer/Styles/Controls.axaml" />
+    <!-- Dialogs and the main window sit on the chrome tone; regions paint their own background on top. -->
+    <Style Selector="Window">
+      <Setter Property="Background" Value="{DynamicResource DbxWindowBg}" />
+      <Setter Property="Foreground" Value="{DynamicResource DbxText}" />
+    </Style>
+  </Application.Styles>
+
+  <Application.DataTemplates>
+    <DataTemplate DataType="vm:TableTabViewModel">
+      <views:TableTabView />
+    </DataTemplate>
+    <DataTemplate DataType="vm:ScriptTabViewModel">
+      <views:ScriptTabView />
+    </DataTemplate>
+    <!-- Tab content templates; later features add one per TabViewModel subclass. -->
+    <DataTemplate DataType="vm:PlaceholderTabViewModel">
+      <TextBlock Text="{Binding Title}" Margin="16" Opacity="0.7" />
+    </DataTemplate>
+  </Application.DataTemplates>
+</Application>
