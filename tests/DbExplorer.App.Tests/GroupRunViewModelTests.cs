@@ -75,6 +75,21 @@ public class GroupRunViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task RunOnGroup_GroupListingAConnectionTwice_RunsItOnce_AndDoesNotThrow()
+    {
+        // A hand-edited config can repeat a connection id in a group: the run must treat it as one member.
+        var dup = new ConnectionGroup(Guid.NewGuid(), "Dup", [_g.A.Id, _g.B.Id, _g.A.Id]);
+        _g.Tree.Config.Groups.Add(dup);
+        var tab = await Tab(group: dup);
+
+        await RunGroup(tab, Three);
+
+        var run = Assert.IsType<GroupRunViewModel>(tab.GroupRun);
+        Assert.Equal(["A", "B"], run.Members.Select(m => m.Name));
+        Assert.All(run.Members, m => Assert.Equal(MemberState.Done, m.State));
+    }
+
+    [Fact]
     public async Task RunOnGroup_AllTab_HasDatabaseColumn_FirstColumn()
     {
         var tab = await Tab();

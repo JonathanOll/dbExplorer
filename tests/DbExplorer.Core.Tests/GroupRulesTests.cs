@@ -124,6 +124,17 @@ public class GroupRulesTests
     }
 
     [Fact]
+    public void MembersOf_ARepeatedIdInTheGroup_CountsOnce_AtItsFirstPlace()
+    {
+        var a = Conn("a", DbKind.Postgres);
+        var b = Conn("b", DbKind.Postgres);
+        var cfg = Cfg(a, b);
+        var g = new ConnectionGroup(Guid.NewGuid(), "G", new() { b.Id, a.Id, b.Id });
+
+        Assert.Equal(new[] { b, a }, GroupRules.MembersOf(cfg, g));
+    }
+
+    [Fact]
     public void RemoveConnection_RemovesFromAllGroups_KeepsGroups()
     {
         var a = Conn("a", DbKind.Postgres);
