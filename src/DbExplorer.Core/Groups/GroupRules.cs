@@ -37,10 +37,11 @@ public static class GroupRules
     public static IReadOnlyList<ConnectionGroup> GroupsOf(AppConfig cfg, Guid connectionId) =>
         cfg.Groups.Where(g => g.ConnectionIds.Contains(connectionId)).ToList();
 
-    /// <summary>The group's connections in group order; unknown ids are skipped.</summary>
+    /// <summary>The group's connections in group order; unknown ids are skipped, a duplicated connection id resolves to its first entry.</summary>
     public static IReadOnlyList<ConnectionConfig> MembersOf(AppConfig cfg, ConnectionGroup g)
     {
-        var byId = cfg.Connections.ToDictionary(c => c.Id);
+        var byId = new Dictionary<Guid, ConnectionConfig>();
+        foreach (var c in cfg.Connections) byId.TryAdd(c.Id, c);   // a hand-edited config may repeat an id: first wins
         var members = new List<ConnectionConfig>();
         foreach (var id in g.ConnectionIds)
             if (byId.TryGetValue(id, out var c)) members.Add(c);
