@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DbExplorer.Core.Drivers;
 using DbExplorer.Core.Model;
 using DbExplorer.Core.Querying;
 using DbExplorer.Core.Sessions;
@@ -66,7 +67,38 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
         UseSession(session);
     }
 
+    /// <summary>
+    /// A tab restored from the last run: it knows its connection and table but connects and queries nothing until
+    /// <see cref="EnsureLoadedAsync"/> (the shell calls it when the tab is first selected). Until then it holds a session
+    /// stand-in with no schema, which no operation reaches. Set <see cref="ColumnFilters"/>, <see cref="RawWhere"/> and
+    /// <see cref="Sort"/> before the first load.
+    /// </summary>
+    public TableTabViewModel(ConnectionConfig config, TableRef table, TableTabHooks? hooks = null)
+        : this(new Session(config, DriverFactory.For(config.Kind), []), table, hooks)
+    {
+        _isDeferred = true;
+    }
+
     public TableRef Table { get; }
+
+    /// <summary>True for a restored tab that has not loaded yet (it shows nothing until it is selected).</summary>
+    public bool IsDeferred => _isDeferred;
+
+    private bool _isDeferred;
+    private Task? _deferredLoad;
+
+    /// <summary>
+    /// First load of a restored tab: connects (through the shell, so the tree follows) and runs the saved query, like Reload.
+    /// Idempotent: later calls return the same task. A connection that cannot be reached leaves the usual error with the
+    /// Reload button. Never throws.
+    /// </summary>
+    public Task EnsureLoadedAsync()
+    {
+        if (!_isDeferred) return _deferredLoad ?? Task.CompletedTask;
+        _isDeferred = false;
+        OnPropertyChanged(nameof(IsDeferred));
+        return _deferredLoad = ReloadAsync();
+    }
 
     public override string Title => $"{Connection.Name} · {Table.Name}";
 
@@ -124,6 +156,12 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
     /// </summary>
     public async Task LoadAsync()
     {
+        if (_isDeferred)   // restored and not loaded yet (F5, Apply): the first load connects first
+        {
+            await EnsureLoadedAsync();
+            return;
+        }
+        if (_deferredLoad is { IsCompleted: false } first) await first;   // still connecting: no table info to query with yet
         if (!await ConfirmLeaveAsync()) return;
         await RunAsync(CurrentInputs(Sort), 0);
     }

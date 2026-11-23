@@ -25,12 +25,13 @@ public abstract class ShellTestBase : IDisposable
     /// <param name="scriptDialogs">Whether script tabs get the Save / Discard / Cancel dialog.</param>
     /// <param name="useStore">False: no autosave store at all.</param>
     /// <param name="store">A store to use instead of the default one.</param>
-    internal MainViewModel NewMain(bool scriptDialogs = true, bool useStore = true, ScriptSessionStore? store = null)
+    /// <param name="config">A config to use instead of the one holding only the fixture connection.</param>
+    internal MainViewModel NewMain(bool scriptDialogs = true, bool useStore = true, ScriptSessionStore? store = null, AppConfig? config = null)
     {
-        var tree = T.Fx.CreateTree(new AppConfig([], [T.Config], new()));
+        var tree = T.Fx.CreateTree(config ?? new AppConfig([], [T.Config], new()));
         var main = new MainViewModel(tree, T.Fx.Status);
         main.UseScriptTabs(Files, useStore ? store ?? Store : null, scriptDialogs ? Dialogs : null);
-        tree.SelectedNode = tree.Nodes.OfType<ConnectionNodeViewModel>().Single();
+        tree.SelectedNode = tree.Nodes.OfType<ConnectionNodeViewModel>().First(c => c.Config.Id == T.Config.Id);
         _mains.Add(main);
         return main;
     }

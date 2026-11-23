@@ -4,8 +4,10 @@ namespace DbExplorer.Core.Scripting;
 
 /// <param name="TabId">Identity of the script tab; also the file name inside the store folder.</param>
 /// <param name="ConnectionId">The connection the script runs on.</param>
+/// <param name="Text">The unsaved text. Null only for a script restored from the tab session that had nothing unsaved:
+/// the tab then reads its text from <paramref name="FilePath"/> (or starts empty). Never null in the store itself.</param>
 /// <param name="FilePath">The file the script was opened from or saved to, when it has one.</param>
-public sealed record SavedScript(Guid TabId, Guid ConnectionId, string Text, string? FilePath);
+public sealed record SavedScript(Guid TabId, Guid ConnectionId, string? Text, string? FilePath);
 
 /// <summary>
 /// Keeps the unsaved text of script tabs on disk (one small JSON file per tab) so it survives a restart or a crash.

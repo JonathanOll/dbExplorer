@@ -14,6 +14,9 @@ public sealed record AppPaths(string DataDir, string DBeaverDir)
     /// <summary>Size, position and maximised state of the main window (a tiny JSON file read at start).</summary>
     public string WindowStateFile => Path.Combine(DataDir, "window.json");
 
+    /// <summary>The tabs that were open when the app closed (order, active tab, filters...), reopened at the next start.</summary>
+    public string SessionFile => Path.Combine(DataDir, "session.json");
+
     /// <summary>Unsaved script tabs, restored at the next start.</summary>
     public string ScriptsDir => Path.Combine(DataDir, "scripts");
 

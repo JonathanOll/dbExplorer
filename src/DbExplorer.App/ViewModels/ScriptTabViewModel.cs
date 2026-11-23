@@ -84,9 +84,9 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         _savedText = "";
         if (restored is not null)
         {
-            _text = restored.Text;
             _filePath = restored.FilePath;
             _savedText = restored.FilePath is null ? "" : TryReadFile(restored.FilePath, out _encoding);
+            _text = restored.Text ?? _savedText ?? "";   // nothing unsaved: the file as it is now
             _isDirty = _text != _savedText;
         }
     }
@@ -686,6 +686,9 @@ public sealed partial class ScriptTabViewModel : TabViewModel
                 return false;
         }
     }
+
+    /// <summary>The user chose Discard while the window was closing: the tab stays in the list until the app ends but must not be restored.</summary>
+    public bool IsDiscarded => _discarding;
 
     /// <summary>The autosave can keep the unsaved text: there is a store and the last write into it worked.</summary>
     private bool AutosaveWorks => _hooks.Store is not null && !_persistFailed;

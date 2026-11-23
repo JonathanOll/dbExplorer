@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DbExplorer.Core.Config;
 using DbExplorer.Core.Metadata;
 using DbExplorer.Core.Model;
+using DbExplorer.Core.Querying;
 using DbExplorer.Core.Scripting;
 using DbExplorer.Core.Sessions;
 
@@ -62,14 +64,20 @@ public partial class MainViewModel : ObservableObject
     /// </summary>
     public void UseTableTabs(SessionManager sessions, IEditDialogs? editDialogs = null)
     {
-        TableTabFactory = (session, table) => new TableTabViewModel(session, table, new TableTabHooks(
-            ct => ResolveScriptSessionAsync(session.Config.Id, ct),   // through the tree: Reload after Disconnect reconnects its node too
+        TableTabHooks Hooks(Guid connectionId) => new(
+            ct => ResolveScriptSessionAsync(connectionId, ct),   // through the tree: Reload after Disconnect reconnects its node too
             (s, t, filters) => OpenTable(s, t, filters),
             editDialogs,
             () => Tree.Config,
             Tree.SetVirtualKey,
-            SwitchHooks));
+            SwitchHooks);
+
+        TableTabFactory = (session, table) => new TableTabViewModel(session, table, Hooks(session.Config.Id));
+        RestoredTableTabFactory = (config, table) => new TableTabViewModel(config, table, Hooks(config.Id));
     }
+
+    /// <summary>Creates the tab of a table restored from the last run: no session, loads when first selected. Set by <see cref="UseTableTabs"/>.</summary>
+    public Func<ConnectionConfig, TableRef, TableTabViewModel>? RestoredTableTabFactory { get; set; }
 
     private GroupSwitchHooks? _switchHooks;
 
@@ -126,6 +134,9 @@ public partial class MainViewModel : ObservableObject
         if (oldValue is not null) oldValue.PropertyChanged -= OnActiveTabPropertyChanged;
         if (newValue is not null) newValue.PropertyChanged += OnActiveTabPropertyChanged;
         OnPropertyChanged(nameof(CurrentConnection));
+        // A restored table tab connects and loads when it is first selected (never before).
+        if (newValue is TableTabViewModel { IsDeferred: true } deferred) _ = deferred.EnsureLoadedAsync();
+        ScheduleSessionSave();
     }
 
     private void OnActiveTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -195,14 +206,17 @@ public partial class MainViewModel : ObservableObject
     /// Brings back the unsaved scripts of the last run whose connection still exists (the others stay in the store).
     /// They are not connected: a restored tab connects when it first runs. Returns how many were restored.
     /// </summary>
-    public int RestoreScripts()
+    public int RestoreScripts() => _scriptStore is { } store ? RestoreUnsaved(store.LoadAll, null) : 0;
+
+    /// <summary>Opens the unsaved scripts <paramref name="load"/> returns, except those of <paramref name="skip"/> (already open).</summary>
+    private int RestoreUnsaved(Func<IEnumerable<SavedScript>> load, ISet<Guid>? skip)
     {
-        if (_scriptStore is not { } store) return 0;
         var restored = 0;
         try
         {
-            foreach (var saved in store.LoadAll())
+            foreach (var saved in load())
             {
+                if (skip is not null && skip.Contains(saved.TabId)) continue;
                 var config = Tree.Config.Connections.FirstOrDefault(c => c.Id == saved.ConnectionId);
                 if (config is null) continue;
                 var tab = CreateScriptTab(config, saved);
@@ -229,6 +243,197 @@ public partial class MainViewModel : ObservableObject
         foreach (var tab in Tabs.OfType<ScriptTabViewModel>()) tab.FlushPersist();
     }
 
+    // ---- tabs survive closing the app (session.json) ----
+
+    private TabSessionStore? _sessionStore;
+    private SavedTabs? _savedSession;
+    private bool _sessionRestored;   // writing starts once the restore ran: an early close must not wipe the saved session
+    private readonly object _sessionGate = new();
+    private int _sessionVersion;
+    private CancellationTokenSource? _sessionTimer;
+
+    /// <summary>How long after the last change the tab session is written (about a second).</summary>
+    public TimeSpan SessionSaveDelay { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Gives the shell the file that remembers the open tabs and the session read from it at startup (null: no usable file).
+    /// Nothing is restored or written until <see cref="RestoreTabs"/> runs. Skip this call to disable the feature.
+    /// </summary>
+    public void UseTabSession(TabSessionStore store, SavedTabs? saved)
+    {
+        _sessionStore = store;
+        _savedSession = saved;
+        Tabs.CollectionChanged += OnTabsChanged;
+        foreach (var tab in Tabs) tab.PropertyChanged += OnTabChanged;
+    }
+
+    private void OnTabsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null) foreach (TabViewModel tab in e.OldItems) tab.PropertyChanged -= OnTabChanged;
+        if (e.NewItems is not null) foreach (TabViewModel tab in e.NewItems) tab.PropertyChanged += OnTabChanged;
+        ScheduleSessionSave();
+    }
+
+    // What the session holds: the connection (group switch), a table's filters, where and sort (and Rows: a query was applied),
+    // a script's file. A script's text is not here (its autosave has it).
+    private void OnTabChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(TabViewModel.Connection) or nameof(TableTabViewModel.Sort) or nameof(TableTabViewModel.RawWhere)
+            or nameof(TableTabViewModel.ColumnFilters) or nameof(TableTabViewModel.Rows) or nameof(ScriptTabViewModel.FilePath))
+            ScheduleSessionSave();
+    }
+
+    /// <summary>
+    /// Reopens the tabs of the last run: from the session file when there is one, else (first run after an upgrade, or an
+    /// unusable file) only the unsaved scripts, as before. Only builds tab shells: table tabs stay unloaded (no connection, no
+    /// query) until first selected, and the active one starts loading when it becomes active. Tabs whose connection no
+    /// longer exists are skipped. Returns how many tabs came back. Never throws.
+    /// </summary>
+    public int RestoreTabs()
+    {
+        if (_sessionStore is null) return RestoreScripts();
+        try
+        {
+            if (_savedSession is not { } saved)
+            {
+                var legacy = RestoreScripts();
+                _sessionRestored = true;
+                ScheduleSessionSave();   // the first session file
+                return legacy;
+            }
+            return RestoreFrom(saved);
+        }
+        catch (Exception e)
+        {
+            Status.Error($"Cannot restore the tabs: {ErrorText.Describe(e)}");
+            return Tabs.Count;
+        }
+        finally
+        {
+            _sessionRestored = true;
+        }
+    }
+
+    private int RestoreFrom(SavedTabs saved)
+    {
+        IReadOnlyList<SavedScript> unsaved = [];
+        try { unsaved = _scriptStore?.LoadAll() ?? []; }
+        catch (Exception e) { Status.Error($"Cannot read the unsaved scripts: {ErrorText.Describe(e)}"); }
+        var unsavedById = unsaved.GroupBy(s => s.TabId).ToDictionary(g => g.Key, g => g.First());
+
+        TabViewModel? active = null;
+        var skipped = 0;
+        for (var i = 0; i < saved.Tabs.Count; i++)
+        {
+            var entry = saved.Tabs[i];
+            var config = Tree.Config.Connections.FirstOrDefault(c => c.Id == entry.ConnectionId);
+            TabViewModel? tab = config is null ? null : entry.Kind switch
+            {
+                SavedTabKind.Table when !string.IsNullOrEmpty(entry.Table) && RestoredTableTabFactory is { } create =>
+                    CreateRestoredTable(create, config, entry),
+                SavedTabKind.Script => CreateRestoredScript(config, entry, unsavedById),
+                _ => null,
+            };
+            if (tab is null)
+            {
+                skipped++;
+                continue;
+            }
+            Tabs.Add(tab);
+            if (i == saved.ActiveIndex) active = tab;
+        }
+        // The active tab last and once: only it starts loading (see OnActiveTabChanged).
+        ActiveTab = active ?? Tabs.FirstOrDefault();
+
+        // Unsaved copies the session does not know (written after its last save, e.g. a crash) must not be lost: keep them too.
+        var known = saved.Tabs.Where(t => t.ScriptId is not null).Select(t => t.ScriptId!.Value).ToHashSet();
+        RestoreUnsaved(() => unsaved, known);
+
+        _sessionRestored = true;
+        if (skipped > 0)
+        {
+            Status.Info($"{skipped} tab(s) were not restored: their connection no longer exists.");
+            ScheduleSessionSave();   // the file forgets them
+        }
+        return Tabs.Count;
+    }
+
+    private static TableTabViewModel CreateRestoredTable(
+        Func<ConnectionConfig, TableRef, TableTabViewModel> create, ConnectionConfig config, SavedTab entry)
+    {
+        var tab = create(config, new TableRef(entry.Schema, entry.Table!));
+        if (entry.Filters is not null)
+            foreach (var (column, text) in entry.Filters)
+                if (!string.IsNullOrEmpty(text)) tab.ColumnFilters[column] = text;
+        tab.RawWhere = entry.RawWhere;
+        if (!string.IsNullOrEmpty(entry.SortColumn)) tab.Sort = new SortSpec(entry.SortColumn, entry.SortDescending);
+        return tab;
+    }
+
+    private ScriptTabViewModel CreateRestoredScript(ConnectionConfig config, SavedTab entry, Dictionary<Guid, SavedScript> unsaved)
+    {
+        var id = entry.ScriptId ?? Guid.NewGuid();
+        if (unsaved.TryGetValue(id, out var dirty))
+            return CreateScriptTab(config, new SavedScript(id, config.Id, dirty.Text, entry.FilePath ?? dirty.FilePath));
+        // Nothing unsaved: the file as it is now, or an empty new script when it is gone.
+        var path = entry.FilePath is { } p && File.Exists(p) ? p : null;
+        return CreateScriptTab(config, new SavedScript(id, config.Id, null, path));
+    }
+
+    private SavedTabs SnapshotSession()
+    {
+        var tabs = new List<SavedTab>();
+        var active = -1;
+        foreach (var tab in Tabs.ToList())
+        {
+            SavedTab? entry = tab switch
+            {
+                TableTabViewModel t => new SavedTab(SavedTabKind.Table, t.Connection.Id, t.Table.Schema, t.Table.Name,
+                    t.ColumnFilters.Where(kv => !string.IsNullOrWhiteSpace(kv.Value)).ToDictionary(kv => kv.Key, kv => kv.Value),
+                    string.IsNullOrWhiteSpace(t.RawWhere) ? null : t.RawWhere,
+                    t.Sort?.Column, t.Sort?.Descending ?? false),
+                ScriptTabViewModel { IsDiscarded: false } s => new SavedTab(SavedTabKind.Script, s.Connection.Id, ScriptId: s.Id, FilePath: s.FilePath),
+                _ => null,   // a placeholder, or a script the user discarded on exit
+            };
+            if (entry is null) continue;
+            if (ReferenceEquals(tab, ActiveTab)) active = tabs.Count;
+            tabs.Add(entry);
+        }
+        return new SavedTabs(active, tabs);
+    }
+
+    /// <summary>Writes the tab session after <see cref="SessionSaveDelay"/> (restarted by every change); the snapshot is taken now, the write runs on a pool thread.</summary>
+    private void ScheduleSessionSave()
+    {
+        if (_sessionStore is not { } store || !_sessionRestored) return;
+        var snapshot = SnapshotSession();
+        int version;
+        lock (_sessionGate) version = ++_sessionVersion;
+        var timer = new CancellationTokenSource();
+        Interlocked.Exchange(ref _sessionTimer, timer)?.Cancel();
+        _ = Task.Delay(SessionSaveDelay, timer.Token).ContinueWith(t =>
+        {
+            if (t.IsCanceled) return;
+            lock (_sessionGate)
+            {
+                if (version == _sessionVersion) store.Save(snapshot);   // an older snapshot never overwrites a newer write
+            }
+        }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+    }
+
+    /// <summary>Writes the tab session now (the window is closing). Idempotent; does nothing before the restore ran or without a store.</summary>
+    public void PersistSession()
+    {
+        if (_sessionStore is not { } store || !_sessionRestored) return;
+        Interlocked.Exchange(ref _sessionTimer, null)?.Cancel();
+        var snapshot = SnapshotSession();
+        lock (_sessionGate)
+        {
+            _sessionVersion++;   // a pending delayed write is now stale
+            store.Save(snapshot);
+        }
+    }
+
     /// <summary>The connection a new script goes to: the active tab's, else the tree selection's. Always its latest saved settings.</summary>
     private ConnectionConfig? ScriptTarget()
     {
@@ -253,6 +458,16 @@ public partial class MainViewModel : ObservableObject
     {
         var config = Tree.Config.Connections.FirstOrDefault(c => c.Id == connectionId);
         if (config is null) return null;
+        // Another request (e.g. a second restored tab on the same connection) is connecting it already: wait for its outcome
+        // instead of being told "still connecting".
+        var waited = false;
+        while (Tree.NodeOf(config.Id) is { State: ConnectionState.Connecting })
+        {
+            waited = true;
+            await Task.Delay(40, ct);
+        }
+        if (waited && Tree.NodeOf(config.Id) is { State: ConnectionState.Failed } failed)
+            throw new InvalidOperationException($"{config.Name} is not available: {failed.ErrorMessage}");
         return await Tree.EnsureConnectedAsync(config, ct)
             ?? throw new InvalidOperationException($"{config.Name} is not available (see the status bar).");
     }
