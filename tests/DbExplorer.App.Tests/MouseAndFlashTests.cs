@@ -117,6 +117,26 @@ public class MouseAndFlashTests : ShellTestBase
     }
 
     [AvaloniaFact]
+    public async Task MiddleButtonPan_InterruptedByDetach_DoesNotLeaveThePanCursor()
+    {
+        var tab = await T.OpenTab("big");
+        var grid = new ResultGrid { Columns = tab.GridColumns, ItemsSource = tab.Rows, Features = tab, Editing = tab };
+        var window = new Window { Content = grid, Width = 1000, Height = 400 };
+        window.Show();
+        await Pump();
+
+        var data = InnerGrid(grid);
+        window.MouseDown(Center(window, data), MouseButton.Middle);
+        Assert.NotNull(data.Cursor);   // the pan cursor while the button is down
+
+        window.Content = null;   // the view goes away mid-pan: no release will ever reach it
+        await Pump(3);
+
+        Assert.Null(data.Cursor);
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public async Task LeftButtonDrag_DoesNotPan()
     {
         var tab = await T.OpenTab("big");

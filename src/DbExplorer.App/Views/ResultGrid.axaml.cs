@@ -167,9 +167,12 @@ public partial class ResultGrid : UserControl
         if (e.Source is Visual source && source.FindAncestorOfType<CellEditor>(includeSelf: true) is not null) return;   // text box: leave it alone
         _panLast = e.GetPosition(Grid);
         e.Pointer.Capture(Grid);
-        Grid.Cursor = new Cursor(StandardCursorType.SizeAll);
+        Grid.Cursor = PanCursor ??= new Cursor(StandardCursorType.SizeAll);
         e.Handled = true;
     }
+
+    // Created on first use (the platform's cursor factory may not exist yet when the type loads) and shared by all grids.
+    private static Cursor? PanCursor;
 
     private void OnPanMoved(object? sender, PointerEventArgs e)
     {
@@ -295,7 +298,11 @@ public partial class ResultGrid : UserControl
     {
         _attached = false;
         ClearFlash();
-        _panLast = null;
+        if (_panLast is not null)
+        {
+            _panLast = null;   // detached mid-pan: no release will reach us, so the pan cursor must not stay
+            Grid.ClearValue(CursorProperty);
+        }
         SubscribeToFeatures();
         AttachEditing();
         BindItems();
