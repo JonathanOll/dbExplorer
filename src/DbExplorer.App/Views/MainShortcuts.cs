@@ -5,8 +5,8 @@ namespace DbExplorer.App.Views;
 
 /// <summary>
 /// The window-level keyboard shortcuts, as a pure key-to-command mapping so it can be tested without a window. Modifiers
-/// are compared for equality, so Ctrl+Shift+T does not also fire Ctrl+T. Every shortcut is a Ctrl chord or F5, so
-/// typing in a text box or the editor is never affected.
+/// are compared for equality, so Ctrl+Shift+T does not also fire Ctrl+T (and Ctrl+Alt+PageDown is not Ctrl+PageDown). Every
+/// shortcut is a Ctrl chord or F5, so typing in a text box or the editor is never affected.
 /// </summary>
 public static class MainShortcuts
 {
@@ -47,6 +47,14 @@ public static class MainShortcuts
                 return true;
             case (Key.Tab, KeyModifiers.Control | KeyModifiers.Shift) when !overlay && main.Tabs.Count > 0:
                 if (Ready()) main.PreviousTabCommand.Execute(null);
+                return true;
+            // Next / previous database of the tab's group. Ctrl+Alt+PageDown/PageUp: PageDown is no character key (so AltGr
+            // typing is unaffected), and the plain / Ctrl / Shift variants stay with the grid and the editor.
+            case (Key.PageDown, KeyModifiers.Control | KeyModifiers.Alt) when !overlay && main.ActiveTab is not null:
+                if (Ready()) main.NextGroupMemberCommand.Execute(null);
+                return true;
+            case (Key.PageUp, KeyModifiers.Control | KeyModifiers.Alt) when !overlay && main.ActiveTab is not null:
+                if (Ready()) main.PreviousGroupMemberCommand.Execute(null);
                 return true;
             case (Key.F5, KeyModifiers.None) when !overlay && main.ActiveTab is TableTabViewModel:
                 if (Ready()) main.RefreshActiveTableCommand.Execute(null);

@@ -20,6 +20,12 @@ public partial class MainViewModel : ObservableObject
         _cache = cache;
         Tree.TableOpener = OpenTable;
         Tabs.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmptyState));
+        // The tree rebuilds (Reset first) whenever groups or connections change: open tabs repaint their database selector.
+        Tree.Nodes.CollectionChanged += (_, e) =>
+        {
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+                foreach (var tab in Tabs) tab.NotifyGroupsChanged();
+        };
         Tree.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(ConnectionTreeViewModel.SelectedConnection)) OnPropertyChanged(nameof(CurrentConnection));
@@ -61,8 +67,14 @@ public partial class MainViewModel : ObservableObject
             (s, t, filters) => OpenTable(s, t, filters),
             editDialogs,
             () => Tree.Config,
-            Tree.SetVirtualKey));
+            Tree.SetVirtualKey,
+            SwitchHooks));
     }
+
+    private GroupSwitchHooks? _switchHooks;
+
+    /// <summary>What a tab needs to switch between group members: the live config and sessions resolved through the tree.</summary>
+    private GroupSwitchHooks SwitchHooks => _switchHooks ??= new GroupSwitchHooks(() => Tree.Config, ResolveScriptSessionAsync);
 
     /// <summary>Opens a new tab for <paramref name="t"/> on the session and makes it active.</summary>
     public Task OpenTable(Session s, TableRef t) => OpenTable(s, t, null);
@@ -104,7 +116,15 @@ public partial class MainViewModel : ObservableObject
     {
         // Leaving a script tab is a good moment to persist it (the debounce may not have fired yet).
         (oldValue as ScriptTabViewModel)?.FlushPersist();
+        // The status bar names the connection of the active tab, which changes when the tab is switched to another group member.
+        if (oldValue is not null) oldValue.PropertyChanged -= OnActiveTabPropertyChanged;
+        if (newValue is not null) newValue.PropertyChanged += OnActiveTabPropertyChanged;
         OnPropertyChanged(nameof(CurrentConnection));
+    }
+
+    private void OnActiveTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(TabViewModel.Connection)) OnPropertyChanged(nameof(CurrentConnection));
     }
 
     /// <summary>
@@ -214,7 +234,7 @@ public partial class MainViewModel : ObservableObject
     private ScriptTabViewModel CreateScriptTab(ConnectionConfig connection, SavedScript? restored)
     {
         var hooks = new ScriptTabHooks(
-            ct => ResolveScriptSessionAsync(connection.Id, ct), _scriptFiles, _scriptStore, Status, _scriptDialogs);
+            ct => ResolveScriptSessionAsync(connection.Id, ct), _scriptFiles, _scriptStore, Status, _scriptDialogs, SwitchHooks);
         return new ScriptTabViewModel(connection, Tree.FindSession(connection.Id), hooks, ++_scriptCounter, restored);
     }
 
@@ -423,6 +443,34 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Ctrl+W: closes the active tab through the same path as its x button, so unsaved work is asked about.</summary>
     [RelayCommand]
     public Task CloseActiveTabAsync() => ActiveTab is { } tab ? CloseTabAsync(tab) : Task.CompletedTask;
+
+    // ---- group member shortcuts (Ctrl+Alt+PageDown, Ctrl+Alt+PageUp) ----
+
+    /// <summary>Ctrl+Alt+PageDown: the active tab moves to the next database of its group, wrapping around.</summary>
+    [RelayCommand]
+    public Task NextGroupMemberAsync() => SwitchActiveTabAsync(+1);
+
+    /// <summary>Ctrl+Alt+PageUp: the active tab moves to the previous database of its group, wrapping around.</summary>
+    [RelayCommand]
+    public Task PreviousGroupMemberAsync() => SwitchActiveTabAsync(-1);
+
+    private async Task SwitchActiveTabAsync(int delta)
+    {
+        if (ActiveTab is not { } tab) return;
+        if (!tab.HasGroupSwitch)
+        {
+            Status.Info($"{tab.Connection.Name} is not in a group with other databases: nothing to switch to.");
+            return;
+        }
+        try
+        {
+            await tab.SwitchRelativeAsync(delta);
+        }
+        catch (Exception e)
+        {
+            Status.Error($"Cannot switch database: {ErrorText.Describe(e)}");
+        }
+    }
 
     /// <summary>Ctrl+Tab: the next tab, wrapping around.</summary>
     [RelayCommand]

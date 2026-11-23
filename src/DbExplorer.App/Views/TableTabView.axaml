@@ -33,6 +33,10 @@
   </UserControl.Styles>
 
   <DockPanel>
+    <!-- Database selector: only for a connection that is in a group with other databases -->
+    <Border DockPanel.Dock="Top" Classes="toolbar" IsVisible="{Binding HasGroupSwitch}">
+      <views:GroupSwitcher HorizontalAlignment="Left" />
+    </Border>
     <!-- Error strip: the previous rows stay visible underneath -->
     <Border DockPanel.Dock="Top" Classes="banner error"
             IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}">

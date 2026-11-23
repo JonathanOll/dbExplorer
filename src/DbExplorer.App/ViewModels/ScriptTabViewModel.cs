@@ -25,12 +25,15 @@ public interface IScriptFiles
 /// <param name="Status">Shared status bar.</param>
 /// <param name="Dialogs">Asks Save / Discard / Cancel when a script with unsaved text is closed. Without it such a tab
 /// refuses to close (its text would be lost without asking).</param>
+/// <param name="Switch">Lets the tab switch between the members of its connection's group; without it the tab never switches.
+/// When given, connecting resolves the session through it too, so it follows the connection the tab was switched to.</param>
 public sealed record ScriptTabHooks(
     Func<CancellationToken, Task<Session?>> ResolveSession,
     IScriptFiles? Files = null,
     ScriptSessionStore? Store = null,
     StatusModel? Status = null,
-    IEditDialogs? Dialogs = null);
+    IEditDialogs? Dialogs = null,
+    GroupSwitchHooks? Switch = null);
 
 /// <summary>
 /// A SQL script editor on one connection. Runs the statement under the caret / the selection (Ctrl+Enter) or the
@@ -184,6 +187,11 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         if (IsRunning)
         {
             _status.Info("A script is already running — cancel it first.");
+            return;
+        }
+        if (IsSwitching)
+        {
+            _status.Info("Switching database — try again in a moment.");
             return;
         }
         if (statements.Count == 0)
@@ -352,7 +360,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         try
         {
             // WaitAsync: Cancel returns at once even when the connect itself cannot be interrupted (it may finish in the background).
-            var resolving = _hooks.ResolveSession(ct);
+            var resolving = ResolveHook(Connection.Id, ct);
             // After a cancel the connect carries on unobserved; if it fails later nobody awaits it, so observe that failure here.
             _ = resolving.ContinueWith(
                 static t => _ = t.Exception, CancellationToken.None,
@@ -380,6 +388,62 @@ public sealed partial class ScriptTabViewModel : TabViewModel
             _status.Error(ErrorMessage);
             return null;
         }
+    }
+
+    /// <summary>Asks the shell for the live session of <paramref name="connectionId"/> (the tab's current connection follows a switch).</summary>
+    private Task<Session?> ResolveHook(Guid connectionId, CancellationToken ct) =>
+        _hooks.Switch is { } sw ? sw.ResolveSession(connectionId, ct) : _hooks.ResolveSession(ct);
+
+    // ---- switching to another member of the group ----
+
+    protected override GroupSwitchHooks? GroupHooks => _hooks.Switch;
+
+    protected override void ReportSwitchProblem(string message) => _status.Info(message);
+
+    /// <summary>
+    /// Moves the script to another database of the group: the text and the results stay, the next run uses the new
+    /// connection. The target is connected first (through the tree), so an unreachable member is reported now and the tab
+    /// stays as it was. Then the tab's dedicated connection to the old database is released (an open transaction on it is
+    /// rolled back, exactly as when the tab closes) and the old session is not used again. Refused while a script runs.
+    /// </summary>
+    protected override async Task<bool> SwitchCoreAsync(ConnectionConfig target)
+    {
+        if (IsRunning)
+        {
+            _status.Info("Cannot switch database while a script is running — cancel it first.");
+            return false;
+        }
+
+        Session? live;
+        try
+        {
+            live = await ResolveHook(target.Id, CancellationToken.None);
+        }
+        catch (Exception e)
+        {
+            ErrorMessage = $"Could not connect to {target.Name}: {ErrorText.Describe(e)} The tab stays on {Connection.Name}.";
+            _status.Error(ErrorMessage);
+            return false;
+        }
+
+        if (live is null)
+        {
+            ErrorMessage = $"{target.Name} no longer exists. The tab stays on {Connection.Name}.";
+            _status.Error(ErrorMessage);
+            return false;
+        }
+        if (_closed || IsRunning) return false;   // closed meanwhile (nothing may be created now) or a run slipped in
+
+        var old = _script;
+        _script = null;
+        old?.Dispose();   // rolls an open transaction back
+        _session = live;
+        Connection = live.Config;
+        ErrorMessage = null;
+        NeedsReconnect = false;
+        if (ShouldPersist) SchedulePersist();   // the persisted copy names the connection
+        _status.Info($"Switched to {live.Config.Name}: the next run uses it.");
+        return true;
     }
 
     /// <summary>Re-resolves the live session of the connection after "Connection closed".</summary>

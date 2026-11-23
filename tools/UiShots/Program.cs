@@ -311,6 +311,8 @@ internal static class Scenes
         ("group-editor", GroupEditor),
         ("group-editor-warning", GroupEditorWarning),
         ("group-schema-diff", GroupSchemaDiff),
+        ("group-switch-table", GroupSwitchTable),
+        ("group-switch-script", GroupSwitchScript),
     ];
 
     private static string Theme = "light";
@@ -567,6 +569,31 @@ internal static class Scenes
         dialog.Show(d.Window);
         await Settle();
         return dialog;
+    }
+
+    // A table tab on "Scratch", a member of the "Notes databases" group: the database selector strip above the tab.
+    private static async Task<Window?> GroupSwitchTable(Demo d)
+    {
+        await Open(d);
+        await d.Main.OpenTable(d.Sessions.Find(d.Scratch.Id)!, new TableRef(null, "notes"));
+        var tab = (TableTabViewModel)d.Main.ActiveTab!;
+        for (var i = 0; i < 100 && (tab.IsLoading || tab.Rows.Count == 0); i++) await Task.Delay(20);
+        await Settle();
+        return null;
+    }
+
+    // A script tab on the same group: the selector replaces the connection badge in the toolbar.
+    private static async Task<Window?> GroupSwitchScript(Demo d)
+    {
+        await Open(d);
+        d.Tree.SelectedNode = d.AllConnectionNodes().First(n => n.Config == d.Scratch);
+        var script = d.Main.NewScript()!;
+        script.Text = "SELECT id, title, body FROM notes ORDER BY id;";
+        d.Window.Show();
+        Pump();
+        await script.RunScriptAsync();
+        await Settle();
+        return null;
     }
 
     private static async Task<Window?> ConfirmDialog(Demo d)

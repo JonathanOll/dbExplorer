@@ -14,12 +14,15 @@ namespace DbExplorer.App.ViewModels;
 /// <param name="Dialogs">Prompts of the editing flow (SQL preview, save/discard, virtual key). Without it nothing can be saved.</param>
 /// <param name="GetConfig">The live application config (virtual keys live in it). Without it a private empty one is used.</param>
 /// <param name="SetVirtualKey">Stores a virtual key in the config and saves it; false when it could not be saved (kept for this session).</param>
+/// <param name="Switch">Lets the tab switch between the members of its connection's group; without it the tab never switches.
+/// When given, Reload resolves the session through it too, so it follows the connection the tab was switched to.</param>
 public sealed record TableTabHooks(
     Func<CancellationToken, Task<Session?>> ResolveSession,
     Func<Session, TableRef, IReadOnlyDictionary<string, string>?, Task> OpenTable,
     IEditDialogs? Dialogs = null,
     Func<AppConfig>? GetConfig = null,
-    Func<Guid, TableRef, string[], bool>? SetVirtualKey = null);
+    Func<Guid, TableRef, string[], bool>? SetVirtualKey = null,
+    GroupSwitchHooks? Switch = null);
 
 /// <summary>
 /// A table (or view) opened in its own tab: one page of rows at a time, with per-column filters, a raw WHERE,
@@ -314,13 +317,77 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
         else await RunAsync(CurrentInputs(Sort), 0);
     }
 
+    // ---- switching to another member of the group ----
+
+    protected override GroupSwitchHooks? GroupHooks => _hooks.Switch;
+
+    protected override void ReportSwitchProblem(string message) => SetError(message);
+
+    /// <summary>
+    /// Reloads the SAME table from another database of the group: same filters, raw WHERE and sort, from page 0. Everything
+    /// that can fail happens before anything changes, so a failed switch leaves the tab exactly as it was (connection, rows,
+    /// pending state): pending edits are asked about first (Cancel keeps the tab), the target must connect, have the table
+    /// and answer the query. Only then the tab takes the target's session (so the edit rules, key and read-only state are
+    /// those of the NEW connection) and its rows. The old session is never used after that.
+    /// </summary>
+    protected override async Task<bool> SwitchCoreAsync(ConnectionConfig target)
+    {
+        if (IsSaving)
+        {
+            SetError("A save is running: wait for it to finish before switching.");
+            return false;
+        }
+        if (!await ConfirmLeaveAsync()) return false;
+
+        Session? live;
+        IsLoading = true;
+        try
+        {
+            live = await _hooks.ResolveSessionAsync(target.Id);
+        }
+        catch (Exception e)
+        {
+            IsLoading = false;
+            SetError($"Could not connect to {target.Name}: {ErrorText.Describe(e)} The tab stays on {Connection.Name}.");
+            return false;
+        }
+
+        if (live is null)
+        {
+            IsLoading = false;
+            SetError($"{target.Name} no longer exists. The tab stays on {Connection.Name}.");
+            return false;
+        }
+        if (FindInfo(live) is not { } info)
+        {
+            IsLoading = false;
+            SetError($"Table '{Table}' does not exist in {target.Name}. The tab stays on {Connection.Name}.");
+            return false;
+        }
+
+        var query = _applied ?? CurrentInputs(Sort);
+        var before = ErrorMessage;
+        var loaded = await RunAsync(query, 0, live, info, commit: () =>
+        {
+            Connection = live.Config;
+            UseSession(live);
+            TotalCount = null;   // counted on the other database
+        });
+        if (!loaded && ErrorMessage is { } failure && failure != before)
+            ErrorMessage = $"Could not switch to {target.Name}: {failure} The tab stays on {Connection.Name}.";
+        return loaded;
+    }
+
+    /// <summary>The connection to resolve a live session for: the one the tab is on now (it follows a switch).</summary>
+    private Task<Session?> ResolveCurrentAsync() => _hooks.ResolveSessionAsync(Connection.Id);
+
     /// <summary>The live session of the connection, or null after setting the error state (and the Reload button).</summary>
     private async Task<Session?> ResolveLiveSessionAsync()
     {
         IsLoading = true;
         try
         {
-            var live = await _hooks.ResolveSessionAsync();
+            var live = await ResolveCurrentAsync();
             if (live is null)
             {
                 SetError("The connection no longer exists — close this tab.");
@@ -356,10 +423,15 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
     private static TableQuery ToQuery(TableInfo info, AppliedQuery q, int page) =>
         new(info, q.Filters, q.RawWhere, q.Sort is null ? [] : [q.Sort], page * PageSize, PageSize);
 
-    /// <summary>Runs the query and replaces the rows. True when the page was loaded. Never asks about pending edits: callers do.</summary>
-    private async Task<bool> RunAsync(AppliedQuery query, int page)
+    /// <summary>
+    /// Runs the query and replaces the rows. True when the page was loaded. Never asks about pending edits: callers do.
+    /// A group switch passes the target's <paramref name="targetSession"/> and its table info, and a
+    /// <paramref name="commit"/> that adopts them: it runs only once the page was read, so a query that fails there changes nothing.
+    /// </summary>
+    private async Task<bool> RunAsync(
+        AppliedQuery query, int page, Session? targetSession = null, TableInfo? targetInfo = null, Action? commit = null)
     {
-        if (Info is not { } info)
+        if ((targetInfo ?? Info) is not { } info)
         {
             SetError(TableMissingMessage());
             return false;
@@ -368,13 +440,14 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
         _loadCts?.Cancel();
         var cts = _loadCts = new CancellationTokenSource();
         var version = ++_loadVersion;
-        var session = _session;
+        var session = targetSession ?? _session;
         IsLoading = true;
         try
         {
             var result = await TableDataLoader.LoadPageAsync(session, ToQuery(info, query, page), PageSize, cts.Token);
             if (version != _loadVersion) return false;   // a newer request replaced this one
 
+            commit?.Invoke();
             ApplyReaderColumns(result.ColumnNames);
             _rowColumns = Columns.Select(c => c.Name).ToArray();
             var rows = new ObservableCollection<RowViewModel>();
@@ -427,13 +500,17 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
         OnPropertyChanged(nameof(CanDefineKey));
     }
 
+    /// <summary>This table's schema info in the session's schema, or null when it has no such table.</summary>
+    private TableInfo? FindInfo(Session session) =>
+        session.Schema.FirstOrDefault(t => t.Ref == Table)
+        ?? session.Schema.FirstOrDefault(t => string.Equals(t.Ref.Name, Table.Name, StringComparison.OrdinalIgnoreCase)
+                                              && string.Equals(t.Ref.Schema, Table.Schema, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>Takes <paramref name="session"/> as the live one and re-reads this table's schema info from it.</summary>
     private void UseSession(Session session)
     {
         _session = session;
-        var info = session.Schema.FirstOrDefault(t => t.Ref == Table)
-                   ?? session.Schema.FirstOrDefault(t => string.Equals(t.Ref.Name, Table.Name, StringComparison.OrdinalIgnoreCase)
-                                                         && string.Equals(t.Ref.Schema, Table.Schema, StringComparison.OrdinalIgnoreCase));
+        var info = FindInfo(session);
         Info = info;
         Columns = info is null ? [] : info.Columns.OrderBy(c => c.Ordinal).ToList();
         GridColumns = BuildGridColumns();
@@ -480,8 +557,13 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
     /// <summary>Null-safe wrapper over the optional hooks.</summary>
     private sealed class TableHookState(TableTabHooks? hooks)
     {
-        public Task<Session?> ResolveSessionAsync() =>
-            hooks is null ? Task.FromResult<Session?>(null) : hooks.ResolveSession(CancellationToken.None);
+        public GroupSwitchHooks? Switch => hooks?.Switch;
+
+        /// <summary>The live session of the connection <paramref name="connectionId"/> (the tab's current one: it follows a switch).</summary>
+        public Task<Session?> ResolveSessionAsync(Guid connectionId) =>
+            hooks is null ? Task.FromResult<Session?>(null)
+            : hooks.Switch is { } sw ? sw.ResolveSession(connectionId, CancellationToken.None)
+            : hooks.ResolveSession(CancellationToken.None);
 
         public Task OpenTableAsync(Session session, TableRef table, IReadOnlyDictionary<string, string>? filters) =>
             hooks is null ? Task.CompletedTask : hooks.OpenTable(session, table, filters);

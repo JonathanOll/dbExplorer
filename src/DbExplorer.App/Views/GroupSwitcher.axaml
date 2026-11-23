@@ -1,0 +1,38 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="using:DbExplorer.App.Views"
+             xmlns:model="using:DbExplorer.Core.Model"
+             x:Class="DbExplorer.App.Views.GroupSwitcher">
+  <!-- The database selector of a table or script tab whose connection is in a group: [group] < database > .
+       Driven by GroupSwitcher.axaml.cs from the TabViewModel (items and selection are synced in code, so a refused or failed
+       switch puts the selector back on the connection the tab is really on). Hidden unless the group has another member. -->
+  <StackPanel x:Name="Root" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" IsVisible="False">
+    <PathIcon Classes="dim" Data="{StaticResource IconGroup}" Width="13" Height="13" Margin="2,0,4,0" VerticalAlignment="Center"
+              ToolTip.Tip="Linked databases: this tab can switch between the members of the group" />
+    <ComboBox x:Name="GroupBox" MinWidth="96" MinHeight="26" Padding="8,0" Margin="0,0,4,0" IsVisible="False"
+              ToolTip.Tip="Group (this connection is in several groups)">
+      <ComboBox.ItemTemplate>
+        <DataTemplate x:DataType="model:ConnectionGroup">
+          <TextBlock Text="{Binding Name}" />
+        </DataTemplate>
+      </ComboBox.ItemTemplate>
+    </ComboBox>
+    <Button x:Name="PrevButton" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconChevronLeft}" Click="OnPreviousClick"
+            ToolTip.Tip="Previous database of the group (Ctrl+Alt+PageUp)" />
+    <ComboBox x:Name="MemberBox" MinWidth="120" MinHeight="26" Padding="8,0"
+              ToolTip.Tip="Switch this tab to another database of the group. A table reloads with the same filters and sort; a script keeps its text and results and runs on the new database from the next run (an open transaction on the old one is rolled back).">
+      <ComboBox.ItemTemplate>
+        <DataTemplate x:DataType="model:ConnectionConfig">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <views:EngineIcon Kind="{Binding Kind}" Width="12" Height="12" />
+            <TextBlock Text="{Binding Name}" />
+            <PathIcon Data="{StaticResource IconLock}" Width="10" Height="10" Foreground="{DynamicResource DbxWarn}"
+                      IsVisible="{Binding ReadOnly}" ToolTip.Tip="Read-only connection" />
+          </StackPanel>
+        </DataTemplate>
+      </ComboBox.ItemTemplate>
+    </ComboBox>
+    <Button x:Name="NextButton" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconChevronRight}" Click="OnNextClick"
+            ToolTip.Tip="Next database of the group (Ctrl+Alt+PageDown)" />
+  </StackPanel>
+</UserControl>

@@ -43,7 +43,8 @@
             <ProgressBar IsIndeterminate="{Binding IsRunning}" Width="70" Height="4" VerticalAlignment="Center" />
             <TextBlock Classes="dim" Text="running…" VerticalAlignment="Center" />
           </StackPanel>
-          <Border Classes="badge" ToolTip.Tip="The connection this script runs on">
+          <views:GroupSwitcher />
+          <Border Classes="badge" ToolTip.Tip="The connection this script runs on" IsVisible="{Binding !HasGroupSwitch}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <views:EngineIcon Kind="{Binding Connection.Kind}" Width="12" Height="12" />
               <TextBlock Text="{Binding Connection.Name}" FontSize="12" />

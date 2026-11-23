@@ -78,6 +78,10 @@ deleted row red `#55B3261E` with strike-through, NULL dim italic.
   read-only badge), the WHERE row, the grid. The grid header is a darker name band over a lighter filter band.
 - **Script tab**: toolbar (run, run all, cancel | row limit | open, save | connection badge), editor (per-theme syntax colours),
   splitter, result tabs with a result line (`N rows · X ms`), error banners.
+- **Database selector** (`GroupSwitcher`, in table and script tabs): group icon, a group picker (only when the connection is in
+  several groups), previous / next chevrons and a combo of the group's databases (engine icon, name, lock for read-only). Shown
+  only when the tab's connection is in a group with other members: in the table tab as a toolbar strip above the banners, in the
+  script tab in place of the connection badge. Ctrl+Alt+PageDown / PageUp switch to the next / previous member.
 - **Status bar**: severity icon + message, busy spinner + cancel, active connection (engine icon, name, engine, read-only
   badge), shortcut hints.
 - **Quick open**: shadowed card, big search box, icon + label + dim detail rows, keyboard-hint footer.
@@ -97,7 +101,8 @@ Scenes: `empty`, `main-table`, `table-edit`, `table-structure`, `script`, `scrip
 `sql-preview`, `virtual-key`, `confirm-dialog`, `live-theme-switch` (flips the theme while the window shows),
 `main-table-125` (1024x640 DIP, the 1280x800 window at 125 percent scaling), and for linked groups `groups-tree` (the Groups
 section of the navigator), `group-editor`, `group-editor-warning` (one member + a name clash: warning and error bands) and
-`group-schema-diff` (schema-difference report with an unreachable member). The `group-*` scenes use a demo config with three
+`group-schema-diff` (schema-difference report with an unreachable member), `group-switch-table` and `group-switch-script`
+(the database selector in a table and a script tab). The `group-*` scenes use a demo config with three
 groups; the Group icon is `IconGroup` / `IconGroupAdd` in `Icons.axaml`. The navigator is 304 px wide by default (it holds one
 more toolbar button than the "before" images). The "before" images were made from the same tool
 at the previous UI (commit `024c5ff`, with the one grid fix of commit `a5d3399`, without which a second table tab showed no grid).

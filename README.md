@@ -64,6 +64,8 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
 | `Ctrl+W` | anywhere | Close the active tab |
 | `Ctrl+Tab` | anywhere | Next tab |
 | `Ctrl+Shift+Tab` | anywhere | Previous tab |
+| `Ctrl+Alt+PageDown` | table / script tab on a connection in a group | Switch the tab to the next database of the group (wraps around) |
+| `Ctrl+Alt+PageUp` | table / script tab on a connection in a group | Switch the tab to the previous database of the group |
 | `Esc` | quick open overlay | Close the overlay |
 | `Esc` | table tab | Discard staged edits: specified in the design, **not wired yet** (use the Revert button; in a cell editor Esc cancels that edit) |
 | `Ctrl+0` | table grid, cell selected | Set the cell to NULL (staged) |
