@@ -1,8 +1,8 @@
 {
 	"folders": {
 		"Admin": {},
-		"Acme": {},
-		"Globex": {},
+		"N2F": {},
+		"Keeple": {},
 		"Translate": {}
 	},
 	"connections": {
@@ -13,8 +13,8 @@
 			"save-password": true,
 			"folder": "Admin",
 			"configuration": {
-				"database": "C:\\Temp\\_Acme\\adminDB.db",
-				"url": "jdbc:sqlite:C:\\Temp\\_Acme\\adminDB.db",
+				"database": "C:\\Temp\\_N2F\\adminDB.db",
+				"url": "jdbc:sqlite:C:\\Temp\\_N2F\\adminDB.db",
 				"configurationType": "MANUAL",
 				"type": "dev",
 				"closeIdleConnection": false
@@ -43,14 +43,14 @@
 		"microsoft-1a05bf273cf-1a6d26bd70a9b734": {
 			"provider": "sqlserver",
 			"driver": "microsoft",
-			"name": "Acme local",
+			"name": "N2F local",
 			"save-password": true,
-			"folder": "Acme",
+			"folder": "N2F",
 			"configuration": {
 				"host": "127.0.0.1",
 				"port": "1433",
-				"database": "acme",
-				"url": "jdbc:sqlserver://;serverName\u003d127.0.0.1;databaseName\u003dacme",
+				"database": "n2f",
+				"url": "jdbc:sqlserver://;serverName\u003d127.0.0.1;databaseName\u003dn2f",
 				"configurationType": "MANUAL",
 				"type": "dev",
 				"closeIdleConnection": false,
@@ -64,14 +64,14 @@
 		"microsoft-1a05bf3407a-f4902502410943f": {
 			"provider": "sqlserver",
 			"driver": "microsoft",
-			"name": "Acme resto ano",
+			"name": "N2F resto ano",
 			"save-password": true,
-			"folder": "Acme",
+			"folder": "N2F",
 			"configuration": {
 				"host": "devsql.example.test",
 				"port": "1433",
-				"database": "acmeResto",
-				"url": "jdbc:sqlserver://;serverName\u003ddevsql.example.test;databaseName\u003dacmeResto",
+				"database": "n2fResto",
+				"url": "jdbc:sqlserver://;serverName\u003ddevsql.example.test;databaseName\u003dn2fResto",
 				"configurationType": "MANUAL",
 				"type": "dev",
 				"closeIdleConnection": false,
@@ -85,14 +85,14 @@
 		"microsoft-1a05bf56182-30022e6b735a4d8": {
 			"provider": "sqlserver",
 			"driver": "microsoft",
-			"name": "Acme resto ano 2",
+			"name": "N2F resto ano 2",
 			"save-password": true,
-			"folder": "Acme",
+			"folder": "N2F",
 			"configuration": {
 				"host": "devsql.example.test",
 				"port": "1433",
-				"database": "acmeResto2",
-				"url": "jdbc:sqlserver://;serverName\u003ddevsql.example.test;databaseName\u003dacmeResto2",
+				"database": "n2fResto2",
+				"url": "jdbc:sqlserver://;serverName\u003ddevsql.example.test;databaseName\u003dn2fResto2",
 				"configurationType": "MANUAL",
 				"type": "dev",
 				"closeIdleConnection": false,
@@ -130,13 +130,13 @@
 		"postgres-jdbc-1a0f6668b80-6dcbdf8868a578d3": {
 			"provider": "postgresql",
 			"driver": "postgres-jdbc",
-			"name": "GlobexAuth",
+			"name": "KeepleAuth",
 			"save-password": true,
 			"configuration": {
 				"host": "localhost",
 				"port": "5454",
-				"database": "appdb",
-				"url": "jdbc:postgresql://localhost:5454/appdb",
+				"database": "n2j",
+				"url": "jdbc:postgresql://localhost:5454/n2j",
 				"configurationType": "MANUAL",
 				"home": "postgresql_client",
 				"type": "dev",
@@ -188,7 +188,7 @@
 			"driver": "microsoft",
 			"name": "Resto",
 			"save-password": true,
-			"folder": "Globex",
+			"folder": "Keeple",
 			"configuration": {
 				"host": "devsql.example.test",
 				"port": "1433",
@@ -205,7 +205,7 @@
 			}
 		}
 	},
-	"virtual-models": {"microsoft-1a05bf273cf-1a6d26bd70a9b734":{"acme":{"liquibase":{":DATABASECHANGELOG":{"constraints":{"VIRTUAL_PK":{"type":"vpk","useAllColumns":true}}}}}}},
+	"virtual-models": {"microsoft-1a05bf273cf-1a6d26bd70a9b734":{"n2f":{"liquibase":{":DATABASECHANGELOG":{"constraints":{"VIRTUAL_PK":{"type":"vpk","useAllColumns":true}}}}}}},
 	"connection-types": {
 		"dev": {
 			"name": "Development",

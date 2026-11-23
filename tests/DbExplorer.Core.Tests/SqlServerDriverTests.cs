@@ -11,7 +11,7 @@ public class SqlServerDriverTests
     private static ConnectionConfig Config(
         string? host = "db.example.com", int? port = 1433, bool encrypt = true, bool trust = false) => new(
         Guid.NewGuid(), "test", DbKind.SqlServer, null, host, port,
-        "acme", "app_user", null, encrypt, trust, false);
+        "n2f", "app_user", null, encrypt, trust, false);
 
     [Fact]
     public void Kind_And_ParamPrefix()
@@ -77,7 +77,7 @@ public class SqlServerDriverTests
         Assert.Equal(SqlConnectionEncryptOption.Mandatory, b.Encrypt);
         Assert.True(b.TrustServerCertificate);
         Assert.Equal("db.example.com,1433", b.DataSource);
-        Assert.Equal("acme", b.InitialCatalog);
+        Assert.Equal("n2f", b.InitialCatalog);
         Assert.Equal("app_user", b.UserID);
         Assert.Equal("s3cret", b.Password);
         Assert.Equal(10, b.ConnectTimeout);

@@ -7,7 +7,7 @@ namespace DbExplorer.Core.Tests;
 
 public class DBeaverImporterTests : IDisposable
 {
-    private const string AcmeLocalId = "microsoft-1a05bf273cf-1a6d26bd70a9b734";
+    private const string N2FLocalId = "microsoft-1a05bf273cf-1a6d26bd70a9b734";
     private static readonly byte[] DBeaverKey = Convert.FromHexString("babb4a9f774ab853c96c2d653dfe544a");
 
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "dbExplorer-dbeaver-" + Guid.NewGuid().ToString("N"));
@@ -54,26 +54,26 @@ public class DBeaverImporterTests : IDisposable
         Assert.Equal(9, target.Connections.Count);
         Assert.Contains("Translate", target.Folders);
 
-        var local = Assert.Single(target.Connections, c => c.Name == "Acme local");
+        var local = Assert.Single(target.Connections, c => c.Name == "N2F local");
         Assert.Equal(DbKind.SqlServer, local.Kind);
         Assert.Equal("127.0.0.1", local.Host);
         Assert.Equal(1433, local.Port);
-        Assert.Equal("acme", local.Database);
-        Assert.Equal("Acme", local.Folder);
+        Assert.Equal("n2f", local.Database);
+        Assert.Equal("N2F", local.Folder);
         Assert.True(local.TrustServerCertificate);
 
-        var remote = Assert.Single(target.Connections, c => c.Name == "Acme resto ano");
+        var remote = Assert.Single(target.Connections, c => c.Name == "N2F resto ano");
         Assert.Equal("devsql.example.test", remote.Host);
         Assert.False(remote.TrustServerCertificate);
 
-        var globex = Assert.Single(target.Connections, c => c.Name == "GlobexAuth");
-        Assert.Equal(DbKind.Postgres, globex.Kind);
-        Assert.Equal(5454, globex.Port);
-        Assert.Null(globex.Folder);
+        var keeple = Assert.Single(target.Connections, c => c.Name == "KeepleAuth");
+        Assert.Equal(DbKind.Postgres, keeple.Kind);
+        Assert.Equal(5454, keeple.Port);
+        Assert.Null(keeple.Folder);
 
         var sqlite = Assert.Single(target.Connections, c => c.Name == "Admin SQLite");
         Assert.Equal(DbKind.Sqlite, sqlite.Kind);
-        Assert.Equal(@"C:\Temp\_Acme\adminDB.db", sqlite.Database);
+        Assert.Equal(@"C:\Temp\_N2F\adminDB.db", sqlite.Database);
         Assert.Null(sqlite.Host);
         Assert.Null(sqlite.Port);
 
@@ -99,20 +99,20 @@ public class DBeaverImporterTests : IDisposable
     [Fact]
     public void Import_DecryptsCredentials()
     {
-        WriteCredentials(_dir, "{\"" + AcmeLocalId + "\":{\"#connection\":{\"user\":\"sa\",\"password\":\"pw\"}}}");
+        WriteCredentials(_dir, "{\"" + N2FLocalId + "\":{\"#connection\":{\"user\":\"sa\",\"password\":\"pw\"}}}");
         var protector = new ReversingProtector();
         var target = AppConfig.Empty();
 
         var result = DBeaverImporter.Import(_dir, target, protector);
 
         Assert.Empty(result.Warnings);
-        var local = Assert.Single(target.Connections, c => c.Name == "Acme local");
+        var local = Assert.Single(target.Connections, c => c.Name == "N2F local");
         Assert.Equal("sa", local.User);
         Assert.NotNull(local.ProtectedPassword);
         Assert.NotEqual("pw", local.ProtectedPassword);
         Assert.Equal("pw", protector.Unprotect(local.ProtectedPassword!));
 
-        var other = Assert.Single(target.Connections, c => c.Name == "GlobexAuth");
+        var other = Assert.Single(target.Connections, c => c.Name == "KeepleAuth");
         Assert.Null(other.User);
         Assert.Null(other.ProtectedPassword);
     }
@@ -152,7 +152,7 @@ public class DBeaverImporterTests : IDisposable
 
         DBeaverImporter.Import(_dir, target, new ReversingProtector());
 
-        var local = Assert.Single(target.Connections, c => c.Name == "Acme local");
+        var local = Assert.Single(target.Connections, c => c.Name == "N2F local");
         var keys = Assert.Single(target.VirtualKeys);
         Assert.Equal(local.Id, keys.Key);
         var entry = Assert.Single(keys.Value);
