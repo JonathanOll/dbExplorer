@@ -461,6 +461,8 @@ public sealed partial class ScriptTabViewModel : TabViewModel
             _status.Error(ErrorMessage);
             return false;
         }
+        var oldName = Connection.Name;
+        var leftTransaction = _script is { } held && await held.HasOpenTransactionAsync();   // probed before the release rolls it back
         if (_closed || IsRunning || IsGroupRunning) return false;   // closed meanwhile (nothing may be created now) or a run slipped in
 
         var old = _script;
@@ -471,7 +473,10 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         ErrorMessage = null;
         NeedsReconnect = false;
         if (ShouldPersist) SchedulePersist();   // the persisted copy names the connection
-        _status.Info($"Switched to {live.Config.Name}: the next run uses it.");
+        _status.Info($"Switched to {live.Config.Name}: the next run uses it."
+                     + (leftTransaction
+                         ? $" The connection to {oldName} was released: a transaction left open there was rolled back (a later COMMIT will not commit it)."
+                         : ""));
         return true;
     }
 

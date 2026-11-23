@@ -61,6 +61,50 @@ public sealed class ScriptConnection : IDisposable
     /// <summary>The connection currently held, or null before the first run and after it was dropped.</summary>
     internal DbConnection? CurrentConnection => _connection;
 
+    /// <summary>
+    /// Best-effort: true when the held connection has a transaction left open by the user's script (so releasing the
+    /// connection will roll it back). Probes with one cheap round trip, never while a run is active and never changing state:
+    /// SQL Server reads <c>@@TRANCOUNT</c>, PostgreSQL compares <c>now()</c> (transaction start) with <c>statement_timestamp()</c>,
+    /// SQLite tries a <c>BEGIN</c> (refused inside a transaction) and rolls it straight back. False when there is no usable
+    /// connection or the probe fails (e.g. a PostgreSQL transaction already aborted): the answer only feeds a status message.
+    /// </summary>
+    public async Task<bool> HasOpenTransactionAsync()
+    {
+        DbConnection? connection;
+        lock (_gate)
+        {
+            if (_disposed || _running) return false;
+            connection = _connection;
+        }
+        if (connection is not { State: ConnectionState.Open }) return false;
+
+        try
+        {
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandTimeout = 5;
+            switch (Session.Driver.Kind)
+            {
+                case Model.DbKind.SqlServer:
+                    cmd.CommandText = "SELECT @@TRANCOUNT";
+                    return Convert.ToInt32(await cmd.ExecuteScalarAsync().ConfigureAwait(false)) > 0;
+                case Model.DbKind.Postgres:
+                    cmd.CommandText = "SELECT now() <> statement_timestamp()";
+                    return await cmd.ExecuteScalarAsync().ConfigureAwait(false) is true;
+                default:
+                    cmd.CommandText = "BEGIN";
+                    try { await cmd.ExecuteNonQueryAsync().ConfigureAwait(false); }
+                    catch (Exception) { return true; }   // "cannot start a transaction within a transaction"
+                    cmd.CommandText = "ROLLBACK";
+                    await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                    return false;
+            }
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     /// <summary>The connection settings changed: the next run uses a fresh connection. Safe to call from any thread.</summary>
     internal void Invalidate() => _invalidated = true;
 
