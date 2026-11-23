@@ -44,9 +44,19 @@ public abstract class TabViewModel : ObservableObject
 
     // ---- linked groups: switching between members ----
 
-    /// <summary>Every group the tab's connection belongs to, in config order (empty when none).</summary>
-    public IReadOnlyList<ConnectionGroup> Groups =>
-        GroupHooks is { } hooks ? GroupRules.GroupsOf(hooks.GetConfig(), Connection.Id) : [];
+    /// <summary>
+    /// The groups the tab's connection belongs to AND can switch in, in config order: those with another resolved member.
+    /// (A group of one, which the config allows, would only hide the selector and the other groups with it.)
+    /// </summary>
+    public IReadOnlyList<ConnectionGroup> Groups
+    {
+        get
+        {
+            if (GroupHooks is not { } hooks) return [];
+            var config = hooks.GetConfig();
+            return GroupRules.GroupsOf(config, Connection.Id).Where(g => GroupRules.MembersOf(config, g).Count > 1).ToList();
+        }
+    }
 
     /// <summary>
     /// The group whose members the tab can switch between: the one chosen with the setter, else the first group of the

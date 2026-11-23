@@ -28,6 +28,7 @@ internal sealed class GroupSwitchFixture : IDisposable
     public ConnectionConfig Solo { get; }
     public ConnectionGroup Items { get; }
     public ConnectionGroup Broken { get; }
+    public ConnectionGroup Lonely { get; }
     public ConnectionTreeViewModel Tree { get; }
     public string FileA { get; }
     private readonly List<ScriptTabViewModel> _scripts = [];
@@ -51,7 +52,9 @@ internal sealed class GroupSwitchFixture : IDisposable
 
         Items = new ConnectionGroup(Guid.NewGuid(), "Items", [A.Id, B.Id, Prod.Id]);
         Broken = new ConnectionGroup(Guid.NewGuid(), "Broken", [A.Id, NoBig.Id, Down.Id]);
-        var config = new AppConfig([], [A, B, Prod, NoBig, Down, Solo], new()) { Groups = [Items, Broken] };
+        // A first sits alone in "Lonely" (allowed by the config): it must not hide the groups A can really switch in.
+        Lonely = new ConnectionGroup(Guid.NewGuid(), "Lonely", [A.Id]);
+        var config = new AppConfig([], [A, B, Prod, NoBig, Down, Solo], new()) { Groups = [Lonely, Items, Broken] };
         Tree = Fx.CreateTree(config);
     }
 
@@ -443,6 +446,28 @@ public class GroupSwitchTests : IDisposable
         Assert.True(await tab.SwitchConnectionAsync(_g.B));
         Assert.Equal("Items", tab.ActiveGroup!.Name);
         Assert.Equal(["A", "B", "Prod"], tab.GroupMembers.Select(m => m.Name));
+    }
+
+    [Fact]
+    public async Task ConnectionWhoseFirstGroupIsASingleton_UsesTheNextGroup()
+    {
+        Assert.Equal("Lonely", _g.Tree.Config.Groups[0].Name);   // first in config order, one member
+        var tab = await _g.OpenTable(_g.A);
+
+        Assert.Equal("Items", tab.ActiveGroup!.Name);
+        Assert.DoesNotContain(tab.Groups, g => g.Name == "Lonely");
+        Assert.True(tab.HasGroupSwitch);
+        Assert.True(await tab.SwitchRelativeAsync(+1));
+        Assert.Equal(_g.B.Id, tab.Connection.Id);
+
+        tab.ActiveGroup = _g.Lonely;   // not a group this tab can switch in: ignored
+        Assert.Equal("Items", tab.ActiveGroup!.Name);
+
+        // A connection that is only in a group of one has no selector at all.
+        _g.Tree.Config.Groups.Add(new ConnectionGroup(Guid.NewGuid(), "Solo group", [_g.Solo.Id]));
+        var solo = await _g.OpenTable(_g.Solo);
+        Assert.Empty(solo.Groups);
+        Assert.False(solo.HasGroupSwitch);
     }
 
     [Fact]

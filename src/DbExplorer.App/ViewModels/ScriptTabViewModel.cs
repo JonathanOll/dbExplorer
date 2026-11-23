@@ -331,7 +331,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         var context = SynchronizationContext.Current;
         _ = work.ContinueWith(_ =>
         {
-            if (!script.ConnectionReset || _closed) return;
+            if (!script.ConnectionReset || _closed || !ReferenceEquals(script, _script)) return;   // not about a connection the tab left (switch)
             if (context is null) ShowReset();
             else context.Post(_ => ShowReset(), null);
         }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
