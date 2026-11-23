@@ -30,7 +30,7 @@ public class ReopenAndQuickOpenMemoryTests : ShellTestBase
     // ---- reopen closed tabs ----
 
     [Fact]
-    public async Task Reopen_GivesTheOldestClosedTabFirst_ThenTheNext()
+    public async Task Reopen_GivesTheLastClosedTabFirst_ThenTheOneBefore()
     {
         var main = NewTableMain();
         var orders = await OpenAsync(main, "orders");
@@ -41,9 +41,9 @@ public class ReopenAndQuickOpenMemoryTests : ShellTestBase
         Assert.Equal(2, main.ClosedTabCount);
 
         await main.ReopenClosedTabAsync();
-        Assert.Equal("orders", Assert.IsType<TableTabViewModel>(main.ActiveTab).Table.Name);   // first closed, first back
+        Assert.Equal("customers", Assert.IsType<TableTabViewModel>(main.ActiveTab).Table.Name);   // last closed, first back
         await main.ReopenClosedTabAsync();
-        Assert.Equal("customers", Assert.IsType<TableTabViewModel>(main.ActiveTab).Table.Name);
+        Assert.Equal("orders", Assert.IsType<TableTabViewModel>(main.ActiveTab).Table.Name);
         Assert.Equal(2, main.Tabs.Count);
         Assert.Equal(0, main.ClosedTabCount);
     }
@@ -119,8 +119,11 @@ public class ReopenAndQuickOpenMemoryTests : ShellTestBase
         Assert.Equal(MainViewModel.MaxClosedTabs, main.ClosedTabCount);
 
         await main.ReopenClosedTabAsync();
+        Assert.Equal($"SELECT {MainViewModel.MaxClosedTabs + 4}", Assert.IsType<ScriptTabViewModel>(main.ActiveTab).Text);   // the last one closed
 
-        Assert.Equal("SELECT 5", Assert.IsType<ScriptTabViewModel>(main.ActiveTab).Text);   // 0..4 were forgotten
+        for (var i = 0; i < MainViewModel.MaxClosedTabs - 1; i++) await main.ReopenClosedTabAsync();
+        Assert.Equal("SELECT 5", Assert.IsType<ScriptTabViewModel>(main.ActiveTab).Text);   // 0..4 were forgotten: 5 is the oldest left
+        Assert.Equal(0, main.ClosedTabCount);
     }
 
     [Fact]

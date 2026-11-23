@@ -57,7 +57,7 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
 | --- | --- | --- |
 | `Ctrl+T` | anywhere | Quick open a table/view of the active connection |
 | `Ctrl+Shift+P` | anywhere | Quick open a table/view across all connections (metadata cache) |
-| `Ctrl+Shift+T` | anywhere | Reopen a closed tab (the oldest closed one first; up to 50 are remembered; a table keeps its filters, a script its text) |
+| `Ctrl+Shift+T` | anywhere | Reopen the last closed tab (like a browser; press again to go further back; up to 50 are remembered; a table keeps its filters, a script its text) |
 | `Ctrl+L` | table tab | Fuzzy-search a column and scroll to it |
 | `Ctrl+N` | anywhere | New script tab on the active (or selected) connection |
 | `Ctrl+O` | anywhere | Open a script file in a script tab |

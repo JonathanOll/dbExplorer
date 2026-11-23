@@ -462,7 +462,7 @@ public partial class MainViewModel : ObservableObject
     /// <summary>How many closed tabs are remembered; the oldest are forgotten first.</summary>
     public const int MaxClosedTabs = 50;
 
-    // Oldest first: Ctrl+Shift+T gives them back in the order they were closed (first in, first out).
+    // Oldest first in the list; Ctrl+Shift+T takes from the end: the tab closed last comes back first, like a browser.
     private readonly List<ClosedTab> _closedTabs = [];
     private bool _reopening;
 
@@ -487,7 +487,8 @@ public partial class MainViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Ctrl+Shift+T: reopens the OLDEST closed tab still remembered (first in, first out), connecting its connection when needed.
+    /// Ctrl+Shift+T: reopens the tab closed most recently (like a browser; pressing again goes further back), connecting its
+    /// connection when needed.
     /// Entries whose connection was deleted are dropped; an entry whose connection cannot be reached stays for the next try.
     /// Never throws.
     /// </summary>
@@ -500,11 +501,11 @@ public partial class MainViewModel : ObservableObject
         {
             while (_closedTabs.Count > 0)
             {
-                var entry = _closedTabs[0];
+                var entry = _closedTabs[^1];
                 var config = Tree.Config.Connections.FirstOrDefault(c => c.Id == entry.ConnectionId);
                 if (config is null)
                 {
-                    _closedTabs.RemoveAt(0);   // its connection was deleted
+                    _closedTabs.RemoveAt(_closedTabs.Count - 1);   // its connection was deleted
                     continue;
                 }
 
