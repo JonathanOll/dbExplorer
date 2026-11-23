@@ -295,6 +295,10 @@ public class TabSessionTests : ShellTestBase
         Assert.True(tab.NeedsReload);
         Assert.False(tab.IsLoading);
         Assert.Empty(tab.Rows);
+
+        await tab.ApplyFiltersAsync();   // retrying goes through the reconnect, not through a query on the stand-in session
+        Assert.DoesNotContain("was not found", tab.ErrorMessage);
+        Assert.Contains("reconnect", tab.ErrorMessage);
         var other = (TableTabViewModel)main.Tabs[0];
         Assert.True(other.IsDeferred);   // the failure of one tab does not touch the others
     }
@@ -399,19 +403,172 @@ public class TabSessionTests : ShellTestBase
     }
 
     [Fact]
-    public void Restore_WithASession_DoesNotDuplicateScripts_AndLeavesUnreferencedStoreCopiesOnDisk()
+    public void Restore_WithASession_DoesNotDuplicateScripts_AndLeavesOlderUnreferencedStoreCopiesOnDisk_WithANotice()
     {
         var first = Saving();
         var inSession = AddScript(first, "in session");
         first.PersistSession();
-        var stray = Guid.NewGuid();   // an autosave copy the session does not reference
+        var stray = Guid.NewGuid();   // an autosave copy the session does not reference, older than the session file
         Store.Save(stray, T.Config.Id, "stray text", null);
+        File.SetLastWriteTimeUtc(StoreCopy(stray), DateTime.UtcNow.AddMinutes(-5));
 
         var main = Restarted();
         Assert.Equal(1, main.RestoreTabs());
 
-        Assert.Equal([inSession.Id], main.Tabs.OfType<ScriptTabViewModel>().Select(s => s.Id));   // the session is the only source
+        Assert.Equal([inSession.Id], main.Tabs.OfType<ScriptTabViewModel>().Select(s => s.Id));
         Assert.Contains(Store.LoadAll(), s => s.TabId == stray);   // untouched on disk
+        Assert.Contains("1 unsaved script(s) are kept in", main.Status.Message);
+        Assert.Contains("not restored", main.Status.Message);
+    }
+
+    private string StoreCopy(Guid id) => Path.Combine(T.Fx.Dir, "scripts", id.ToString("N") + ".json");
+
+    [Fact]
+    public void Restore_AnUnsavedCopyNewerThanTheSession_IsAdopted_AfterTheSessionsTabs_AndNotActive()
+    {
+        var first = Saving();
+        var inSession = AddScript(first, "in session");
+        first.PersistSession();
+        File.SetLastWriteTimeUtc(SessionFile, DateTime.UtcNow.AddMinutes(-5));
+        var late = Guid.NewGuid();   // autosaved after the last session write (killed app, failed session write...)
+        Store.Save(late, T.Config.Id, "written after", null);
+
+        var main = Restarted();
+        Assert.Equal(2, main.RestoreTabs());
+
+        var scripts = main.Tabs.OfType<ScriptTabViewModel>().ToList();
+        Assert.Equal([inSession.Id, late], scripts.Select(s => s.Id));
+        Assert.Equal("written after", scripts[1].Text);
+        Assert.Same(scripts[0], main.ActiveTab);
+        Assert.DoesNotContain("not restored", main.Status.Message);
+    }
+
+    private string SessionFile => Path.Combine(T.Fx.Dir, "session.json");
+
+    [Fact]
+    public async Task Restore_AScriptClosedByTheUser_IsNotBroughtBack_ButANewerOrphanIs()
+    {
+        var first = Saving();
+        var keep = AddScript(first, "keep");
+        var closed = AddScript(first, "close me");
+        Dialogs.Choices.Enqueue(SaveChoice.Discard);
+        await first.CloseTabCommand.ExecuteAsync(closed);   // its autosave copy is deleted
+        first.PersistSession();
+        File.SetLastWriteTimeUtc(SessionFile, DateTime.UtcNow.AddMinutes(-5));
+        Assert.DoesNotContain(Store.LoadAll(), s => s.TabId == closed.Id);
+
+        var main = Restarted();
+        main.RestoreTabs();
+
+        Assert.Equal([keep.Id], main.Tabs.OfType<ScriptTabViewModel>().Select(s => s.Id));
+    }
+
+    [Fact]
+    public void Restore_ASessionScriptWhoseSavedCopyCannotBeRead_IsSkipped_AndItsCopyIsKept()
+    {
+        var id = Guid.NewGuid();
+        Directory.CreateDirectory(Path.Combine(T.Fx.Dir, "scripts"));
+        File.WriteAllText(StoreCopy(id), "{ not json");   // corrupt: LoadAll skips it and keeps the file
+        SessionStore.Save(new SavedTabs(0,
+        [
+            new SavedTab(SavedTabKind.Script, T.Config.Id, ScriptId: id),
+            new SavedTab(SavedTabKind.Table, T.Config.Id, null, "customers"),
+        ]));
+
+        var main = Restarted();
+        Assert.Equal(1, main.RestoreTabs());
+
+        Assert.IsType<TableTabViewModel>(Assert.Single(main.Tabs));
+        Assert.Contains("could not be read; its saved copy is kept in", main.Status.Message);
+        main.PersistSession();
+        Assert.Equal("{ not json", File.ReadAllText(StoreCopy(id)));   // never deleted
+    }
+
+    [Fact]
+    public async Task Restore_ACleanScriptWhoseFileCannotBeRead_ComesBackNotDirty_WithNoFileBinding_AndAnError()
+    {
+        var file = Path.Combine(T.Fx.Dir, "locked.sql");
+        File.WriteAllText(file, "select 'precious'");
+        SessionStore.Save(new SavedTabs(0, [new SavedTab(SavedTabKind.Script, T.Config.Id, ScriptId: Guid.NewGuid(), FilePath: file)]));
+
+        MainViewModel main;
+        using (new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None))   // locked: antivirus, OneDrive...
+        {
+            main = Restarted();
+            main.RestoreTabs();
+        }
+
+        var script = Assert.IsType<ScriptTabViewModel>(Assert.Single(main.Tabs));
+        Assert.Equal(("", false, null), (script.Text, script.IsDirty, script.FilePath));
+        Assert.True(main.Status.IsError);
+        Assert.Contains($"Could not read {file}", main.Status.Message);
+        script.FlushPersist();
+        Assert.Empty(Store.LoadAll());   // nothing autosaved for the path
+        Assert.Equal("select 'precious'", await File.ReadAllTextAsync(file));
+    }
+
+    [Fact]
+    public async Task Restore_OneEntryFailing_IsReported_TheOthersComeBack_AndTheFileIsNotRewritten()
+    {
+        SessionStore.Save(new SavedTabs(0,
+        [
+            new SavedTab(SavedTabKind.Table, T.Config.Id, null, "customers"),
+            new SavedTab(SavedTabKind.Table, T.Config.Id, null, "orders"),
+            new SavedTab(SavedTabKind.Script, T.Config.Id, ScriptId: Guid.NewGuid()),
+        ]));
+        var main = Restarted();
+        var inner = main.RestoredTableTabFactory!;
+        main.RestoredTableTabFactory = (c, t) => t.Name == "orders" ? throw new InvalidOperationException("boom") : inner(c, t);
+
+        Assert.Equal(2, main.RestoreTabs());
+
+        Assert.Equal(["customers", null], main.Tabs.Select(t => (t as TableTabViewModel)?.Table.Name));
+        Assert.True(main.Status.IsError);
+        Assert.Contains("boom", main.Status.Message);
+        await Task.Delay(50);
+        Assert.Equal(3, Saved().Tabs.Count);   // the intact file is not replaced by the partial list
+    }
+
+    [Fact]
+    public void Restore_WholeRestoreFailing_KeepsSessionWritesDisabledForTheRun()
+    {
+        SessionStore.Save(new SavedTabs(0,
+            [new SavedTab(SavedTabKind.Table, T.Config.Id, null, "customers"), new SavedTab(SavedTabKind.Table, T.Config.Id, null, "orders")]));
+        var main = Restarted();
+        main.SessionSaveDelay = TimeSpan.FromMilliseconds(20);
+        var exploded = false;
+        main.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(MainViewModel.ActiveTab) || exploded) return;
+            exploded = true;
+            throw new InvalidOperationException("view exploded");
+        };
+
+        main.RestoreTabs();   // never throws
+
+        Assert.True(main.Status.IsError);
+        Assert.Contains("Cannot restore the tabs", main.Status.Message);
+        main.NextTab();   // a later change, and then the window closing
+        main.PersistSession();
+        Thread.Sleep(100);
+        Assert.Equal(2, Saved().Tabs.Count);
+    }
+
+    [Fact]
+    public void Restore_ATableEntryWithoutATable_OrWithoutATabFactory_HasItsOwnMessage()
+    {
+        SessionStore.Save(new SavedTabs(-1, [new SavedTab(SavedTabKind.Table, T.Config.Id, null, null)]));
+        var main = Restarted();
+        Assert.Equal(0, main.RestoreTabs());
+        Assert.Contains("no table name", main.Status.Message);
+        Assert.DoesNotContain("connection no longer exists", main.Status.Message);
+
+        SessionStore.Save(new SavedTabs(-1, [new SavedTab(SavedTabKind.Table, T.Config.Id, null, "customers")]));
+        var bare = Restarted();
+        bare.RestoredTableTabFactory = null;
+        Assert.Equal(0, bare.RestoreTabs());
+        Assert.Contains("cannot be restored", bare.Status.Message);
+        Assert.DoesNotContain("connection no longer exists", bare.Status.Message);
     }
 
     [Fact]

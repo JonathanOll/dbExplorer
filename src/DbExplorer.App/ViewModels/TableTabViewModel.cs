@@ -162,6 +162,12 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
             return;
         }
         if (_deferredLoad is { IsCompleted: false } first) await first;   // still connecting: no table info to query with yet
+        if (_deferredLoad is not null && Info is null)
+        {
+            // A restored tab whose first load did not get a real session: retry the reconnect, not a query on the stand-in.
+            await ReloadAsync();
+            return;
+        }
         if (!await ConfirmLeaveAsync()) return;
         await RunAsync(CurrentInputs(Sort), 0);
     }

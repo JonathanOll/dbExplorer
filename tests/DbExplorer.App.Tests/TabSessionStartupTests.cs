@@ -34,8 +34,7 @@ public class TabSessionStartupTests : ShellTestBase
         var (window, main) = Start();
         Assert.Empty(main.Tabs);   // nothing before the window opened
 
-        window.Show();
-        await Pump();
+        await ShowAndRestoreAsync(window);
 
         Assert.Equal(3, main.Tabs.Count);
         var customers = (TableTabViewModel)main.Tabs[0];
@@ -61,8 +60,7 @@ public class TabSessionStartupTests : ShellTestBase
         File.WriteAllText(SessionFile, "{ broken");
         var (window, main) = Start();
 
-        window.Show();
-        await Pump();
+        await ShowAndRestoreAsync(window);
 
         Assert.Empty(main.Tabs);
         Assert.Contains("session.json", main.Status.Message);
@@ -78,8 +76,7 @@ public class TabSessionStartupTests : ShellTestBase
         var before = File.ReadAllText(SessionFile);
         var (window, main) = Start(persistenceEnabled: false);
 
-        window.Show();
-        await Pump();
+        await ShowAndRestoreAsync(window);
 
         Assert.Empty(main.Tabs);
         window.Close();
@@ -95,8 +92,7 @@ public class TabSessionStartupTests : ShellTestBase
         main.SessionSaveDelay = TimeSpan.FromMilliseconds(40);
 
         var locked = new FileStream(SessionFile, FileMode.Open, FileAccess.Read, FileShare.None);   // e.g. an antivirus scan
-        window.Show();
-        await Pump();
+        await ShowAndRestoreAsync(window);
         locked.Dispose();
         await Task.Delay(300);   // longer than the save delay: a wrongly scheduled write would have landed
 
@@ -106,13 +102,16 @@ public class TabSessionStartupTests : ShellTestBase
         Assert.Equal(before, File.ReadAllText(SessionFile));   // not even on close
     }
 
-    private static async Task Pump()
+    /// <summary>
+    /// Shows the window and waits until the restore job posted by <see cref="SessionStartup.Wire"/> has run: a marker job posted
+    /// from the Opened event (after Wire's own handler) at the same priority runs behind it. No fixed delays.
+    /// </summary>
+    private static async Task ShowAndRestoreAsync(MainWindow window)
     {
-        for (var i = 0; i < 8; i++)
-        {
-            Dispatcher.UIThread.RunJobs();
-            await Task.Delay(15);
-        }
+        var markerRan = false;
+        window.Opened += (_, _) => Dispatcher.UIThread.Post(() => markerRan = true, DispatcherPriority.Background);
+        window.Show();
+        await WaitFor(() => markerRan);
     }
 
     private static async Task WaitFor(Func<bool> condition)

@@ -43,7 +43,8 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
   line runs the statement above it. A selection runs as selected (split by `;`/`GO` only). One result grid per result
   set, rows affected and duration, cancel button, and a "Rows" limit box (default 1000, up to 100 000): a result cut at
   the limit says so, raise the limit and run again. Honours the connection read-only flag. Scripts are plain files;
-  unsaved editor contents are restored at the next start.
+  unsaved editor contents are restored at the next start: from the saved tab list, plus any autosave copy written after it
+  (e.g. after a crash); older copies the list does not mention stay in `scripts\` and the status bar says how many.
 - **One connection per script tab**: the tab opens its own connection on its first run and keeps it, so `BEGIN TRAN`,
   temp tables (`#t`), variables and `SET` options survive from one run to the next, and `ROLLBACK`/`COMMIT` in a later run
   works. It is released when the tab closes (a transaction still open is rolled back), on Disconnect, when the connection
@@ -56,8 +57,9 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
   they run. Nothing connects before the first paint. A tab whose connection was deleted is skipped; one that cannot
   connect shows the usual error with Reload. Tabs you closed yourself are not restored (and neither is a script you chose
   Discard for when closing the window); the Ctrl+Shift+T history of closed tabs is not kept across runs. The list is saved
-  about a second after every change and when the window closes, in `session.json`; to forget it, delete that file (with
-  no file the app restores only the unsaved scripts, as before).
+  about a second after every change and when the window closes, in `session.json`. To start with no tabs, delete that file:
+  the app then restores only the unsaved scripts, as before. A script whose autosave copy or file cannot be read is not
+  opened as an empty dirty tab: its copy stays on disk, or it opens empty and unlinked from the file, with a message.
 - **Linked database groups**: link databases that share one schema (dev, preprod, customer copies) into a named group, switch
   a tab between them with one key press, run the same read-only query on all of them at once and see where the results
   differ, or compare their schemas. Details, shortcuts and limits: [Linked database groups](#linked-database-groups).
@@ -202,12 +204,14 @@ Everything lives in `%APPDATA%\dbExplorer`:
 | `cache\` | per-connection metadata cache (schema/table/column names) used by `Ctrl+Shift+P` |
 | `scripts\` | unsaved script tabs, restored at the next start |
 | `window.json` | size, position and maximised state of the main window |
-| `session.json` | the open tabs (order, active tab, table filters / WHERE / sort, script files); delete it to start with no tabs |
+| `session.json` | the open tabs (order, active tab, table filters / WHERE / sort, script files); delete it to forget them (only unsaved scripts then come back) |
 
 A corrupt `config.json` is moved to `config.json.bad-<timestamp>` and the app starts empty with a notice. If the file
 cannot be read at all (locked, unreadable) the app starts in read-only-config mode: a red banner says so and nothing is
 ever written to it (`session.json` is then neither read nor written either). A corrupt `session.json` is moved to
-`session.json.bad-<timestamp>` the same way, with a notice, and the app starts with no tabs.
+`session.json.bad-<timestamp>` the same way, with a notice, and the app starts with no tabs from it (the unsaved scripts
+still come back). A `session.json` that exists but cannot be read (locked) is not restored and not written for that run, so
+it cannot be overwritten; the same holds in read-only-config mode.
 
 ### Command line and environment
 

@@ -86,6 +86,14 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         {
             _filePath = restored.FilePath;
             _savedText = restored.FilePath is null ? "" : TryReadFile(restored.FilePath, out _encoding);
+            if (restored.Text is null && _savedText is null)
+            {
+                // Nothing unsaved and the file cannot be read (the shell already told the user): a new script, never bound to
+                // that path, so neither the autosave nor Ctrl+S can touch the file.
+                _filePath = null;
+                _encoding = null;
+                _savedText = "";
+            }
             _text = restored.Text ?? _savedText ?? "";   // nothing unsaved: the file as it is now
             _isDirty = _text != _savedText;
         }

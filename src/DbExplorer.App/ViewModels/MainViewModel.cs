@@ -303,12 +303,10 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception e)
         {
-            Status.Error($"Cannot restore the tabs: {ErrorText.Describe(e)}");
+            // Writes stay disabled for this run (_sessionRestored is not set): the tabs now open are only a part of the saved
+            // list, and the next change would replace the intact file with it.
+            Status.Error($"Cannot restore the tabs: {ErrorText.Describe(e)}. Your session file is left as it was.");
             return Tabs.Count;
-        }
-        finally
-        {
-            _sessionRestored = true;
         }
     }
 
@@ -320,28 +318,62 @@ public partial class MainViewModel : ObservableObject
         var unsavedById = unsaved.GroupBy(s => s.TabId).ToDictionary(g => g.Key, g => g.First());
 
         TabViewModel? active = null;
-        var skipped = 0;
+        var forgotten = 0;   // connection deleted: the file forgets these tabs
+        var adopted = 0;
+        var kept = 0;
+        var problems = new List<string>();   // things the user must hear about (these tabs stay in the file until the next change)
         _restoringTabs = true;   // the tab control selects the first tab it is given: that selection must not start a load
         try
         {
             for (var i = 0; i < saved.Tabs.Count; i++)
             {
                 var entry = saved.Tabs[i];
-                var config = Tree.Config.Connections.FirstOrDefault(c => c.Id == entry.ConnectionId);
-                TabViewModel? tab = config is null ? null : entry.Kind switch
+                try
                 {
-                    SavedTabKind.Table when !string.IsNullOrEmpty(entry.Table) && RestoredTableTabFactory is { } create =>
-                        CreateRestoredTable(create, config, entry),
-                    SavedTabKind.Script => CreateRestoredScript(config, entry, unsavedById),
-                    _ => null,
-                };
-                if (tab is null)
-                {
-                    skipped++;
-                    continue;
+                    var config = Tree.Config.Connections.FirstOrDefault(c => c.Id == entry.ConnectionId);
+                    if (config is null)
+                    {
+                        forgotten++;
+                        continue;
+                    }
+                    var tab = CreateRestored(config, entry, unsavedById, problems);
+                    if (tab is null) continue;
+                    Tabs.Add(tab);
+                    if (i == saved.ActiveIndex) active = tab;
                 }
-                Tabs.Add(tab);
-                if (i == saved.ActiveIndex) active = tab;
+                catch (Exception e)
+                {
+                    problems.Add($"A tab could not be restored: {ErrorText.Describe(e)}");
+                }
+            }
+
+            // Autosave copies the session does not reference: the app was killed (or the session could not be written) after a
+            // script was last saved. Those written after the session file are brought back, after its tabs and never active;
+            // older ones stay on disk untouched. (A closed or discarded script has no copy left.)
+            if (_scriptStore is { } store)
+            {
+                var referenced = saved.Tabs.Where(t => t.ScriptId is not null).Select(t => t.ScriptId!.Value).ToHashSet();
+                var sessionWritten = File.GetLastWriteTimeUtc(_sessionStore!.FilePath);
+                foreach (var copy in unsavedById.Values.Where(s => !referenced.Contains(s.TabId)))
+                {
+                    try
+                    {
+                        var config = Tree.Config.Connections.FirstOrDefault(c => c.Id == copy.ConnectionId);
+                        if (config is not null && store.LastWriteUtc(copy.TabId) > sessionWritten)
+                        {
+                            Tabs.Add(CreateScriptTab(config, copy));
+                            adopted++;
+                        }
+                        else
+                        {
+                            kept++;
+                        }
+                    }
+                    catch (Exception)
+                    {
+                        kept++;
+                    }
+                }
             }
             ActiveTab = active ?? Tabs.FirstOrDefault();
         }
@@ -352,14 +384,45 @@ public partial class MainViewModel : ObservableObject
         // Only the active tab loads now (the others when first selected).
         if (ActiveTab is TableTabViewModel { IsDeferred: true } current) _ = current.EnsureLoadedAsync();
 
-        // Copies in the script store that the session does not reference stay on disk, untouched (the session is the only source).
-        _sessionRestored = true;
-        if (skipped > 0)
+        _sessionRestored = true;   // only reached when the restore as a whole worked: see RestoreTabs
+        var notes = new List<string>();
+        if (forgotten > 0) notes.Add($"{forgotten} tab(s) were not restored: their connection no longer exists.");
+        if (adopted > 0) notes.Add($"Restored {adopted} unsaved script(s) that were not in the session.");
+        if (kept > 0) notes.Add($"{kept} unsaved script(s) are kept in {_scriptStore!.Folder} (not restored).");
+        notes.AddRange(problems);
+        if (notes.Count > 0)
         {
-            Status.Info($"{skipped} tab(s) were not restored: their connection no longer exists.");
-            ScheduleSessionSave();   // the file forgets them
+            var text = string.Join(" ", notes);
+            if (problems.Count > 0) Status.Error(text);
+            else Status.Info(text);
         }
+        if (forgotten > 0 || adopted > 0) ScheduleSessionSave();   // the file now says what is open
         return Tabs.Count;
+    }
+
+    /// <summary>The tab of a saved entry, or null (after adding the reason to <paramref name="problems"/>, unless it is silent). May throw.</summary>
+    private TabViewModel? CreateRestored(ConnectionConfig config, SavedTab entry, Dictionary<Guid, SavedScript> unsaved, List<string> problems)
+    {
+        switch (entry.Kind)
+        {
+            case SavedTabKind.Table:
+                if (string.IsNullOrEmpty(entry.Table))
+                {
+                    problems.Add("A saved table tab has no table name and was not restored.");
+                    return null;
+                }
+                if (RestoredTableTabFactory is not { } create)
+                {
+                    problems.Add("Table tabs cannot be restored here.");
+                    return null;
+                }
+                return CreateRestoredTable(create, config, entry);
+            case SavedTabKind.Script:
+                return CreateRestoredScript(config, entry, unsaved, problems);
+            default:
+                problems.Add($"A saved tab of kind {entry.Kind} was not restored.");
+                return null;
+        }
     }
 
     private static TableTabViewModel CreateRestoredTable(
@@ -374,13 +437,34 @@ public partial class MainViewModel : ObservableObject
         return tab;
     }
 
-    private ScriptTabViewModel CreateRestoredScript(ConnectionConfig config, SavedTab entry, Dictionary<Guid, SavedScript> unsaved)
+    private ScriptTabViewModel? CreateRestoredScript(
+        ConnectionConfig config, SavedTab entry, Dictionary<Guid, SavedScript> unsaved, List<string> problems)
     {
         var id = entry.ScriptId ?? Guid.NewGuid();
         if (unsaved.TryGetValue(id, out var dirty))
             return CreateScriptTab(config, new SavedScript(id, config.Id, dirty.Text, entry.FilePath ?? dirty.FilePath));
-        // Nothing unsaved: the file as it is now, or an empty new script when it is gone.
-        var path = entry.FilePath is { } p && File.Exists(p) ? p : null;
+        if (entry.ScriptId is not null && _scriptStore is { } store && store.Exists(id))
+        {
+            // A copy exists but could not be read: opening a clean tab with this id would delete it at the first autosave flush.
+            var name = entry.FilePath is { } named ? Path.GetFileName(named) : id.ToString("N");
+            problems.Add($"Script {name} could not be read; its saved copy is kept in {store.Folder}.");
+            return null;
+        }
+
+        // Nothing unsaved: the file as it is now, or an empty new script when it is gone or cannot be read (never bound to it then).
+        string? path = null;
+        if (entry.FilePath is { } p && File.Exists(p))
+        {
+            try
+            {
+                using (new FileStream(p, FileMode.Open, FileAccess.Read, FileShare.Read)) { }
+                path = p;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                problems.Add($"Could not read {p}: {e.Message} The script tab was opened empty and is not linked to the file.");
+            }
+        }
         return CreateScriptTab(config, new SavedScript(id, config.Id, null, path));
     }
 

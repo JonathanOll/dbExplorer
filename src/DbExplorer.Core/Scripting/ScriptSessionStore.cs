@@ -18,6 +18,15 @@ public sealed class ScriptSessionStore(string dir)
 {
     private const string Extension = ".json";
 
+    /// <summary>The folder holding the copies.</summary>
+    public string Folder => dir;
+
+    /// <summary>True when a copy file exists for the tab, readable or not (a corrupt one is skipped by <see cref="LoadAll"/> but kept).</summary>
+    public bool Exists(Guid tabId) => File.Exists(PathOf(tabId));
+
+    /// <summary>When the copy of the tab was last written (UTC); the minimum date when there is none.</summary>
+    public DateTime LastWriteUtc(Guid tabId) => File.GetLastWriteTimeUtc(PathOf(tabId));
+
     public void Save(Guid tabId, Guid connectionId, string text, string? filePath)
     {
         Directory.CreateDirectory(dir);
