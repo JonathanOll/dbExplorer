@@ -146,6 +146,45 @@ with a hand-edited `config.json`) is refused by the runner, after the app has st
 - While a group run is active, an ordinary run, a database switch and a second group run are refused in that tab.
 - Results are kept in memory: the row limit applies per database (default 1000, up to 100 000).
 
+## Execution statistics
+
+SQL Server script tabs have a **Statistics** check box in the toolbar (hidden for PostgreSQL and SQLite). With it on, the
+next runs send `SET STATISTICS IO ON; SET STATISTICS TIME ON` on the tab's connection before your statements and
+`... OFF` after them (a session setting sent as commands, not added to your text: the read-only guard, the statement
+split and an open transaction are unaffected, and no option is left on the reused connection). The server messages are
+captured per statement (`InfoMessage`; errors still fail the statement exactly as before) and two tabs appear after the
+statement tabs, replaced by each run: **Statistics** and **Messages**. With the box off nothing is captured and nothing
+changes. The box is per tab and not remembered across restarts.
+
+**Statistics** is one grid, sortable by a click on a header (numbers by value, NULL last):
+
+| Column | Content |
+| --- | --- |
+| `Database` | only in a group run: the member the row comes from |
+| `Statement` | 1-based position of the statement in the run |
+| `Kind` | `IO` (one table), `Parse/compile` or `Execution` (STATISTICS TIME), `Total` (sums of the statement), `Grand total` (sums of the run, or of the database in a group run; only when more than one statement has statistics) |
+| `Table` | the table of an `IO` row (`Worktable`, `#temp` tables included) |
+| `Scan count`, `Logical reads`, `Physical reads`, `Read-ahead reads`, `LOB logical reads`, `LOB physical reads`, `LOB read-ahead reads` | the IO counters (four page-server columns follow only when one of them is not 0, i.e. on Azure Hyperscale) |
+| `CPU ms`, `Elapsed ms` | the TIME values (empty on `IO` rows) |
+
+A stored procedure reports each inner statement and then the call itself, so its `Total` time can exceed the wall-clock
+time. **Messages** lists every line the server sent (`PRINT`, warnings, the statistics lines), one per row, with the
+statement number and the time; "Copy value" in the cell menu copies a whole line.
+
+The server writes these lines in the language of the login (English, French, ...). They are read **by structure**, not by
+keyword: a table name between quotes followed by 7 (older servers) or 11 counters, and two `= N ms` values for the times
+(only the parse/compile versus execution split looks at words: English and French, else execution). A line that does
+not match stays a plain message; nothing is ever dropped or raised.
+
+**Run on group** honours the check box: every database sets the options on its own read-only connection and the extra
+**Statistics** tab has a leading `Database` column, so the IO of the databases can be compared side by side. A write
+statement is still refused before any database is contacted.
+
+Limits: SQL Server only. A result cut at the row limit cancels its command, so the lines the server would have sent at the
+end of that statement are lost; a cancelled statement yields none. `SET STATISTICS ...` typed in the script itself keeps
+working as before but is only captured when the check box is on. The `DBX_MSSQL` integration tests check the capture and
+the French messages against a real server ([Integration tests](#integration-tests-against-real-databases)).
+
 ## Keyboard shortcuts
 
 | Shortcut | Where | Action |
@@ -171,6 +210,71 @@ with a hand-edited `config.json`) is refused by the runner, after the app has st
 | `Ctrl+0` | table grid, cell selected | Set the cell to NULL (staged) |
 | `Ctrl+Break` | script tab | Cancel the running query, or the running group run (all databases) |
 | `F2` | table grid | Edit the cell |
+
+## Installation
+
+Requirements: Windows 10/11 and the GitHub CLI (`winget install --id GitHub.cli`; `gh auth login` if the repository is
+private). No admin rights and no .NET needed (the release is self-contained). `install.ps1` runs in Windows PowerShell 5.1
+and PowerShell 7; it downloads the latest release with `gh`, verifies its SHA-256, and installs it for the current user.
+
+One-liner, straight from GitHub (add the parameters after the closing parentheses, for example `-Version 1.0.4 -DesktopShortcut -Launch`):
+
+```powershell
+& ([scriptblock]::Create((gh api repos/JonathanOll/dbExplorer/contents/install.ps1 -H 'Accept: application/vnd.github.raw' | Out-String)))
+```
+
+Or download, then run (`-ExecutionPolicy Bypass` because many machines block local scripts; `Out-File -Encoding ascii` because
+`>` writes UTF-16 in Windows PowerShell 5.1):
+
+```powershell
+gh api repos/JonathanOll/dbExplorer/contents/install.ps1 -H "Accept: application/vnd.github.raw" | Out-File -Encoding ascii install.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Version 1.0.4 -DesktopShortcut
+```
+
+Piping the script into `powershell -Command -` does not work (a script with a `param` block is not accepted on stdin).
+`... | Out-String | iex` runs, but in your current session, without parameters, and leaves strict mode on in it: prefer the
+script block form above.
+
+| Parameter | Effect |
+| --- | --- |
+| `-InstallDir <path>` | Where to install (default `%LOCALAPPDATA%\Programs\dbExplorer`) |
+| `-Version <tag>` | `1.0.4` or `v1.0.4` (default: the latest release) |
+| `-Repository <owner/name>` | Default `JonathanOll/dbExplorer` |
+| `-DesktopShortcut` / `-NoStartMenu` | Add a desktop shortcut / skip the Start Menu shortcut (created by default) |
+| `-Launch` | Start the app at the end |
+| `-Force` | Reinstall the same (or a newer) version; close a running dbExplorer without asking (window first, killed after 20 s) |
+| `-Uninstall` | Remove the app (see below) |
+| `-RemoveUserData` | With `-Uninstall`: also delete `%APPDATA%\dbExplorer`, after a confirmation unless `-Force` |
+| `-Quiet` | Only warnings and errors |
+| `-WhatIf` / `-Confirm` | Standard PowerShell switches |
+
+Run again to update: the same version is left alone (`already installed`), an older one is upgraded. A running dbExplorer
+makes the installer stop (close it, or pass `-Force`). Errors print a cause and a fix, and exit with a non-zero code.
+
+What it creates:
+
+- the app in `%LOCALAPPDATA%\Programs\dbExplorer` (a writable folder, as the in-app updater needs); the installer replaces
+  everything in it and refuses a non-empty folder that is not a dbExplorer install;
+- a copy of the script in `%LOCALAPPDATA%\Programs\dbExplorer-setup\install.ps1`: it is the uninstaller, kept outside the install
+  folder because the in-app updater empties that folder;
+- the Start Menu shortcut `dbExplorer.lnk` (and the desktop one on request);
+- an "Apps & features" entry (`HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\dbExplorer`, per user).
+
+Uninstall: Settings > Apps > dbExplorer, or
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\Programs\dbExplorer-setup\install.ps1" -Uninstall
+```
+
+It removes the files, the shortcuts, the entry and the setup copy (deleted a few seconds after it exits). `%APPDATA%\dbExplorer`
+(config, sessions, scripts) is kept unless `-RemoveUserData` is given, and is never touched by an install or an update.
+
+The installer and the [automatic updates](#automatic-updates) work on the same folder: after an in-app update, running
+`install.ps1` sees the new version (it reads it from the exe) and does nothing. Only the version shown in "Apps & features" keeps
+the one that was installed by the script.
+
+Test: `pwsh .\scripts\test-install.ps1 [-Engine pwsh]` runs the real script against throw-away folders and a throw-away registry
+key (needs network and `gh`; it downloads the latest release a few times) and checks that nothing else was touched.
 
 ## Build, test, publish
 
@@ -261,7 +365,7 @@ How it works:
    starts the old version again; the backup, the zip and the relay are deleted after a success.
 
 Requirements: the GitHub CLI (`gh`) installed and logged in with access to the repository, and the app running from its
-install folder (the folder must be writable). Nothing is offered for development runs (`dotnet run`, `bin\Debug`,
+install folder (the folder must be writable; [`install.ps1`](#installation) creates one). Nothing is offered for development runs (`dotnet run`, `bin\Debug`,
 `bin\Release`), for a build without a stamped version (v1.0.0 is the SDK default and counts as "unknown", so builds from
 before this feature and local builds never self-update), or when `DbExplorer.exe` is not what is running.
 `%APPDATA%\dbExplorer` (config, sessions, scripts, cache) is outside the install folder and is never touched.
