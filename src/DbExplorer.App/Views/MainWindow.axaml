@@ -148,7 +148,10 @@
                   <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconSettings}" MinWidth="26" Padding="4,0"
                           ToolTip.Tip="Settings">
                     <Button.Flyout>
-                      <MenuFlyout Placement="BottomEdgeAlignedRight">
+                      <MenuFlyout Placement="BottomEdgeAlignedRight" Opening="OnSettingsFlyoutOpening">
+                        <MenuItem Header="Upgrade database..." Command="{Binding OpenUpgradeCommand}" />
+                        <MenuItem Header="Options..." Command="{Binding OpenOptionsCommand}" />
+                        <Separator />
                         <MenuItem Header="Check for updates automatically" ToggleType="CheckBox"
                                   IsChecked="{Binding Update.AutoCheckEnabled, Mode=TwoWay}" />
                       </MenuFlyout>

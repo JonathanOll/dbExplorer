@@ -32,7 +32,8 @@ public class ConfigStore(string path, ISecretProtector protector)
         var normalized = new AppConfig(config.Folders ?? new(), config.Connections ?? new(), config.VirtualKeys ?? new())
         {
             Groups = config.Groups,
-            AutoUpdateCheck = config.AutoUpdateCheck
+            AutoUpdateCheck = config.AutoUpdateCheck,
+            DbUpdatePath = config.DbUpdatePath
         };
         if (normalized.Groups.Any(g => g is null || g.Name is null || g.ConnectionIds is null)
             || normalized.Folders.Any(f => f is null)

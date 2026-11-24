@@ -96,6 +96,10 @@ public partial class MainWindow : Window
         Resized += (_, e) => _bounds.SizeChanged(e.ClientSize.Width, e.ClientSize.Height, WindowState == WindowState.Normal);
     }
 
+    // The only place besides Options-OK that looks at the dbupdate folder: on demand, never at launch.
+    private void OnSettingsFlyoutOpening(object? sender, EventArgs e) =>
+        (DataContext as MainViewModel)?.RefreshUpgradeAvailability();
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);

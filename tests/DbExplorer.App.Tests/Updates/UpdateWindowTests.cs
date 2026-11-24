@@ -93,7 +93,8 @@ public class UpdateWindowTests : IDisposable
         window.Show();
 
         var settings = window.GetVisualDescendants().OfType<Button>().First(b => b.Flyout is MenuFlyout);
-        var item = (MenuItem)((MenuFlyout)settings.Flyout!).Items.Single()!;
+        var item = (MenuItem)((MenuFlyout)settings.Flyout!).Items.OfType<MenuItem>()
+            .Single(i => i.Header as string == "Check for updates automatically");
         settings.Flyout.ShowAt(settings);   // bindings of a menu apply when it opens
         Dispatcher.UIThread.RunJobs();
         Assert.True(item.IsChecked);   // the setting reaches the menu through the binding

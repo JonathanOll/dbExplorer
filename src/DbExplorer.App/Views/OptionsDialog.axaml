@@ -1,0 +1,61 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbExplorer.App.ViewModels"
+        x:Class="DbExplorer.App.Views.OptionsDialog"
+        x:DataType="vm:OptionsViewModel"
+        Title="Options"
+        Width="640" Height="300" CanResize="False"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel>
+    <!-- Footer: the dialog verdict -->
+    <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxWindowBg}" BorderBrush="{DynamicResource DbxBorder}"
+            BorderThickness="0,1,0,0" Padding="20,12">
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Content="OK" Classes="accent" IsDefault="True" Click="OnOkClick" MinWidth="88" HorizontalContentAlignment="Center" />
+        <Button Content="Cancel" IsCancel="True" Click="OnCancelClick" MinWidth="88" HorizontalContentAlignment="Center" />
+      </StackPanel>
+    </Border>
+
+    <!-- Header -->
+    <Border DockPanel.Dock="Top" Background="{DynamicResource DbxPanelHeaderBg}" BorderBrush="{DynamicResource DbxBorder}"
+            BorderThickness="0,0,0,1" Padding="20,14">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <PathIcon Data="{StaticResource IconSettings}" Width="30" Height="30" Foreground="{DynamicResource DbxAccent}" />
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="Options" FontSize="17" FontWeight="SemiBold" />
+          <TextBlock Classes="dim small" Text="Settings kept in the config file." />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Messages: why the folder cannot be used, what it holds -->
+    <StackPanel DockPanel.Dock="Bottom" Background="{DynamicResource DbxContentBg}">
+      <Border Classes="banner error" Padding="20,8" IsVisible="{Binding HasPathError}">
+        <Grid ColumnDefinitions="Auto,*">
+          <PathIcon Classes="bi" Data="{StaticResource IconError}" VerticalAlignment="Top" Margin="0,1,8,0" />
+          <TextBlock Grid.Column="1" Text="{Binding PathError}" TextWrapping="Wrap" />
+        </Grid>
+      </Border>
+      <Border Classes="banner info" Padding="20,8" IsVisible="{Binding PathInfo, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <Grid ColumnDefinitions="Auto,*">
+          <PathIcon Classes="bi" Data="{StaticResource IconInfo}" VerticalAlignment="Top" Margin="0,1,8,0" />
+          <TextBlock Grid.Column="1" Text="{Binding PathInfo}" TextWrapping="Wrap" />
+        </Grid>
+      </Border>
+    </StackPanel>
+
+    <StackPanel Background="{DynamicResource DbxContentBg}" Spacing="8" Margin="0" >
+      <StackPanel Margin="20,16,20,0" Spacing="8">
+        <TextBlock Classes="section" Text="N2F DATABASE UPDATES" />
+        <TextBlock Classes="dim" TextWrapping="Wrap"
+                   Text="Folder with the dbupdate scripts of the n2f repo (Web/Common/n2jWeb.Data/dbupdate). Leave empty to switch the upgrade feature off." />
+        <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+          <TextBox x:Name="PathBox" Text="{Binding DbUpdatePath}" LostFocus="OnPathLostFocus"
+                   Watermark="C:\repos\n2f\Web\Common\n2jWeb.Data\dbupdate" />
+          <Button Grid.Column="1" Content="Browse..." Margin="8,0,0,0" Click="OnBrowseClick" />
+        </Grid>
+      </StackPanel>
+    </StackPanel>
+  </DockPanel>
+</Window>

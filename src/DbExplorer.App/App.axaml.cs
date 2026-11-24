@@ -38,6 +38,12 @@ public class App : Application
             var editDialogs = new EditDialogService(window);
             main.UseTableTabs(sessions, editDialogs);
             main.UseScriptTabs(new ScriptFiles(window), new Core.Scripting.ScriptSessionStore(paths.ScriptsDir), editDialogs);
+            // Only stores the dialog service and the clipboard delegate: the dbupdate folder is not read until the gear menu opens.
+            main.UseUpgrade(new UpgradeDialogService(window));
+            main.CopyToClipboard = async text =>
+            {
+                if (window.Clipboard is { } clipboard) await clipboard.SetTextAsync(text);
+            };
             // After the window is up: restoring the tabs (their editors, views) must not delay the first paint. Only tab shells
             // are built; nothing connects until a table tab is first selected (the active one loads at once).
             SessionStartup.Wire(window, main, startup, new Core.Config.TabSessionStore(paths.SessionFile),

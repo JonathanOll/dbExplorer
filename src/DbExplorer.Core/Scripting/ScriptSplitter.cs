@@ -17,6 +17,79 @@ public static class ScriptSplitter
     public static IReadOnlyList<ScriptStatement> Split(string script, DbKind kind) => SplitCore(script, kind, blankLines: false);
 
     /// <summary>
+    /// Splits a SQL Server script into the batches the server would receive: only a lone GO line separates them, a ';' stays
+    /// inside its batch (so <c>IF ... BEGIN ... DROP INDEX ...; CREATE INDEX ...; END</c> is never cut). Strings, [bracketed]
+    /// identifiers and comments are respected. A batch's text excludes its GO line; comment-only and empty batches are dropped.
+    /// A <c>GO n</c> line still only separates here: use <see cref="FindUnsupportedGo"/> to refuse it. A line that looks like a GO
+    /// separator but is not one (<c>GO;</c>, <c>GO SELECT 1</c>...) is never silently merged into the previous batch: it throws
+    /// <see cref="InvalidOperationException"/>, so callers refuse such a script first. Used by the upgrade runner.
+    /// </summary>
+    public static IReadOnlyList<ScriptStatement> SplitBatches(string script) =>
+        SplitCore(script, DbKind.SqlServer, blankLines: false, semicolons: false, strictGo: true);
+
+    /// <summary>
+    /// The 1-based line of the first <c>GO n</c> separator with a repeat count other than 1 (T-SQL runs the batch n times; the
+    /// splitter would silently run it once), or null. <c>GO</c> and <c>GO 1</c> are fine. A count too big for an int counts as above 1.
+    /// </summary>
+    public static int? FindGoRepeat(string script)
+    {
+        var tokens = SqlLexer.Tokenize(script, SqlLexOptions.For(DbKind.SqlServer));
+        for (var i = 0; i < tokens.Count; i++)
+        {
+            var go = ClassifyGo(script, tokens, i);
+            if (go.Kind == GoKind.Repeat) return LineOf(script, tokens[i].Start);
+            if (go.Kind == GoKind.Separator) i = SkipGoLine(tokens, i, go.End);
+        }
+        return null;
+    }
+
+    /// <param name="Line">1-based line of the GO.</param>
+    /// <param name="Reason">User-facing, without the line number (<c>GO n</c> for a repeat count).</param>
+    public sealed record UnsupportedGo(int Line, string Reason);
+
+    /// <summary>
+    /// The first GO line the upgrade cannot play as written, or null: a <c>GO n</c> repeat count (not 1), or a line that starts with
+    /// GO but is not a separator (<c>GO;</c>, <c>GO SELECT 1</c>, <c>GO 5x</c>...). sqlcmd and SSMS reject such lines too, and merging
+    /// them into the previous batch would run it without the boundary the author intended. A word GO elsewhere in a line, GOTO,
+    /// and GO inside strings, brackets and comments are not GO lines.
+    /// </summary>
+    public static UnsupportedGo? FindUnsupportedGo(string script)
+    {
+        var tokens = SqlLexer.Tokenize(script, SqlLexOptions.For(DbKind.SqlServer));
+        for (var i = 0; i < tokens.Count; i++)
+        {
+            var go = ClassifyGo(script, tokens, i);
+            switch (go.Kind)
+            {
+                case GoKind.Repeat:
+                    return new UnsupportedGo(LineOf(script, tokens[i].Start), "'GO n' (repeat count) is not supported");
+                case GoKind.Unsupported:
+                    return new UnsupportedGo(LineOf(script, tokens[i].Start),
+                        "GO must be alone on its line (only a count of 1 or a comment may follow it); this line is not supported");
+                case GoKind.Separator:
+                    i = SkipGoLine(tokens, i, go.End);
+                    break;
+            }
+        }
+        return null;
+    }
+
+    private static int LineOf(string script, int offset)
+    {
+        var line = 1;
+        for (var k = 0; k < offset; k++)
+            if (script[k] == '\n') line++;
+        return line;
+    }
+
+    // Index of the last token that belongs to the GO line ending at goEnd (the loops' own i++ moves past it).
+    private static int SkipGoLine(IReadOnlyList<SqlToken> tokens, int i, int goEnd)
+    {
+        while (i + 1 < tokens.Count && tokens[i + 1].Start < goEnd) i++;
+        return i;
+    }
+
+    /// <summary>
     /// As <see cref="Split"/>, and a blank line (a line with nothing but whitespace) also ends a statement, unless it is inside a
     /// string, quoted identifier, comment or dollar-quoted body. T-SQL needs no ';' between statements, so for "run the
     /// statement under the cursor" the blank line is the only visible boundary (DBeaver does the same). Used by Ctrl+Enter
@@ -75,7 +148,9 @@ public static class ScriptSplitter
         t.Kind == SqlTokenKind.Word && t.End - t.Start == word.Length
         && text.AsSpan(t.Start, word.Length).Equals(word, StringComparison.OrdinalIgnoreCase);
 
-    private static IReadOnlyList<ScriptStatement> SplitCore(string script, DbKind kind, bool blankLines)
+    /// <param name="semicolons">False: a ';' is an ordinary token of its statement, only GO (and blank lines) separate.</param>
+    /// <param name="strictGo">True: a GO-like line that is not a separator throws instead of staying in its statement.</param>
+    private static IReadOnlyList<ScriptStatement> SplitCore(string script, DbKind kind, bool blankLines, bool semicolons = true, bool strictGo = false)
     {
         var options = SqlLexOptions.For(kind);
         var tokens = SqlLexer.Tokenize(script, options);
@@ -106,19 +181,22 @@ public static class ScriptSplitter
                 segmentStart = gap;
             }
 
-            if (t.Kind == SqlTokenKind.Semicolon)
+            if (t.Kind == SqlTokenKind.Semicolon && semicolons)
             {
                 Flush();
                 segmentStart = t.End;
             }
-            else if (kind == DbKind.SqlServer && IsGoSeparator(script, t, out var goEnd))
+            else if (kind == DbKind.SqlServer && ClassifyGo(script, tokens, i) is var go && go.Kind is GoKind.Separator or GoKind.Repeat)
             {
                 Flush();
-                segmentStart = goEnd;
-                while (i + 1 < tokens.Count && tokens[i + 1].Start < goEnd) i++;   // skip the rest of the GO line
+                segmentStart = go.End;
+                i = SkipGoLine(tokens, i, go.End);   // skip the rest of the GO line
             }
             else
             {
+                if (strictGo && kind == DbKind.SqlServer && ClassifyGo(script, tokens, i).Kind == GoKind.Unsupported)
+                    throw new InvalidOperationException(
+                        $"Line {LineOf(script, t.Start)} starts with GO but is not a GO separator; refuse the script instead of splitting it.");
                 if (firstToken < 0) firstToken = i;
                 lastEnd = t.End;
             }
@@ -180,34 +258,75 @@ public static class ScriptSplitter
         return previous;
     }
 
+    private enum GoKind { None, Separator, Repeat, Unsupported }
+
+    /// <param name="End">For a separator or a repeat: the offset of the end of the GO line.</param>
+    private readonly record struct GoLine(GoKind Kind, int End);
+
     /// <summary>
-    /// A GO batch separator is the word GO alone on its line, optionally followed by a repeat count and a
-    /// -- comment. <paramref name="end"/> is the offset of the end of that line.
+    /// A GO batch separator is the word GO first on its line (only whitespace and block comments before it), optionally followed
+    /// by a repeat count and then only block comments and a -- comment. A count other than 1 is a <see cref="GoKind.Repeat"/>
+    /// (it still separates). Any other text after GO makes the line <see cref="GoKind.Unsupported"/>. A word GO that is not first
+    /// on its line, or that is part of a longer word (GOTO), is <see cref="GoKind.None"/>.
     /// </summary>
-    private static bool IsGoSeparator(string s, SqlToken t, out int end)
+    private static GoLine ClassifyGo(string s, IReadOnlyList<SqlToken> tokens, int index)
     {
-        end = t.End;
+        var t = tokens[index];
         if (t.Kind != SqlTokenKind.Word || t.End - t.Start != 2
             || !s.AsSpan(t.Start, 2).Equals("GO", StringComparison.OrdinalIgnoreCase))
-            return false;
+            return new GoLine(GoKind.None, t.End);
 
-        for (var i = t.Start - 1; i >= 0 && s[i] != '\n' && s[i] != '\r'; i--)
-            if (!char.IsWhiteSpace(s[i])) return false;
+        if (!FirstOnItsLine(s, index == 0 ? 0 : tokens[index - 1].End, t.Start, startsLine: index == 0))
+            return new GoLine(GoKind.None, t.End);
 
-        var j = SkipBlanks(s, t.End);
+        var j = SkipInlineSpace(s, t.End);
+        var digitsFrom = j;
         while (j < s.Length && char.IsAsciiDigit(s[j])) j++;
-        j = SkipBlanks(s, j);
-        if (j < s.Length && s[j] != '\n' && s[j] != '\r' && !(s[j] == '-' && j + 1 < s.Length && s[j + 1] == '-'))
-            return false;
+        var repeat = false;
+        if (j > digitsFrom)
+            repeat = !int.TryParse(s.AsSpan(digitsFrom, j - digitsFrom), out var count) || count != 1;
 
-        while (j < s.Length && s[j] != '\n' && s[j] != '\r') j++;   // the rest of the line is only a comment
-        end = j;
-        return true;
+        while (true)
+        {
+            j = SkipInlineSpace(s, j);
+            if (j >= s.Length || s[j] == '\n' || s[j] == '\r') break;
+            if (s[j] == '-' && j + 1 < s.Length && s[j + 1] == '-')
+            {
+                j = SqlLexer.SkipLineComment(s, j);
+                break;
+            }
+            if (s[j] == '/' && j + 1 < s.Length && s[j + 1] == '*')
+            {
+                j = SqlLexer.SkipBlockComment(s, j, nested: true);
+                continue;
+            }
+            return new GoLine(GoKind.Unsupported, t.End);
+        }
+        return new GoLine(repeat ? GoKind.Repeat : GoKind.Separator, j);
     }
 
-    private static int SkipBlanks(string s, int i)
+    /// <summary>
+    /// True when the gap between the previous token and the GO holds a line break, or nothing but whitespace and block comments
+    /// from the start of the script; a -- comment never precedes a token of its own line.
+    /// </summary>
+    private static bool FirstOnItsLine(string s, int from, int to, bool startsLine)
     {
-        while (i < s.Length && s[i] is ' ' or '\t') i++;
+        var onLineStart = startsLine;
+        var i = from;
+        while (i < to)
+        {
+            var c = s[i];
+            if (c is '\n' or '\r') { onLineStart = true; i++; }
+            else if (c == '-' && i + 1 < s.Length && s[i + 1] == '-') { i = SqlLexer.SkipLineComment(s, i); onLineStart = false; }
+            else if (c == '/' && i + 1 < s.Length && s[i + 1] == '*') i = SqlLexer.SkipBlockComment(s, i, nested: true);
+            else i++;
+        }
+        return onLineStart;
+    }
+
+    private static int SkipInlineSpace(string s, int i)
+    {
+        while (i < s.Length && char.IsWhiteSpace(s[i]) && s[i] is not ('\n' or '\r')) i++;
         return i;
     }
 

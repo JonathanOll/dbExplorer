@@ -506,6 +506,21 @@ public partial class ConnectionTreeViewModel : ObservableObject
     public bool SetAutoUpdateCheck(bool enabled)
     {
         Config.AutoUpdateCheck = enabled;
+        return SaveSetting();
+    }
+
+    /// <summary>
+    /// Stores the dbupdate folder of the upgrade feature (null switches it off), with the same contract as
+    /// <see cref="SetAutoUpdateCheck"/>: applied in memory, saved unless persistence is off, status-bar error when not saved.
+    /// </summary>
+    public bool SetDbUpdatePath(string? path)
+    {
+        Config.DbUpdatePath = path;
+        return SaveSetting();
+    }
+
+    private bool SaveSetting()
+    {
         if (!_persistenceEnabled)
         {
             _status.Error("The config file could not be read at startup: this setting is NOT saved.");

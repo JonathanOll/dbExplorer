@@ -12,5 +12,8 @@ public record AppConfig(
     /// <summary>Whether the app looks for a newer release in the background after start. Missing in old files: on.</summary>
     public bool AutoUpdateCheck { get; set; } = true;
 
+    /// <summary>Folder with the n2f dbupdate scripts; null switches the upgrade feature off. Missing in old files: null.</summary>
+    public string? DbUpdatePath { get; set; }
+
     public static AppConfig Empty() => new(new(), new(), new());
 }

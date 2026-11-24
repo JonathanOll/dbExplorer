@@ -1,0 +1,234 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbExplorer.App.ViewModels"
+        xmlns:up="using:DbExplorer.Core.Upgrade"
+        x:Class="DbExplorer.App.Views.UpgradeDialog"
+        x:DataType="vm:UpgradeViewModel"
+        Title="Upgrade database"
+        Width="900" Height="640" MinWidth="640" MinHeight="420"
+        WindowStartupLocation="CenterOwner">
+
+  <Window.Styles>
+    <Style Selector="PathIcon.ok"><Setter Property="Foreground" Value="{DynamicResource DbxSuccess}" /></Style>
+    <Style Selector="PathIcon.bad"><Setter Property="Foreground" Value="{DynamicResource DbxError}" /></Style>
+    <Style Selector="PathIcon.run"><Setter Property="Foreground" Value="{DynamicResource DbxAccent}" /></Style>
+  </Window.Styles>
+
+  <DockPanel>
+    <!-- Footer: the buttons of the current phase -->
+    <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxWindowBg}" BorderBrush="{DynamicResource DbxBorder}"
+            BorderThickness="0,1,0,0" Padding="20,12">
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Content="Cancel all" Command="{Binding CancelAllCommand}" IsVisible="{Binding IsRunning}"
+                MinWidth="88" HorizontalContentAlignment="Center" />
+        <Button Content="Copy log" Command="{Binding CopyLogCommand}" IsVisible="{Binding IsFinished}"
+                MinWidth="88" HorizontalContentAlignment="Center" />
+        <Button Content="Run..." Classes="accent" Command="{Binding RequestRunCommand}" IsVisible="{Binding IsPreview}"
+                MinWidth="88" HorizontalContentAlignment="Center" />
+        <Button Content="Run" Classes="accent" Command="{Binding ConfirmRunCommand}" IsVisible="{Binding IsConfirm}"
+                MinWidth="88" HorizontalContentAlignment="Center" />
+        <Button Content="Back" Command="{Binding BackCommand}" IsVisible="{Binding IsConfirm}"
+                MinWidth="88" HorizontalContentAlignment="Center" />
+        <Button Content="Close" IsCancel="True" Click="OnCloseClick" IsEnabled="{Binding CanClose}"
+                Classes.accent="{Binding IsFinished}" IsVisible="{Binding !IsConfirm}"
+                MinWidth="88" HorizontalContentAlignment="Center" />
+      </StackPanel>
+    </Border>
+
+    <!-- Header -->
+    <Border DockPanel.Dock="Top" Background="{DynamicResource DbxPanelHeaderBg}" BorderBrush="{DynamicResource DbxBorder}"
+            BorderThickness="0,0,0,1" Padding="20,14">
+      <StackPanel Orientation="Horizontal" Spacing="12">
+        <PathIcon Data="{StaticResource IconDatabase}" Width="30" Height="30" Foreground="{DynamicResource DbxAccent}" />
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="Upgrade database" FontSize="17" FontWeight="SemiBold" />
+          <TextBlock Classes="dim" Text="Play the SQL scripts of one sprint of the n2f dbupdate folder." />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Sprint and target pickers (before the run) -->
+    <Border DockPanel.Dock="Top" Background="{DynamicResource DbxToolbarBg}" BorderBrush="{DynamicResource DbxBorder}"
+            BorderThickness="0,0,0,1" Padding="20,10" IsVisible="{Binding ShowInput}">
+      <StackPanel Spacing="8">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="Sprint" VerticalAlignment="Center" />
+          <TextBox x:Name="SprintBox" Width="90" Watermark="143" Text="{Binding SprintText}">
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Enter" Command="{Binding LoadCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+          <Button Content="Load" Command="{Binding LoadCommand}" MinWidth="72" HorizontalContentAlignment="Center" />
+          <TextBlock Classes="dim" Text="or folder" VerticalAlignment="Center" Margin="8,0,0,0" />
+          <ComboBox ItemsSource="{Binding FolderChoices}" SelectedItem="{Binding SelectedFolder}" MinWidth="320"
+                    PlaceholderText="(none)">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:UpgradeFolderChoice">
+                <TextBlock Text="{Binding Label}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowTargets}">
+          <TextBlock Text="Run on" VerticalAlignment="Center" />
+          <ComboBox ItemsSource="{Binding Targets}" SelectedItem="{Binding SelectedTarget}" MinWidth="320">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="up:UpgradeTarget">
+                <TextBlock Text="{Binding Label}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- Messages: why nothing happened, the outcome, the warnings of the ticked scripts, the files the scan skipped -->
+    <StackPanel DockPanel.Dock="Top">
+      <Border Classes="banner warn" Padding="20,8" IsVisible="{Binding HasWarnMessage}">
+        <Grid ColumnDefinitions="Auto,*">
+          <PathIcon Classes="bi" Data="{StaticResource IconWarning}" VerticalAlignment="Top" Margin="0,1,8,0" />
+          <TextBlock Grid.Column="1" Text="{Binding Message}" TextWrapping="Wrap" />
+        </Grid>
+      </Border>
+      <Border Classes="banner info" Padding="20,8" IsVisible="{Binding HasInfoMessage}">
+        <Grid ColumnDefinitions="Auto,*">
+          <PathIcon Classes="bi" Data="{StaticResource IconInfo}" VerticalAlignment="Top" Margin="0,1,8,0" />
+          <TextBlock Grid.Column="1" Text="{Binding Message}" TextWrapping="Wrap" />
+        </Grid>
+      </Border>
+      <StackPanel IsVisible="{Binding IsPreview}">
+        <Border Classes="banner warn" Padding="20,8" IsVisible="{Binding WarningSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <Grid ColumnDefinitions="Auto,*">
+            <PathIcon Classes="bi" Data="{StaticResource IconWarning}" VerticalAlignment="Top" Margin="0,1,8,0" />
+            <TextBlock Grid.Column="1" Text="{Binding WarningSummary}" TextWrapping="Wrap" />
+          </Grid>
+        </Border>
+        <Border Classes="banner info" Padding="20,8" IsVisible="{Binding IgnoredNote, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <Grid ColumnDefinitions="Auto,*">
+            <PathIcon Classes="bi" Data="{StaticResource IconInfo}" VerticalAlignment="Top" Margin="0,1,8,0" />
+            <TextBlock Grid.Column="1" Text="{Binding IgnoredNote}" TextWrapping="Wrap" />
+          </Grid>
+        </Border>
+      </StackPanel>
+    </StackPanel>
+
+    <Border Background="{DynamicResource DbxContentBg}">
+      <Panel>
+        <!-- Setup: nothing loaded yet -->
+        <TextBlock Classes="dim" IsVisible="{Binding IsSetup}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                   TextAlignment="Center" TextWrapping="Wrap" MaxWidth="420"
+                   Text="Enter a sprint number (or pick a folder) and press Load to preview its scripts." />
+
+        <!-- Preview: one line per script -->
+        <ScrollViewer IsVisible="{Binding IsPreview}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <ItemsControl ItemsSource="{Binding Rows}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:UpgradeScriptRow">
+                <Border BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1" Padding="20,6">
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding CanSelect}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12.5"
+                                 TextTrimming="CharacterEllipsis" />
+                      <TextBlock Classes="dim small" Text="{Binding Folder}" />
+                      <TextBlock Foreground="{DynamicResource DbxError}" Text="{Binding LoadError}" TextWrapping="Wrap"
+                                 IsVisible="{Binding HasLoadError}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="12,0,0,0">
+                      <Border Classes="badge warn" IsVisible="{Binding IsProduction}"
+                              ToolTip.Tip="Targets specific servers: unticked by default">
+                        <TextBlock Text="{Binding ProductionTag}" FontSize="11.5" />
+                      </Border>
+                      <ItemsControl ItemsSource="{Binding WarningBadges}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="6" />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:UpgradeWarningBadge">
+                            <Border Classes="badge warn" ToolTip.Tip="{Binding Tip}">
+                              <TextBlock Text="{Binding Text}" FontSize="11.5" />
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Confirm: what is about to happen -->
+        <ScrollViewer IsVisible="{Binding IsConfirm}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="20,16" Spacing="10">
+            <TextBlock Text="{Binding ConfirmHeading}" FontSize="15" FontWeight="SemiBold" />
+            <ItemsControl ItemsSource="{Binding ConfirmDatabases}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                    <PathIcon Data="{StaticResource IconDatabase}" Width="14" Height="14" Foreground="{DynamicResource DbxAccent}" />
+                    <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Border Classes="banner warn" Padding="12,8" IsVisible="{Binding !!ProductionSelectedCount}">
+              <Grid ColumnDefinitions="Auto,*">
+                <PathIcon Classes="bi" Data="{StaticResource IconWarning}" VerticalAlignment="Top" Margin="0,1,8,0" />
+                <TextBlock Grid.Column="1" TextWrapping="Wrap"
+                           Text="{Binding ProductionSelectedCount, StringFormat='{}{0} Production script(s) ticked: they target specific servers.'}" />
+              </Grid>
+            </Border>
+            <StackPanel Spacing="4" IsVisible="{Binding !!SelectedWarnings.Count}">
+              <TextBlock Classes="section" Text="WARNINGS" />
+              <ItemsControl ItemsSource="{Binding SelectedWarnings}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:UpgradeWarningLine">
+                    <TextBlock Text="{Binding Text}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12" TextWrapping="Wrap"
+                               Margin="0,1" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+            <StackPanel Spacing="4" IsVisible="{Binding NeedsTypedConfirmation}">
+              <TextBlock Text="{Binding ConfirmPrompt}" />
+              <TextBox x:Name="ConfirmBox" Text="{Binding ConfirmInput}" Watermark="{Binding ConfirmToken}" MaxWidth="240"
+                       HorizontalAlignment="Left" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- Running / Finished: one card per database -->
+        <ScrollViewer IsVisible="{Binding ShowMembers}" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <ItemsControl ItemsSource="{Binding Members}" Margin="20,14">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:UpgradeMemberViewModel">
+                <Border Background="{DynamicResource DbxToolbarBg}" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="1"
+                        CornerRadius="6" Margin="0,0,0,8" Padding="12,9">
+                  <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                    <Panel Margin="0,0,8,0" VerticalAlignment="Center">
+                      <PathIcon Classes="dim" Data="{StaticResource IconSchedule}" Width="14" Height="14" IsVisible="{Binding IsPending}" />
+                      <PathIcon Classes="run" Data="{StaticResource IconRefresh}" Width="14" Height="14" IsVisible="{Binding IsRunning}" />
+                      <PathIcon Classes="ok" Data="{StaticResource IconCheck}" Width="14" Height="14" IsVisible="{Binding IsDone}" />
+                      <PathIcon Classes="bad" Data="{StaticResource IconError}" Width="14" Height="14" IsVisible="{Binding IsFailed}" />
+                      <PathIcon Classes="dim" Data="{StaticResource IconStop}" Width="14" Height="14" IsVisible="{Binding IsCancelled}" />
+                    </Panel>
+                    <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBlock Grid.Column="2" Classes="dim" Text="{Binding StatusText}" TextWrapping="Wrap" VerticalAlignment="Center"
+                               ToolTip.Tip="{Binding StatusText}" />
+                    <Button Grid.Column="3" Classes="close" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}"
+                            Command="{Binding CancelCommand}" IsVisible="{Binding CanCancel}" Margin="8,0,0,0"
+                            ToolTip.Tip="Cancel this database only" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </Panel>
+    </Border>
+  </DockPanel>
+</Window>

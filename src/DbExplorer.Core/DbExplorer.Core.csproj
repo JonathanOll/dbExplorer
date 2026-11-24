@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="DbExplorer.Core.Tests" />
+    <InternalsVisibleTo Include="DbExplorer.App.Tests" />
   </ItemGroup>
 
   <ItemGroup>
