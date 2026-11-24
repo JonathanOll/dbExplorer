@@ -51,6 +51,25 @@ public partial class MainViewModel : ObservableObject
     /// <summary>Persistent warning shown above the content (e.g. the config could not be read and is not saved).</summary>
     [ObservableProperty] private string? _banner;
 
+    /// <summary>The "new version available" banner; inert (never visible) until <see cref="UseUpdates"/> gives it a checker.</summary>
+    public UpdateViewModel Update { get; private set; } = new();
+
+    /// <summary>Installs the update view model the window binds to.</summary>
+    public void UseUpdates(UpdateViewModel update)
+    {
+        Update = update;
+        OnPropertyChanged(nameof(Update));
+    }
+
+    /// <summary>
+    /// A close that <see cref="ConfirmExitAsync"/> agreed to will not happen after all (the update could not start): tabs that
+    /// said yes (a script the user chose to discard) go back to normal. Safe on every tab.
+    /// </summary>
+    public void ExitAborted()
+    {
+        foreach (var tab in Tabs) tab.CloseAborted();
+    }
+
     /// <summary>
     /// Creates the tab for a table. Later features replace this with the real table view; until then the
     /// shell shows a placeholder so the tab plumbing can be exercised.

@@ -499,6 +499,30 @@ public partial class ConnectionTreeViewModel : ObservableObject
         node.IsExpanded = false;
     }
 
+    /// <summary>
+    /// Stores the "check for updates automatically" setting in the config. The choice holds for this run either way; in
+    /// read-only-config mode (or when the save fails) the status bar says it is not kept. Returns whether it was saved.
+    /// </summary>
+    public bool SetAutoUpdateCheck(bool enabled)
+    {
+        Config.AutoUpdateCheck = enabled;
+        if (!_persistenceEnabled)
+        {
+            _status.Error("The config file could not be read at startup: this setting is NOT saved.");
+            return false;
+        }
+        try
+        {
+            _store.Save(Config);
+            return true;
+        }
+        catch (Exception e)
+        {
+            _status.Error($"Cannot save config: {ErrorText.Describe(e)}");
+            return false;
+        }
+    }
+
     // ---- DBeaver import ----
 
     /// <summary>

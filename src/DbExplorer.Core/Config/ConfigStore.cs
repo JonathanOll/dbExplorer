@@ -31,7 +31,8 @@ public class ConfigStore(string path, ISecretProtector protector)
             throw new JsonException("The config contains null entries.");
         var normalized = new AppConfig(config.Folders ?? new(), config.Connections ?? new(), config.VirtualKeys ?? new())
         {
-            Groups = config.Groups
+            Groups = config.Groups,
+            AutoUpdateCheck = config.AutoUpdateCheck
         };
         if (normalized.Groups.Any(g => g is null || g.Name is null || g.ConnectionIds is null)
             || normalized.Folders.Any(f => f is null)

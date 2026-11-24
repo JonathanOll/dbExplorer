@@ -49,6 +49,21 @@
         </StackPanel>
       </Border>
 
+      <!-- New version: info band with "Update and restart" / "Later"; red with the reason when the update failed (Retry / Dismiss) -->
+      <Border DockPanel.Dock="Top" Classes="banner" Classes.info="{Binding !Update.IsFailed}" Classes.error="{Binding Update.IsFailed}"
+              IsVisible="{Binding Update.IsVisible}">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+          <PathIcon Classes="bi" Data="{StaticResource IconInfo}" Margin="0,0,8,0" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Text="{Binding Update.Text}" TextWrapping="Wrap" VerticalAlignment="Center" />
+          <ProgressBar Grid.Column="2" Minimum="0" Maximum="1" Value="{Binding Update.Progress}" Width="120" Height="4" Margin="8,0,0,0"
+                       VerticalAlignment="Center" IsVisible="{Binding Update.IsDownloading}" />
+          <Button Grid.Column="3" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconImport}" Margin="8,0,0,0"
+                  Content="{Binding Update.ActionText}" Command="{Binding Update.UpdateCommand}" IsVisible="{Binding Update.CanAct}" />
+          <Button Grid.Column="4" Theme="{StaticResource DbxToolButton}" Margin="4,0,0,0"
+                  Content="{Binding Update.DismissText}" Command="{Binding Update.DismissCommand}" IsVisible="{Binding Update.CanAct}" />
+        </Grid>
+      </Border>
+
       <!-- Status bar: message (left), busy + cancel (middle), active connection and shortcuts (right) -->
       <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxPanelHeaderBg}" BorderBrush="{DynamicResource DbxBorder}"
               BorderThickness="0,1,0,0" MinHeight="26" Padding="10,0,8,0">
@@ -129,6 +144,16 @@
                           MinWidth="26" Padding="4,0" ToolTip.Tip="Refresh the schema of the selected connection" />
                   <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconCollapseAll}" Command="{Binding Tree.CollapseAllCommand}"
                           MinWidth="26" Padding="4,0" ToolTip.Tip="Collapse all" />
+                  <Border Classes="vsep" Margin="3,7" />
+                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconSettings}" MinWidth="26" Padding="4,0"
+                          ToolTip.Tip="Settings">
+                    <Button.Flyout>
+                      <MenuFlyout Placement="BottomEdgeAlignedRight">
+                        <MenuItem Header="Check for updates automatically" ToggleType="CheckBox"
+                                  IsChecked="{Binding Update.AutoCheckEnabled, Mode=TwoWay}" />
+                      </MenuFlyout>
+                    </Button.Flyout>
+                  </Button>
                 </StackPanel>
               </Grid>
             </Border>

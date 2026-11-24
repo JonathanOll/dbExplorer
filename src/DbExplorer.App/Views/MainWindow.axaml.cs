@@ -154,6 +154,13 @@ public partial class MainWindow : Window
         _ = FinishExitAsync(asking);
     }
 
+    /// <summary>Closes the window whose exit prompts were already answered (the update flow asked them): no second round of questions.</summary>
+    public void CloseConfirmed()
+    {
+        _exitConfirmed = true;
+        Close();
+    }
+
     private async Task FinishExitAsync(Task<bool> asking)
     {
         bool ok;

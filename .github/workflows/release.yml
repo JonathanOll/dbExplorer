@@ -52,7 +52,9 @@ jobs:
                   -c Release \
                   -o publish \
                   -r win-x64 \
-                  --self-contained true
+                  --self-contained true \
+                  -p:Version=${{ steps.version.outputs.SemVer }} \
+                  -p:GitHubRepository=${{ github.repository }}
             
             - name: Zip
               run: |

@@ -15,7 +15,13 @@
     <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
     <!-- The UI is English only: do not ship (and Defender-scan) 12 satellite resource folders of the dependencies. -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- GitHub repo (owner/name) the auto-update checks; baked into the exe as assembly metadata. CI overrides it. -->
+    <GitHubRepository Condition="'$(GitHubRepository)' == ''">JonathanOll/dbExplorer</GitHubRepository>
   </PropertyGroup>
+
+  <ItemGroup>
+    <AssemblyMetadata Include="GitHubRepository" Value="$(GitHubRepository)" />
+  </ItemGroup>
 
   <!-- Startup speed (see README, Startup performance). Only active when publishing for a runtime (publish.ps1 passes -r win-x64):
        ReadyToRun of the app AND its dependencies as ONE composite image, so Avalonia's generic instantiations over its own
@@ -39,6 +45,11 @@
   <ItemGroup>
     <InternalsVisibleTo Include="UiShots" />
     <InternalsVisibleTo Include="DbExplorer.App.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Relay script of the auto-update, written to a temp dir at apply time (see Updates\UpdateApplier). -->
+    <EmbeddedResource Include="Updates\ApplyUpdate.ps1" LogicalName="DbExplorer.App.Updates.ApplyUpdate.ps1" />
   </ItemGroup>
 
   <ItemGroup>

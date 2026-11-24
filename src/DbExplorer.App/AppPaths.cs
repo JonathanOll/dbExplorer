@@ -20,7 +20,7 @@ public sealed record AppPaths(string DataDir, string DBeaverDir)
     /// <summary>Unsaved script tabs, restored at the next start.</summary>
     public string ScriptsDir => Path.Combine(DataDir, "scripts");
 
-    public const string Usage = "Usage: dbExplorer [--data-dir <path>] [--dbeaver-dir <path>]";
+    public const string Usage = "Usage: dbExplorer [--data-dir <path>] [--dbeaver-dir <path>] [--no-update-check]";
 
     /// <summary>
     /// Checks the command line only (cheap, no disk access): the message to show the user when a flag has no value, or null when
@@ -34,6 +34,17 @@ public sealed record AppPaths(string DataDir, string DBeaverDir)
             catch (ArgumentException e) { return e.Message + " " + Usage; }
         }
         return null;
+    }
+
+    /// <summary>
+    /// True when the automatic update check is switched off for this run: <c>--no-update-check</c> or env
+    /// <c>DBEXPLORER_NO_UPDATE_CHECK</c> set to 1 / true. The flag takes no value, so it never makes <see cref="CheckArguments"/> fail.
+    /// </summary>
+    public static bool UpdateCheckDisabled(string[] args, Func<string, string?>? env = null)
+    {
+        if (Array.IndexOf(args, "--no-update-check") >= 0) return true;
+        var value = (env ?? Environment.GetEnvironmentVariable)("DBEXPLORER_NO_UPDATE_CHECK")?.Trim();
+        return value is "1" || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
     }
 
     public static AppPaths Resolve(string[] args, Func<string, string?>? env = null)

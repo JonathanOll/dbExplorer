@@ -200,7 +200,7 @@ Everything lives in `%APPDATA%\dbExplorer`:
 
 | Path | Content |
 | --- | --- |
-| `config.json` | folders, connections (passwords DPAPI-encrypted for the current Windows user), virtual keys, linked groups |
+| `config.json` | folders, connections (passwords DPAPI-encrypted for the current Windows user), virtual keys, linked groups, the automatic-update setting |
 | `cache\` | per-connection metadata cache (schema/table/column names) used by `Ctrl+Shift+P` |
 | `scripts\` | unsaved script tabs, restored at the next start |
 | `window.json` | size, position and maximised state of the main window |
@@ -220,6 +220,7 @@ it cannot be overwritten; the same holds in read-only-config mode.
 | `--data-dir <path>` | `DBEXPLORER_DATA_DIR` | Use this folder instead of `%APPDATA%\dbExplorer` |
 | `--dbeaver-dir <path>` | `DBEXPLORER_DBEAVER_DIR` | DBeaver config folder for the import. When only the data dir is overridden it defaults to `<data dir>\dbeaver`, never the real workspace |
 | | `DBEXPLORER_RENDERING=gpu` | Use Avalonia's default GPU/ANGLE rendering instead of software rendering (see Startup performance) |
+| `--no-update-check` | `DBEXPLORER_NO_UPDATE_CHECK=1` | Do not look for a newer release in the background for this run (see Automatic updates) |
 
 A flag without a value is reported in a message box and the app exits (exit code 2). The flags win over the environment
 variables.
@@ -237,6 +238,42 @@ Connections that DBeaver marks `read-only`, or whose connection type is `prod` /
 never silently becomes editable. The status bar names them after the import; untick **Read-only** in the connection's
 context menu to edit one. Virtual keys that use "all columns" skip the columns SQL Server / PostgreSQL cannot compare
 with `=` (text, ntext, image, xml, json...).
+
+## Automatic updates
+
+A published copy checks GitHub for a newer release a few seconds after the window opened, on a background thread (the
+startup path is untouched, see Startup performance). When one exists, a band appears above the window: **Update and
+restart** or **Later** (hides it until the next start).
+
+How it works:
+
+1. The release workflow stamps the version (from the tag, via GitVersion) and the `owner/name` of the repository into the
+   exe, and attaches `DbExplorer.zip` (a plain self-contained `win-x64` publish) to the GitHub release.
+2. The check runs `gh release view` on that repository; a version higher than the running one offers the update. A failed
+   check (no `gh`, offline, not logged in, rate limit) is silent: no dialog, at most a trace line.
+3. **Update and restart** runs `gh release download` into a fresh temp folder (the band shows the progress) and verifies the
+   SHA-256 against the digest GitHub gives for the asset; a mismatch deletes the file and installs nothing.
+4. Unsaved work is handled as when you close the window: a table tab with staged edits asks Save / Discard / Cancel (Cancel
+   keeps the app open and the download for the next click); unsaved scripts are kept by their autosave and come back, with the
+   tabs, at the next start.
+5. A hidden Windows PowerShell relay waits for the app to exit, moves the current files to `.update-backup` inside the install
+   folder, copies the new ones and starts the new exe with the same arguments. On any failure it puts the backup back and
+   starts the old version again; the backup, the zip and the relay are deleted after a success.
+
+Requirements: the GitHub CLI (`gh`) installed and logged in with access to the repository, and the app running from its
+install folder (the folder must be writable). Nothing is offered for development runs (`dotnet run`, `bin\Debug`,
+`bin\Release`), for a build without a stamped version (v1.0.0 is the SDK default and counts as "unknown", so builds from
+before this feature and local builds never self-update), or when `DbExplorer.exe` is not what is running.
+`%APPDATA%\dbExplorer` (config, sessions, scripts, cache) is outside the install folder and is never touched.
+
+To turn it off: untick **Check for updates automatically** in the navigator's settings (gear) button (saved in `config.json`
+as `AutoUpdateCheck`; a config without it means on), or start with `--no-update-check` / `DBEXPLORER_NO_UPDATE_CHECK=1`
+for one run. The check is also skipped when the config could not be read at startup.
+
+Limits: the release zip is a plain self-contained `win-x64` publish made by CI (not by `publish.ps1`, and unsigned); only the
+latest release GitHub reports is considered; the only integrity check is the SHA-256 GitHub gives for the asset; there is no
+"check now" action. A build stamped `1.0.0` (the SDK default) is treated as "unknown": it never self-updates, and a `v1.0.0`
+release can only be updated to, not from.
 
 ## Integration tests against real databases
 

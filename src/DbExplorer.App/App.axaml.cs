@@ -49,6 +49,11 @@ public class App : Application
                 main.PersistScripts();
                 main.PersistSession();
             };
+            // The update check starts a few seconds after the window opened (see UpdateStartup); nothing here touches the disk. Not in
+            // read-only-config mode: the real setting is unknown there.
+            var launchArgs = desktop.Args ?? [];
+            Updates.UpdateStartup.Wire(window, main, launchArgs, startup.Config.AutoUpdateCheck,
+                AppPaths.UpdateCheckDisabled(launchArgs) || !startup.PersistenceEnabled, enabled => tree.SetAutoUpdateCheck(enabled));
             window.RestorePlacement(paths.WindowStateFile);
             window.DataContext = main;
             desktop.MainWindow = window;
