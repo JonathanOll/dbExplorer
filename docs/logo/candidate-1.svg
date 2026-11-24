@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>dbExplorer - candidate 1 (strata)</title>
+  <defs>
+    <linearGradient id="tile" gradientUnits="userSpaceOnUse" x1="20" y1="8" x2="236" y2="248">
+      <stop offset="0" stop-color="#4F8FD0"/><stop offset="1" stop-color="#2D5887"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#tile)"/>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#sheen)"/>
+  <!-- cylinder: white body, tinted lid, two curved gaps cut in the tile colour -->
+  <path d="M56 70V178A72 26 0 0 0 200 178V70Z" fill="#fff"/>
+  <g fill="none" stroke="url(#tile)" stroke-width="9" stroke-linecap="butt">
+    <path d="M56 106A72 26 0 0 0 200 106"/>
+    <path d="M56 142A72 26 0 0 0 200 142"/>
+  </g>
+  <ellipse cx="128" cy="70" rx="72" ry="26" fill="#CFE3F8"/>
+  <ellipse cx="128" cy="70" rx="72" ry="26" fill="none" stroke="#fff" stroke-width="0"/>
+</svg>

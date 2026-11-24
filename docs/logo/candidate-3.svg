@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>dbExplorer - candidate 3 (D of rows)</title>
+  <defs>
+    <linearGradient id="ink" gradientUnits="userSpaceOnUse" x1="30" y1="30" x2="226" y2="226">
+      <stop offset="0" stop-color="#5FA0E0"/><stop offset="1" stop-color="#3F76B3"/>
+    </linearGradient>
+    <clipPath id="d"><path d="M54 24H122A104 104 0 0 1 122 232H54A14 14 0 0 1 40 218V38A14 14 0 0 1 54 24Z"/></clipPath>
+  </defs>
+  <!-- a D cut into four table rows; the second row is the selected one -->
+  <g clip-path="url(#d)" transform="translate(-5 0)">
+    <rect x="30" y="24" width="200" height="43" fill="url(#ink)"/>
+    <rect x="30" y="79" width="200" height="43" fill="#A9CDF2"/>
+    <rect x="30" y="134" width="200" height="43" fill="url(#ink)"/>
+    <rect x="30" y="189" width="200" height="43" fill="url(#ink)"/>
+  </g>
+</svg>
