@@ -108,12 +108,14 @@ public static class ScriptRunner
         DbConnection c, DbTransaction? transaction, ScriptStatement stmt, ScriptOptions o, CancellationToken ct)
     {
         var watch = Stopwatch.StartNew();
+        CancelPump? pump = null;
         try
         {
             await using var cmd = c.CreateCommand();
             cmd.Transaction = transaction;
             cmd.CommandText = stmt.Text;
-            using var cancelRegistration = ct.Register(() => TryCancel(cmd));
+            pump = new CancelPump(cmd);
+            using var cancelRegistration = ct.Register(pump.OnCancel);
 
             var sets = new List<ResultSet>();
             int affected;
@@ -152,6 +154,10 @@ public static class ScriptRunner
                 return new StatementResult(stmt, [], null, watch.Elapsed, split.Error, split.Messages);
             return new StatementResult(stmt, [], null, watch.Elapsed, ex.Message);
         }
+        finally
+        {
+            pump?.Stop();   // after the command is disposed: no interrupt may reach the statements that follow on this connection
+        }
     }
 
     private static IReadOnlyList<ServerMessage> MergeMessages(IReadOnlyList<ServerMessage> raised, IReadOnlyList<ServerMessage>? fromException)
@@ -187,13 +193,54 @@ public static class ScriptRunner
         try { cmd.Cancel(); }
         catch (Exception) { /* cancellation is best effort; the command may already be finished or disposed */ }
 
-        // Microsoft.Data.Sqlite's Cancel() cannot stop a statement that is already running inside sqlite3_step (a
-        // slow query that returns no row yet would keep going for ever); interrupting the connection does.
+        InterruptSqlite(cmd);
+    }
+
+    // Microsoft.Data.Sqlite's Cancel() cannot stop a statement that is already running inside sqlite3_step (a
+    // slow query that returns no row yet would keep going for ever); interrupting the connection does.
+    private static void InterruptSqlite(DbCommand cmd)
+    {
         try
         {
             if (cmd.Connection is Microsoft.Data.Sqlite.SqliteConnection { Handle: { IsInvalid: false } handle })
                 SQLitePCL.raw.sqlite3_interrupt(handle);
         }
-        catch (Exception) { /* same: best effort */ }
+        catch (Exception) { /* best effort */ }
+    }
+
+    /// <summary>
+    /// Cancels one command. sqlite3_interrupt does nothing when no statement is running yet, so a cancel landing between "the
+    /// command is prepared" and "sqlite3_step starts" would be lost and an endless statement would then run for ever (a script
+    /// tab closed right after a run was started leaked a busy thread holding the database file). For SQLite the interrupt is
+    /// therefore repeated until <see cref="Stop"/> says the command is done. Interrupts and <see cref="Stop"/> are serialised, so
+    /// none can reach a later statement of the same connection.
+    /// </summary>
+    private sealed class CancelPump(DbCommand cmd)
+    {
+        private readonly object _gate = new();
+        private bool _stopped;
+
+        public void OnCancel()
+        {
+            TryCancel(cmd);
+            if (cmd.Connection is not Microsoft.Data.Sqlite.SqliteConnection) return;
+            _ = Task.Run(async () =>
+            {
+                while (true)
+                {
+                    await Task.Delay(5).ConfigureAwait(false);
+                    lock (_gate)
+                    {
+                        if (_stopped) return;
+                        InterruptSqlite(cmd);
+                    }
+                }
+            });
+        }
+
+        public void Stop()
+        {
+            lock (_gate) _stopped = true;
+        }
     }
 }

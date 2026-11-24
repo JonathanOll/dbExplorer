@@ -62,12 +62,15 @@ public sealed class UpdateApplierTests : IDisposable
     }
 
     /// <summary>Writes the relay for this layout and runs it to the end; returns its exit code.</summary>
-    private int RunRelay(int processId = 0, string[]? extra = null, int timeoutMs = 30_000)
+    /// <param name="retryCount">The script retries a failing file operation this many times (RetryDelayMs apart): Defender or the
+    /// indexer briefly locks freshly written files, so a generous default keeps the tests off that noise. Only a test that WANTS a
+    /// persistent lock to abort the swap asks for few retries.</param>
+    private int RunRelay(int processId = 0, string[]? extra = null, int timeoutMs = 60_000, int retryCount = 8)
     {
         var script = UpdateApplier.WriteRelay(Zip, Install, Path.Combine(Install, FakeExe), processId, RelaunchArgs, Relay, out var args);
         var psi = new ProcessStartInfo(UpdateApplier.PowerShellPath()!) { UseShellExecute = false, CreateNoWindow = true };
         foreach (var a in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", script }) psi.ArgumentList.Add(a);
-        foreach (var a in args.Concat(["-ExeName", FakeExe, "-RetryCount", "2", "-RetryDelayMs", "50"]).Concat(extra ?? [])) psi.ArgumentList.Add(a);
+        foreach (var a in args.Concat(["-ExeName", FakeExe, "-RetryCount", retryCount.ToString(), "-RetryDelayMs", "100"]).Concat(extra ?? [])) psi.ArgumentList.Add(a);
         using var p = Process.Start(psi)!;
         Assert.True(p.WaitForExit(timeoutMs), "the relay script did not finish");
         return p.ExitCode;
@@ -76,9 +79,16 @@ public sealed class UpdateApplierTests : IDisposable
     /// <summary>The version of the relaunched app (its marker is written atomically; the arguments line is checked here too).</summary>
     private string WaitForMarker()
     {
-        for (var i = 0; i < 200 && !File.Exists(Marker); i++) Thread.Sleep(50);
-        Assert.True(File.Exists(Marker), "the app was not relaunched");
-        var lines = File.ReadAllLines(Marker);
+        // The marker is moved into place by the relaunched cmd; right after that an antivirus/indexer scan can still hold it open
+        // for a moment, so the read is retried on a sharing violation instead of failing the test on it.
+        string[]? lines = null;
+        for (var i = 0; i < 200 && lines is null; i++)
+        {
+            try { if (File.Exists(Marker)) lines = File.ReadAllLines(Marker); }
+            catch (IOException) { /* still being released */ }
+            if (lines is null) Thread.Sleep(50);
+        }
+        Assert.True(lines is not null, "the app was not relaunched");
         Assert.Equal("first arg|second|", lines[0]);   // the original arguments, the one with a space kept whole
         return lines[1].Trim();
     }
@@ -169,7 +179,7 @@ public sealed class UpdateApplierTests : IDisposable
         MakeZip();
         using var locked = new FileStream(Path.Combine(Install, "old-only.dll"), FileMode.Open, FileAccess.Read, FileShare.None);
 
-        Assert.Equal(1, RunRelay());
+        Assert.Equal(1, RunRelay(retryCount: 2));   // the lock is permanent: fail fast
 
         locked.Dispose();
         AssertOldIntact();
@@ -233,7 +243,7 @@ public sealed class UpdateApplierTests : IDisposable
         gone.WaitForExit();
 
         // CanSelfUpdate wants the real exe name: only the guard looks at it, the relay relaunches the fake through -ExeName.
-        var result = UpdateApplier.Launch(Zip, Install, Path.Combine(Install, "DbExplorer.exe"), gone.Id, RelaunchArgs, Relay, ["-ExeName", FakeExe, "-RetryDelayMs", "50"]);
+        var result = UpdateApplier.Launch(Zip, Install, Path.Combine(Install, "DbExplorer.exe"), gone.Id, RelaunchArgs, Relay, ["-ExeName", FakeExe, "-RetryDelayMs", "200"]);
 
         Assert.True(result.Started, result.Reason);
         Assert.Equal("new", WaitForMarker());

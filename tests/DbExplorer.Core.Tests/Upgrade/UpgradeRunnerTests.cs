@@ -498,6 +498,58 @@ public class UpgradeRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task CancelMember_RequestedBeforeTheRunHasItsSlots_IsNotLost()
+    {
+        // The UI cancels right after starting the run, which begins on a pool thread: the slots may not exist yet.
+        var a = Fake("a");
+        var b = Fake("b");
+        var c = Fake("c");
+        var never = new TaskCompletionSource<DbConnection>();   // ignores the token, like a driver stuck in a login
+        var opened = new ConcurrentBag<Guid>();
+        var runner = Runner((cfg, ct) =>
+        {
+            opened.Add(cfg.Id);
+            return cfg.Id == b.Id ? never.Task : Task.FromResult<DbConnection>(new FakeDbConnection(0));
+        });
+
+        runner.CancelMember(b.Id);   // no slot exists yet
+        var results = await runner.RunAsync([a, b, c], [S("s.sql", "SELECT 1")], Defaults, null, CancellationToken.None)
+            .WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal([MemberState.Done, MemberState.Cancelled, MemberState.Done], results.Select(r => r.State));
+        Assert.DoesNotContain(b.Id, opened);   // a database cancelled before it started is never contacted
+    }
+
+    [Fact]
+    public async Task CancelMember_RacingTheRunStart_NeverLeavesARunHanging()
+    {
+        var a = Fake("a");
+        var never = new TaskCompletionSource<DbConnection>();
+        for (var i = 0; i < 200; i++)
+        {
+            var runner = Runner((cfg, ct) => cfg.Id == a.Id ? never.Task : Task.FromResult<DbConnection>(new FakeDbConnection(0)));
+            var run = Task.Run(() => runner.RunAsync([a], [S("s.sql", "SELECT 1")], Defaults, null, CancellationToken.None));
+            runner.CancelMember(a.Id);
+            var results = await run.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.Equal(MemberState.Cancelled, Assert.Single(results).State);
+        }
+    }
+
+    [Fact]
+    public async Task CancelMember_PendingCancel_DoesNotLeakIntoTheNextRun()
+    {
+        var a = Fake("a");
+        var runner = Runner((cfg, ct) => Task.FromResult<DbConnection>(new FakeDbConnection(0)));
+        runner.CancelMember(Fake("someone else").Id);   // not part of the run
+
+        var first = await runner.RunAsync([a], [S("s.sql", "SELECT 1")], Defaults, null, CancellationToken.None);
+        var second = await runner.RunAsync([a], [S("s.sql", "SELECT 1")], Defaults, null, CancellationToken.None);
+
+        Assert.Equal(MemberState.Done, Assert.Single(first).State);
+        Assert.Equal(MemberState.Done, Assert.Single(second).State);
+    }
+
+    [Fact]
     public async Task Run_DuplicateTargets_RunOnceKeepingTheFirst_AndSaySoInTheResult()
     {
         var fake = new FakeDbConnection(affected: 0);

@@ -58,6 +58,8 @@ public sealed class UpgradeRunner
     private readonly Func<ConnectionConfig, CancellationToken, Task<DbConnection>> openConnection;
     private readonly bool _requireSqlServer;
     private volatile MemberSlot[] _slots = [];
+    private readonly object _cancelLock = new();
+    private readonly HashSet<Guid> _pendingCancels = [];   // guarded by _cancelLock
     private int _running;
 
     public UpgradeRunner(Func<ConnectionConfig, CancellationToken, Task<DbConnection>> openConnection)
@@ -72,11 +74,44 @@ public sealed class UpgradeRunner
         _requireSqlServer = requireSqlServer;
     }
 
-    /// <summary>Cancels one database of the current run: a running one is interrupted, a pending one never starts. No-op otherwise.</summary>
+    /// <summary>
+    /// Cancels one database of the current run: a running one is interrupted, a pending one never starts. A cancel that arrives
+    /// before the run has created that database's slot (the run starts on another thread) is remembered and applied when the slot
+    /// is created, so it is never lost (a cancel made while no run is in progress applies to the next run that contains that database;
+    /// the UI builds one runner per run). An id that is not part of the run has no effect on it.
+    /// </summary>
     public void CancelMember(Guid connectionId)
     {
-        foreach (var slot in _slots)
-            if (slot.Config.Id == connectionId) slot.Cancel();
+        MemberSlot? found = null;
+        lock (_cancelLock)
+        {
+            foreach (var slot in _slots)
+                if (slot.Config.Id == connectionId) found = slot;
+            if (found is null) _pendingCancels.Add(connectionId);
+        }
+        found?.Cancel();   // outside the lock: cancelling runs callbacks
+    }
+
+    /// <summary>Publishes the slots of a run and cancels those whose cancel was requested before they existed.</summary>
+    private void Publish(MemberSlot[] slots)
+    {
+        List<MemberSlot> late;
+        lock (_cancelLock)
+        {
+            _slots = slots;
+            late = slots.Where(s => _pendingCancels.Contains(s.Config.Id)).ToList();
+            _pendingCancels.Clear();
+        }
+        foreach (var slot in late) slot.Cancel();
+    }
+
+    private void Unpublish()
+    {
+        lock (_cancelLock)
+        {
+            _slots = [];
+            _pendingCancels.Clear();
+        }
     }
 
     public async Task<IReadOnlyList<UpgradeResult>> RunAsync(
@@ -100,7 +135,7 @@ public sealed class UpgradeRunner
 
             using var gate = new SemaphoreSlim(Math.Max(1, options.MaxParallel));
             var slots = distinct.Select(t => new MemberSlot(t, ct)).ToArray();
-            _slots = slots;
+            Publish(slots);
             try
             {
                 foreach (var slot in slots)
@@ -111,7 +146,7 @@ public sealed class UpgradeRunner
             }
             finally
             {
-                _slots = [];
+                Unpublish();
                 foreach (var slot in slots) slot.Dispose();
             }
         }
