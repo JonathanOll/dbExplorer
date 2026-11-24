@@ -34,7 +34,17 @@ public partial class ResultGrid : UserControl
     public static readonly StyledProperty<ITableEditActions?> EditingProperty =
         AvaloniaProperty.Register<ResultGrid, ITableEditActions?>(nameof(Editing));
 
+    /// <summary>
+    /// Opt-in header-click sort done in memory on the rows the grid shows (numbers by value, text ignoring case, NULL last):
+    /// ascending, then descending, then the original order. For small computed tables such as the Statistics tab; the table
+    /// tabs sort on the server through <see cref="Features"/> and leave this off.
+    /// </summary>
+    public static readonly StyledProperty<bool> ClientSortProperty =
+        AvaloniaProperty.Register<ResultGrid, bool>(nameof(ClientSort));
+
     private readonly List<HeaderParts> _headers = [];
+    private int _clientSortColumn = -1;
+    private bool _clientSortDescending;
     private GridCell? _contextCell;
     private ITableGridActions? _subscribed;
     private ITableEditActions? _editing;
@@ -75,6 +85,12 @@ public partial class ResultGrid : UserControl
         set => SetValue(ItemsSourceProperty, value);
     }
 
+    public bool ClientSort
+    {
+        get => GetValue(ClientSortProperty);
+        set => SetValue(ClientSortProperty, value);
+    }
+
     public ITableGridActions? Features
     {
         get => GetValue(FeaturesProperty);
@@ -91,7 +107,7 @@ public partial class ResultGrid : UserControl
     {
         base.OnPropertyChanged(change);
         if (change.Property == EditingProperty) AttachEditing();
-        if (change.Property == ColumnsProperty || change.Property == FeaturesProperty) RebuildColumns();
+        if (change.Property == ColumnsProperty || change.Property == FeaturesProperty || change.Property == ClientSortProperty) RebuildColumns();
         else if (change.Property == ItemsSourceProperty) BindItems();
     }
 
@@ -214,6 +230,7 @@ public partial class ResultGrid : UserControl
 
         _headers.Clear();
         Grid.Columns.Clear();
+        _clientSortColumn = -1;
         if (Columns is not { } columns) return;
 
         for (var i = 0; i < columns.Count; i++)
@@ -257,6 +274,8 @@ public partial class ResultGrid : UserControl
         if (!_attached || ItemsSource is not { } source) return;
 
         _mirror = new MirrorList(source);
+        _clientSortColumn = -1;
+        RefreshClientSortGlyph();
         if (source is INotifyCollectionChanged notifying)
         {
             _watching = notifying;
@@ -280,11 +299,70 @@ public partial class ResultGrid : UserControl
                 _mirror.Reset(source);
                 break;
         }
+        ApplyClientSort();
+    }
+
+    // ---- client-side sort (opt-in through ClientSort) ----
+
+    private void ToggleClientSort(int column)
+    {
+        if (_clientSortColumn != column) { _clientSortColumn = column; _clientSortDescending = false; }
+        else if (!_clientSortDescending) _clientSortDescending = true;
+        else _clientSortColumn = -1;
+        ApplyClientSort();
+        RefreshClientSortGlyph();
+    }
+
+    private void ApplyClientSort()
+    {
+        if (_mirror is null || ItemsSource is not { } source) return;
+        var rows = source.Cast<object>().ToList();
+        if (_clientSortColumn >= 0)
+        {
+            var column = _clientSortColumn;
+            var sign = _clientSortDescending ? -1 : 1;
+            object? ValueOf(object row) => GridCellColumn.ValuesOf(row) is { } v && column < v.Length ? v[column] : null;
+            rows = rows.Order(Comparer<object>.Create((a, b) =>
+            {
+                var (x, y) = (ValueOf(a), ValueOf(b));
+                if (x is null || y is null) return x is null ? (y is null ? 0 : 1) : -1;   // NULL last, whatever the direction
+                return sign * CompareValues(x, y);
+            })).ToList();
+        }
+        _mirror.ReplaceWith(rows);
+    }
+
+    private static int CompareValues(object x, object y)
+    {
+        if (x is long a && y is long b) return a.CompareTo(b);
+        if (x is IConvertible && y is IConvertible && CellFormatter.Format(x).IsNumber && CellFormatter.Format(y).IsNumber)
+            return Convert.ToDecimal(x, System.Globalization.CultureInfo.InvariantCulture)
+                .CompareTo(Convert.ToDecimal(y, System.Globalization.CultureInfo.InvariantCulture));
+        return string.Compare(CellFormatter.Format(x).Text, CellFormatter.Format(y).Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void RefreshClientSortGlyph()
+    {
+        if (!ClientSort || Features is not null) return;
+        for (var i = 0; i < _headers.Count; i++)
+        {
+            var sorted = i == _clientSortColumn;
+            _headers[i].SortGlyph.IsVisible = sorted;
+            if (sorted) _headers[i].SortGlyph.Data = Icons.Find(_clientSortDescending ? "IconSortDown" : "IconSortUp");
+        }
     }
 
     private sealed class MirrorList : ObservableCollection<object>
     {
         public MirrorList(IEnumerable source) : base(source.Cast<object>()) { }
+
+        public void ReplaceWith(IReadOnlyList<object> rows)
+        {
+            if (rows.Count == Items.Count && rows.Zip(Items).All(p => ReferenceEquals(p.First, p.Second))) return;
+            Items.Clear();
+            foreach (var row in rows) Items.Add(row);
+            OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        }
 
         public void Reset(IEnumerable source)
         {
@@ -340,6 +418,18 @@ public partial class ResultGrid : UserControl
         root.Children.Add(nameBand);
 
         TextBox? filter = null;
+        if (ClientSort && Features is null)
+        {
+            var index = _headers.Count;   // the header is added to the list right after this call
+            nameBand.Background = Brushes.Transparent;
+            nameBand.Cursor = new Cursor(StandardCursorType.Hand);
+            nameBand.PointerPressed += (_, e) =>
+            {
+                if (!e.GetCurrentPoint(nameBand).Properties.IsLeftButtonPressed) return;
+                e.Handled = true;
+                ToggleClientSort(index);
+            };
+        }
         if (Features is { } features)
         {
             // Clicking the name sorts server-side; the built-in client-side sort is off.

@@ -13,6 +13,21 @@
     <Style Selector="PathIcon.run"><Setter Property="Foreground" Value="{DynamicResource DbxAccent}" /></Style>
   </UserControl.Styles>
 
+  <!-- What the result strip shows for a statement's result, and for the Statistics / Messages grids (one table each) -->
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="vm:StatementResultViewModel" x:DataType="vm:StatementResultViewModel">
+      <ContentControl Content="{Binding}" ContentTemplate="{StaticResource StatementResultContent}" />
+    </DataTemplate>
+    <DataTemplate DataType="vm:GridResultTab" x:DataType="vm:GridResultTab">
+      <DockPanel>
+        <Border DockPanel.Dock="Bottom" Classes="toolbar" BorderThickness="0,1,0,0" Padding="10,4">
+          <TextBlock Text="{Binding StatusText}" FontWeight="SemiBold" FontSize="12.5" TextWrapping="Wrap" />
+        </Border>
+        <views:ResultGrid ClientSort="True" Columns="{Binding Columns}" ItemsSource="{Binding Rows}" />
+      </DockPanel>
+    </DataTemplate>
+  </UserControl.DataTemplates>
+
   <UserControl.Resources>
     <!-- What one statement (or one member of a group run) produced: result line, error banner, result grids. -->
     <DataTemplate x:Key="StatementResultContent" x:DataType="vm:StatementResultViewModel">
@@ -78,6 +93,10 @@
           <NumericUpDown x:Name="RowLimitBox" Minimum="1" Maximum="100000" Increment="100" FormatString="0" Width="112"
                          MinHeight="0" Height="26" Padding="6,0" VerticalAlignment="Center"
                          ToolTip.Tip="Maximum rows kept per result set (1 to 100000), per database in a group run" />
+          <Border Classes="vsep" IsVisible="{Binding CanUseStatistics}" />
+          <CheckBox Content="Statistics" IsChecked="{Binding StatisticsEnabled}" IsVisible="{Binding CanUseStatistics}"
+                    VerticalAlignment="Center" Margin="2,0,0,0"
+                    ToolTip.Tip="SQL Server: set STATISTICS IO and TIME for the next runs and show the Statistics (one row per table, with totals) and Messages tabs" />
           <Border Classes="vsep" />
           <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconFileOpen}" Content="Open"
                   Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).OpenScriptFileCommand}"
@@ -149,19 +168,21 @@
             </StackPanel>
           </StackPanel>
           <TabControl Theme="{StaticResource DbxSubTabControl}" ItemContainerTheme="{StaticResource DbxSubTabItem}"
-                      ItemsSource="{Binding Results}" SelectedItem="{Binding SelectedResult}"
+                      ItemsSource="{Binding ResultTabs}" SelectedItem="{Binding SelectedResultTab}"
                       IsVisible="{Binding !!Results.Count}">
             <TabControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:StatementResultViewModel">
-                <StackPanel Orientation="Horizontal" Spacing="6" ToolTip.Tip="{Binding StatementText}">
-                  <PathIcon Classes="ok" Data="{StaticResource IconCheck}" Width="12" Height="12" IsVisible="{Binding !HasError}" />
+              <DataTemplate x:DataType="vm:IResultTab">
+                <StackPanel Orientation="Horizontal" Spacing="6" ToolTip.Tip="{Binding ToolTipText}">
+                  <PathIcon Classes="ok" Data="{StaticResource IconCheck}" Width="12" Height="12" IsVisible="{Binding ShowOk}" />
                   <PathIcon Classes="bad" Data="{StaticResource IconError}" Width="12" Height="12" IsVisible="{Binding HasError}" />
                   <TextBlock Text="{Binding Header}" TextTrimming="CharacterEllipsis" MaxWidth="240" />
                 </StackPanel>
               </DataTemplate>
             </TabControl.ItemTemplate>
             <TabControl.ContentTemplate>
-              <StaticResource ResourceKey="StatementResultContent" />
+              <DataTemplate x:DataType="vm:IResultTab">
+                <ContentControl Content="{Binding}" />
+              </DataTemplate>
             </TabControl.ContentTemplate>
           </TabControl>
         </Grid>
@@ -240,6 +261,8 @@
                         </DockPanel>
                         <ContentControl Content="{Binding Member}" ContentTemplate="{StaticResource StatementResultContent}"
                                         IsVisible="{Binding IsMember}" />
+                        <!-- Statistics / Messages of a run with statistics on: the same grids, with a Database column -->
+                        <ContentControl Content="{Binding Grid}" IsVisible="{Binding IsGrid}" />
                       </Grid>
                     </DataTemplate>
                   </TabControl.ContentTemplate>

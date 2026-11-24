@@ -21,7 +21,9 @@ public sealed record MemberResult(
 
 /// <param name="MaxRows">Row limit per result set and per member (the existing <see cref="ScriptOptions.MaxRows"/>, at most 100000).</param>
 /// <param name="MaxParallel">Members running at the same time (at least 1).</param>
-public sealed record GroupRunOptions(int MaxRows = 1000, int MaxParallel = 4);
+/// <param name="Statistics">SQL Server: every member sets STATISTICS IO / TIME on its connection (a session setting applied by the
+/// connection, not script text, so the read-only guard is unchanged) and returns the server messages with its results.</param>
+public sealed record GroupRunOptions(int MaxRows = 1000, int MaxParallel = 4, bool Statistics = false);
 
 /// <summary>The run was refused before any member was contacted: a write statement, mixed kinds, or nothing to run.</summary>
 public sealed class GroupRunRefusedException(string message) : Exception(message);
@@ -67,7 +69,7 @@ public sealed class GroupRunner(Func<ConnectionConfig, CancellationToken, Task<S
         var kind = members[0].Kind;
         Refuse(members, statements, kind);
 
-        var memberOptions = new ScriptOptions(Math.Clamp(options.MaxRows, 1, MaxRowsCeiling), ReadOnly: true, Kind: kind);
+        var memberOptions = new ScriptOptions(Math.Clamp(options.MaxRows, 1, MaxRowsCeiling), ReadOnly: true, Kind: kind, Statistics: options.Statistics);
         using var gate = new SemaphoreSlim(Math.Max(1, options.MaxParallel));
         var slots = members.Select(m => new MemberSlot(m, ct)).ToArray();
         _slots = slots;

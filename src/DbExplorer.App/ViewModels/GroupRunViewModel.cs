@@ -83,7 +83,7 @@ public sealed partial class MemberStatusViewModel : ObservableObject
 }
 
 /// <summary>A tab of the results of a group run: "All" (the merged rows) or the result of one member.</summary>
-public sealed class GroupResultTab(GroupRunViewModel run, string title, StatementResultViewModel? member)
+public sealed class GroupResultTab(GroupRunViewModel run, string title, StatementResultViewModel? member, GridResultTab? grid = null)
 {
     public GroupRunViewModel Run { get; } = run;
 
@@ -92,7 +92,12 @@ public sealed class GroupResultTab(GroupRunViewModel run, string title, Statemen
     /// <summary>The member's own result; null for the "All" tab.</summary>
     public StatementResultViewModel? Member { get; } = member;
 
-    public bool IsAll => Member is null;
+    /// <summary>The Statistics or Messages grid of a run with statistics on; null for the other tabs.</summary>
+    public GridResultTab? Grid { get; } = grid;
+
+    public bool IsAll => Member is null && Grid is null;
+
+    public bool IsGrid => Grid is not null;
 
     public bool IsMember => Member is not null;
 
@@ -224,7 +229,9 @@ public sealed partial class GroupRunViewModel : ObservableObject
         IReadOnlyList<(Guid Id, MemberState State, int? Rows, TimeSpan Duration, string? Error)> Outcomes,
         IReadOnlyList<(string Title, StatementResultViewModel Result)> MemberResults,
         AllView Merged,
-        AllView Differences);
+        AllView Differences,
+        GridResultTab? Statistics = null,
+        GridResultTab? Messages = null);
 
     /// <summary>What the "All" tab shows in one mode: columns, rows and the notices that go with it.</summary>
     public sealed record AllView(MergedResult Result, IReadOnlyList<string> Notices, string Status);
@@ -235,7 +242,7 @@ public sealed partial class GroupRunViewModel : ObservableObject
     /// are left out and named in the notices. The compared statement is the last one of the script that returned columns
     /// for at least one member (the only one, for Ctrl+Shift+Enter): the same statement for every member.
     /// </summary>
-    public static Prepared Prepare(IReadOnlyList<MemberResult> results, int statementCount, int maxRows)
+    public static Prepared Prepare(IReadOnlyList<MemberResult> results, int statementCount, int maxRows, bool statistics = false)
     {
         var names = UniqueNames(results.Select(r => r.Connection.Name));
         var compared = ComparedStatement(results, statementCount);
@@ -275,10 +282,23 @@ public sealed partial class GroupRunViewModel : ObservableObject
             shared.Add($"The script has {statementCount} statements: All and Differences compare statement {compared + 1}.");
         shared.AddRange(exclusions);
 
+        // Statistics: the messages of EVERY statement of every member (also a failed or cancelled one: what ran before), one
+        // table with a leading Database column so the IO of the databases can be compared.
+        GridResultTab? statsTab = null, messagesTab = null;
+        if (statistics)
+        {
+            var sources = new List<StatementMessages>();
+            for (var i = 0; i < results.Count; i++)
+                for (var s = 0; s < results[i].Statements.Count; s++)
+                    sources.Add(new StatementMessages(names[i], s + 1, results[i].Statements[s].Messages ?? []));
+            (statsTab, messagesTab) = GridResultTab.Build(sources);
+        }
+
         return new Prepared(
             outcomes, tabs,
             Build(included, shared, truncated, differences: false, maxRows),
-            Build(included, shared, truncated, differences: true, maxRows));
+            Build(included, shared, truncated, differences: true, maxRows),
+            statsTab, messagesTab);
     }
 
     private static AllView Build(List<MemberSet> included, List<string> shared, List<string> truncated, bool differences, int maxRows)
@@ -338,6 +358,8 @@ public sealed partial class GroupRunViewModel : ObservableObject
             PerMemberResults.Add(result);
             Tabs.Add(new GroupResultTab(this, title, result));
         }
+        if (prepared.Statistics is { } statsTab) Tabs.Add(new GroupResultTab(this, statsTab.Header, null, statsTab));
+        if (prepared.Messages is { } messagesTab) Tabs.Add(new GroupResultTab(this, messagesTab.Header, null, messagesTab));
 
         IsRunning = false;
         ShowView();
@@ -347,8 +369,8 @@ public sealed partial class GroupRunViewModel : ObservableObject
     }
 
     /// <summary>Convenience for tests and callers that are already on the UI thread.</summary>
-    public void Complete(IReadOnlyList<MemberResult> results, int statementCount) =>
-        Complete(Prepare(results, statementCount, MaxRows));
+    public void Complete(IReadOnlyList<MemberResult> results, int statementCount, bool statistics = false) =>
+        Complete(Prepare(results, statementCount, MaxRows, statistics));
 
     private void ShowView()
     {

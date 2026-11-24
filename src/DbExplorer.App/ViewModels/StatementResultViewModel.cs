@@ -14,7 +14,7 @@ public sealed class ResultSetViewModel(IReadOnlyList<ResultColumn> columns, IRea
 }
 
 /// <summary>What one executed statement of a script produced: its result sets, or its error, and the status line.</summary>
-public sealed class StatementResultViewModel
+public sealed class StatementResultViewModel : IResultTab
 {
     /// <param name="title">Replaces the statement preview in <see cref="Header"/> (a group run names the member).</param>
     public StatementResultViewModel(int index, StatementResult result, int maxRows, string? title = null)
@@ -22,6 +22,7 @@ public sealed class StatementResultViewModel
         Index = index;
         StatementText = result.Statement.Text;
         Error = result.Error;
+        Messages = result.Messages ?? [];
         Sets = result.Sets
             .Select(s => new ResultSetViewModel(s.Columns.Select(c => new ResultColumn(c)).ToList(), s.Rows, s.Truncated))
             .ToList();
@@ -51,6 +52,13 @@ public sealed class StatementResultViewModel
     public string? Error { get; }
 
     public bool HasError => Error is not null;
+
+    /// <summary>The server messages of this statement (empty unless the run had statistics on).</summary>
+    public IReadOnlyList<ServerMessage> Messages { get; }
+
+    bool IResultTab.ShowOk => !HasError;
+
+    string? IResultTab.ToolTipText => StatementText;
 
     public IReadOnlyList<ResultSetViewModel> Sets { get; }
 

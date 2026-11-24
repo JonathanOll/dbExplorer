@@ -136,6 +136,42 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     /// <summary>The result tab selected in the view (the latest, or the failed one).</summary>
     [ObservableProperty] private StatementResultViewModel? _selectedResult;
 
+    /// <summary>
+    /// What the result tab strip shows: <see cref="Results"/> and, after a run with <see cref="StatisticsEnabled"/>, the
+    /// Statistics and Messages tabs behind them. <see cref="Results"/> never holds those two.
+    /// </summary>
+    public ObservableCollection<IResultTab> ResultTabs { get; } = new();
+
+    /// <summary>The tab selected in the strip; follows <see cref="SelectedResult"/> when that is a statement's result.</summary>
+    [ObservableProperty] private IResultTab? _selectedResultTab;
+
+    partial void OnSelectedResultChanged(StatementResultViewModel? value)
+    {
+        if (value is not null || SelectedResultTab is StatementResultViewModel) SelectedResultTab = value;
+    }
+
+    partial void OnSelectedResultTabChanged(IResultTab? value)
+    {
+        if (value is StatementResultViewModel result) SelectedResult = result;
+    }
+
+    // ---- execution statistics ----
+
+    /// <summary>
+    /// The "Statistics" toggle: the next runs set STATISTICS IO / TIME on the tab's connection and show the Statistics and
+    /// Messages tabs. Per tab, not remembered across restarts. Only has an effect on SQL Server (<see cref="CanUseStatistics"/>).
+    /// </summary>
+    [ObservableProperty] private bool _statisticsEnabled;
+
+    /// <summary>The tab's connection is SQL Server, the only engine with STATISTICS IO / TIME.</summary>
+    public bool CanUseStatistics => Connection.Kind == DbKind.SqlServer;
+
+    protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.PropertyName == nameof(Connection)) OnPropertyChanged(nameof(CanUseStatistics));
+    }
+
     partial void OnTextChanged(string value)
     {
         _discarding = false;   // edited again: whatever was said about discarding no longer applies
@@ -224,7 +260,9 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         ErrorMessage = null;
         NeedsReconnect = false;
         Results.Clear();
+        ResultTabs.Clear();
         SelectedResult = null;
+        SelectedResultTab = null;
         using var cts = _runCts = new CancellationTokenSource();
         var ct = cts.Token;
         var ran = 0;
@@ -246,7 +284,8 @@ public sealed partial class ScriptTabViewModel : TabViewModel
 
             var maxRows = RowLimit;
             // The connection's current flag (it can be toggled while connected) and its kind drive the guard.
-            var options = new ScriptOptions(maxRows, session.Config.ReadOnly, session.Config.Kind);
+            var statistics = StatisticsEnabled && session.Config.Kind == DbKind.SqlServer;
+            var options = new ScriptOptions(maxRows, session.Config.ReadOnly, session.Config.Kind, statistics);
 
             // Everything that touches the database runs on the thread pool: some providers (SQLite) execute
             // synchronously, so the UI thread must never be the one calling them. Results flow back through a channel.
@@ -278,10 +317,12 @@ public sealed partial class ScriptTabViewModel : TabViewModel
             {
                 var vm = new StatementResultViewModel(++ran, r, maxRows);
                 Results.Add(vm);
+                ResultTabs.Add(vm);
                 SelectedResult = vm;
             }
 
             if (await producer is { } failure) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
+            if (statistics && Results.Count > 0) AddStatisticsTabs();
 
             Report(ran, script.Reopened, script.ConnectionReset);
         }
@@ -313,6 +354,15 @@ public sealed partial class ScriptTabViewModel : TabViewModel
             _runCts = null;
             IsRunning = false;
         }
+    }
+
+    /// <summary>Appends the Statistics and Messages tabs built from the messages of the statements that ran (the failed one included).</summary>
+    private void AddStatisticsTabs()
+    {
+        var (stats, messages) = GridResultTab.Build(
+            Results.Select(r => new StatementMessages(null, r.Index, r.Messages)).ToList());
+        ResultTabs.Add(stats);
+        ResultTabs.Add(messages);
     }
 
     public const string SessionResetNote =

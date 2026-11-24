@@ -151,8 +151,18 @@ public sealed class ScriptConnection : IDisposable
             ConnectionReset = false;
             var connection = await EnsureConnectionAsync(ct).ConfigureAwait(false);
             DbTransaction? tx = null;
+            // STATISTICS IO / TIME is a SQL Server session setting: set before the read-only transaction (so its commands need no
+            // transaction), unset after it, because this connection is reused by the next run.
+            var statistics = o.Statistics && Session.Driver.Kind == Model.DbKind.SqlServer;
+            o = o with { Statistics = statistics };
+            var statisticsOn = false;
             try
             {
+                if (statistics)
+                {
+                    await StatisticsSession.EnableAsync(connection, ct).ConfigureAwait(false);
+                    statisticsOn = true;
+                }
                 if (o.ReadOnly)
                     tx = await Querying.TableDataLoader.BeginReadOnlyContextAsync(connection, Session.Driver.Kind, ct).ConfigureAwait(false);
                 await foreach (var result in ScriptRunner.RunAsync(connection, stmts, o, ct, tx).ConfigureAwait(false))
@@ -166,6 +176,7 @@ public sealed class ScriptConnection : IDisposable
                 // A cancelled statement or a truncated result set (the command is aborted) may leave the connection unusable.
                 if (ct.IsCancellationRequested) _suspect = true;
                 await TearDownReadOnlyContextAsync(connection, tx, o).ConfigureAwait(false);
+                if (statisticsOn && !await StatisticsSession.DisableAsync(connection).ConfigureAwait(false)) _suspect = true;
                 // Probe now, not at the next run: the abort (PostgreSQL: the cancel request fails a statement inside the user's
                 // transaction, which then aborts it) must be reported by THIS run, while the user still knows what ran.
                 if (_suspect) await CheckAfterAbortAsync(connection).ConfigureAwait(false);

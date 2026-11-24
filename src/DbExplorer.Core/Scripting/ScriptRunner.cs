@@ -11,16 +11,23 @@ public sealed record ResultSet(IReadOnlyList<string> Columns, IReadOnlyList<obje
 /// <param name="Sets">Result sets returned by the statement; empty for statements that return no columns.</param>
 /// <param name="RowsAffected">Null when the provider reports none (SELECT, DDL).</param>
 /// <param name="Error">Null on success; the failure message otherwise.</param>
+/// <param name="Messages">What the server said while this statement ran (see <see cref="ScriptOptions.Statistics"/>); null when
+/// messages were not captured.</param>
 public sealed record StatementResult(
     ScriptStatement Statement,
     IReadOnlyList<ResultSet> Sets,
     int? RowsAffected,
     TimeSpan Duration,
-    string? Error);
+    string? Error,
+    IReadOnlyList<ServerMessage>? Messages = null);
 
 /// <param name="Kind">Database kind of the connection, when known; lets the read-only guard lex like that database.
 /// Null makes the guard use its most conservative, kind-agnostic check.</param>
-public sealed record ScriptOptions(int MaxRows = 1000, bool ReadOnly = false, DbKind? Kind = null);
+/// <param name="Statistics">SQL Server only: the run sets <c>STATISTICS IO / TIME</c> on the connection around the statements and
+/// captures the server's messages into <see cref="StatementResult.Messages"/>. Ignored for other kinds by
+/// <see cref="ScriptConnection"/> and the session overload of <see cref="ScriptRunner.RunAsync(Session, IReadOnlyList{ScriptStatement}, ScriptOptions, CancellationToken)"/>.
+/// The connection overload trusts it: the caller applies it only to SQL Server.</param>
+public sealed record ScriptOptions(int MaxRows = 1000, bool ReadOnly = false, DbKind? Kind = null, bool Statistics = false);
 
 public static class ScriptRunner
 {
@@ -36,15 +43,19 @@ public static class ScriptRunner
         [EnumeratorCancellation] CancellationToken ct,
         DbTransaction? transaction = null)
     {
+        // Only while the user's statements run: what the statistics settings themselves print never lands on a statement.
+        using var capture = o.Statistics ? ServerMessageCapture.Start(c) : null;
         foreach (var stmt in stmts)
         {
             if (ct.IsCancellationRequested) yield break;
 
+            capture?.Drain();
             var result = o.ReadOnly && IsRefused(stmt, o)
                 ? new StatementResult(stmt, [], null, TimeSpan.Zero, "Refused: this connection is read-only, write statements are not allowed.")
                 : await ExecuteAsync(c, transaction, stmt, o, ct);
 
             if (result is null) yield break;   // cancelled
+            if (capture is not null) result = result with { Messages = MergeMessages(capture.Drain(), result.Messages) };
             yield return result;
             if (result.Error is not null) yield break;
         }
@@ -64,6 +75,10 @@ public static class ScriptRunner
         [EnumeratorCancellation] CancellationToken ct)
     {
         await using var connection = await session.OpenConnectionAsync(ct).ConfigureAwait(false);
+        var statistics = o.Statistics && session.Driver.Kind == DbKind.SqlServer;
+        o = o with { Statistics = statistics };
+        // Before the read-only transaction (a command needs cmd.Transaction while one is pending; SET options outlive it anyway).
+        if (statistics) await StatisticsSession.EnableAsync(connection, ct).ConfigureAwait(false);
         var tx = o.ReadOnly
             ? await Querying.TableDataLoader.BeginReadOnlyContextAsync(connection, session.Driver.Kind, ct).ConfigureAwait(false)
             : null;
@@ -80,6 +95,8 @@ public static class ScriptRunner
                 catch (Exception) { /* nothing was committed; the connection is about to be closed */ }
                 await tx.DisposeAsync().ConfigureAwait(false);
             }
+            // The connection is closed right after: the provider's pool reset undoes the options even when this fails.
+            if (statistics) await StatisticsSession.DisableAsync(connection).ConfigureAwait(false);
         }
     }
 
@@ -129,8 +146,19 @@ public static class ScriptRunner
         }
         catch (Exception ex)
         {
+            // SqlClient folds the info messages still pending when an error arrives into the exception (and Message joins them
+            // all): with statistics on they go back to the messages and the error text keeps only the real errors.
+            if (o.Statistics && ServerMessageCapture.SplitSqlException(ex) is { } split)
+                return new StatementResult(stmt, [], null, watch.Elapsed, split.Error, split.Messages);
             return new StatementResult(stmt, [], null, watch.Elapsed, ex.Message);
         }
+    }
+
+    private static IReadOnlyList<ServerMessage> MergeMessages(IReadOnlyList<ServerMessage> raised, IReadOnlyList<ServerMessage>? fromException)
+    {
+        if (fromException is not { Count: > 0 }) return raised;
+        var known = raised.Select(m => m.Text).ToHashSet(StringComparer.Ordinal);
+        return [.. raised, .. fromException.Where(m => !known.Contains(m.Text))];   // an event and the exception never say a line twice
     }
 
     private static async Task<ResultSet> ReadSetAsync(DbDataReader reader, int maxRows, CancellationToken ct)

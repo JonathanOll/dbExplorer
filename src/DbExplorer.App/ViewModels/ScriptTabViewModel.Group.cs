@@ -135,6 +135,7 @@ public sealed partial class ScriptTabViewModel
         using var cts = _groupCts = new CancellationTokenSource();
         var ct = cts.Token;
         var maxRows = RowLimit;
+        var statistics = StatisticsEnabled && CanUseStatistics;
         var run = GroupRun = new GroupRunViewModel(members, maxRows, CancelGroup, id => _groupRunner?.CancelMember(id));
         lock (_groupGate) _groupConnections = [];
 
@@ -154,7 +155,7 @@ public sealed partial class ScriptTabViewModel
             // Everything that touches a database starts on the pool: SQLite executes synchronously, so the UI thread must never
             // be the one that opens or runs it.
             work = Task.Run(
-                () => runner.RunAsync(members, statements, new GroupRunOptions(maxRows), progress, ct), CancellationToken.None);
+                () => runner.RunAsync(members, statements, new GroupRunOptions(maxRows, Statistics: statistics), progress, ct), CancellationToken.None);
             IReadOnlyList<MemberResult>? results;
             try
             {
@@ -177,7 +178,7 @@ public sealed partial class ScriptTabViewModel
                 return;
             }
 
-            var prepared = await Task.Run(() => GroupRunViewModel.Prepare(results, statements.Count, maxRows), CancellationToken.None);
+            var prepared = await Task.Run(() => GroupRunViewModel.Prepare(results, statements.Count, maxRows, statistics), CancellationToken.None);
             if (_closed || generation != _groupGeneration) return;
             run.Complete(prepared);
             _status.Info(Summary(run));
