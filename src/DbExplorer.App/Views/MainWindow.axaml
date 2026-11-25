@@ -105,6 +105,7 @@
 
           <MenuItem Header="_View">
             <MenuItem Header="_Navigator" ToggleType="CheckBox" IsChecked="{Binding IsNavigatorVisible, Mode=OneWay}" Command="{Binding ToggleNavigatorCommand}" InputGesture="Ctrl+B" />
+            <MenuItem Header="Show active item in _navigator" Command="{Binding RevealActiveTabCommand}" />
             <MenuItem Header="Show _folders" ToggleType="CheckBox" IsChecked="{Binding Tree.ShowFolders, Mode=OneWay}" Command="{Binding Tree.ToggleFoldersCommand}"
                       ToolTip.Tip="Off: the connections are listed flat, without their folders" />
             <MenuItem Header="Show _groups" ToggleType="CheckBox" IsChecked="{Binding Tree.ShowGroups, Mode=OneWay}" Command="{Binding Tree.ToggleGroupsCommand}" />
@@ -329,6 +330,12 @@
                         <TextBlock Text="Refresh the schema of the selected connection" />
                         <Border Classes="kbd"><TextBlock Text="F5" /></Border>
                       </StackPanel>
+                    </ToolTip.Tip>
+                  </Button>
+                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconLocate}" Command="{Binding RevealActiveTabCommand}"
+                          MinWidth="30" Padding="4,0" AutomationProperties.Name="Show the active item in the navigator">
+                    <ToolTip.Tip>
+                      <TextBlock Text="Show the active tab's item: expands the folders down to it and selects it" />
                     </ToolTip.Tip>
                   </Button>
                   <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconCollapseAll}" Command="{Binding Tree.CollapseAllCommand}"

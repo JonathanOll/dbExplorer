@@ -34,10 +34,14 @@ public partial class MainWindow : Window
         this.FindControl<GridSplitter>("NavSplitter")!.DoubleTapped += OnNavigatorSplitterDoubleTapped;
         DataContextChanged += (_, _) =>
         {
-            if (DataContext is MainViewModel main) main.PropertyChanged += (_, e) =>
+            if (DataContext is MainViewModel main)
             {
-                if (e.PropertyName == nameof(MainViewModel.IsNavigatorVisible)) ShowNavigator(main.IsNavigatorVisible);
-            };
+                main.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName == nameof(MainViewModel.IsNavigatorVisible)) ShowNavigator(main.IsNavigatorVisible);
+                };
+                main.Tree.NodeRevealed += ScrollNodeIntoView;
+            }
         };
         this.FindControl<TabControl>("DocTabs")!.AddHandler(PointerReleasedEvent, OnDocTabsPointerReleased, RoutingStrategies.Tunnel);
     }
@@ -110,6 +114,19 @@ public partial class MainWindow : Window
     }
 
     // The only place besides Options-OK that looks at the dbupdate folder: on demand, never at launch.
+    // The row of a node just revealed does not exist until the tree has laid out the expanded branch: try now, then once more.
+    private void ScrollNodeIntoView(TreeNodeViewModel node)
+    {
+        var tree = this.FindControl<TreeView>("ConnectionTree")!;
+        void Scroll() => tree.TreeContainerFromItem(node)?.BringIntoView();
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            tree.UpdateLayout();
+            Scroll();
+            Avalonia.Threading.Dispatcher.UIThread.Post(Scroll, Avalonia.Threading.DispatcherPriority.Background);
+        }, Avalonia.Threading.DispatcherPriority.Loaded);
+    }
+
     private void OnExitMenuClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
 
     // The Upgrade entries follow the same availability as the settings menu's.
