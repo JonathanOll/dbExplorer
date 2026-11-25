@@ -1,0 +1,168 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DbExplorer.App.ViewModels"
+             xmlns:views="using:DbExplorer.App.Views"
+             x:Class="DbExplorer.App.Views.SearchOverlay"
+             x:DataType="vm:SearchViewModel"
+             HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+
+  <UserControl.Styles>
+    <!-- the rows are driven from the search box (arrows, Enter): they never take the keyboard focus themselves -->
+    <Style Selector="ListBoxItem">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="Padding" Value="10,4" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Margin" Value="6,1" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border x:Name="Scrim" Background="{DynamicResource DbxScrim}">
+    <Border x:Name="Card" Width="800" MaxHeight="640" VerticalAlignment="Top" HorizontalAlignment="Center"
+            Margin="24,56,24,24" CornerRadius="{DynamicResource DbxCardRadius}" BorderThickness="1"
+            Background="{DynamicResource DbxSurface}" BorderBrush="{DynamicResource DbxBorder}"
+            BoxShadow="{DynamicResource DbxCardShadow}">
+      <DockPanel>
+
+        <!-- status line, hints -->
+        <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,1,0,0" Padding="16,8">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <PathIcon Classes="spin" Data="{StaticResource IconRefresh}" Width="13" Height="13" Foreground="{DynamicResource DbxAccent}"
+                        IsVisible="{Binding IsRunning}" VerticalAlignment="Center" />
+              <TextBlock Classes="dim small" Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                         MaxWidth="540" AutomationProperties.Name="Search status" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <Border Classes="kbd"><TextBlock Text="↑↓" /></Border>
+              <TextBlock Classes="dim small" Text="select" VerticalAlignment="Center" />
+              <Border Classes="kbd" Margin="6,0,0,0"><TextBlock Text="Enter" /></Border>
+              <TextBlock Classes="dim small" Text="search / open" VerticalAlignment="Center" />
+              <Border Classes="kbd" Margin="6,0,0,0"><TextBlock Text="Esc" /></Border>
+              <TextBlock Classes="dim small" Text="close" VerticalAlignment="Center" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- more results than shown -->
+        <Border DockPanel.Dock="Bottom" Classes="banner warn" CornerRadius="0" BorderThickness="0,1,0,0"
+                IsVisible="{Binding Notice, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <Grid ColumnDefinitions="Auto,*">
+            <PathIcon Classes="bi" Data="{StaticResource IconWarning}" Margin="0,0,8,0" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="{Binding Notice}" TextWrapping="Wrap" VerticalAlignment="Center" />
+          </Grid>
+        </Border>
+
+        <!-- what to search for, and how -->
+        <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1" Padding="16,10,16,10">
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+              <PathIcon Data="{StaticResource IconSearch}" Width="18" Height="18" Foreground="{DynamicResource DbxAccent}" Margin="0,0,10,0" />
+              <TextBox x:Name="QueryBox" Grid.Column="1" Classes="bare" Text="{Binding Query, Mode=TwoWay}" Watermark="{Binding Placeholder}"
+                       FontSize="16" MinHeight="36" Padding="0,6" AutomationProperties.Name="Search text" />
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="8,0" VerticalAlignment="Center" IsVisible="{Binding IsScripts}">
+                <ToggleButton Classes="segment" Content="Aa" Padding="8,2" MinWidth="34" IsChecked="{Binding CaseSensitive, Mode=TwoWay}"
+                              ToolTip.Tip="Match case" AutomationProperties.Name="Match case" />
+                <ToggleButton Classes="segment" Content="ab" Padding="8,2" MinWidth="34" IsChecked="{Binding WholeWord, Mode=TwoWay}"
+                              ToolTip.Tip="Whole word" AutomationProperties.Name="Whole word" FontWeight="SemiBold" />
+                <ToggleButton Classes="segment" Content=".*" Padding="8,2" MinWidth="34" IsChecked="{Binding UseRegex, Mode=TwoWay}"
+                              ToolTip.Tip="Regular expression" AutomationProperties.Name="Regular expression" FontFamily="{StaticResource DbxMonoFont}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" Margin="8,0" VerticalAlignment="Center" IsVisible="{Binding IsData}">
+                <ComboBox SelectedIndex="{Binding ModeIndex, Mode=TwoWay}" MinWidth="130" AutomationProperties.Name="Match mode"
+                          ToolTip.Tip="How the value must match the cell text">
+                  <ComboBoxItem Content="Contains" />
+                  <ComboBoxItem Content="Is exactly" />
+                  <ComboBoxItem Content="Starts with" />
+                </ComboBox>
+              </StackPanel>
+              <Panel Grid.Column="3" VerticalAlignment="Center">
+                <Button Content="Search" Classes="accent" MinWidth="84" HorizontalContentAlignment="Center"
+                        Command="{Binding SearchCommand}" IsVisible="{Binding !IsRunning}" ToolTip.Tip="Search (Enter)" />
+                <Button Command="{Binding StopSearchCommand}" IsVisible="{Binding IsRunning}" MinWidth="84" ToolTip.Tip="Stop searching: what was found stays listed"
+                        AutomationProperties.Name="Stop searching">
+                  <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                    <PathIcon Data="{StaticResource IconStop}" Width="12" Height="12" Foreground="{DynamicResource DbxStop}" />
+                    <TextBlock Text="Stop" />
+                  </StackPanel>
+                </Button>
+              </Panel>
+            </Grid>
+
+            <TextBlock Classes="fielderror" Text="{Binding ErrorMessage}" Margin="28,0,0,0"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            <Grid ColumnDefinitions="Auto,*">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <ToggleButton Classes="segment" Content="Scripts" IsChecked="{Binding IsScripts, Mode=OneWay}"
+                              Command="{Binding SelectScopeCommand}" CommandParameter="{x:Static vm:SearchScope.Scripts}" />
+                <ToggleButton Classes="segment" Content="Data" IsChecked="{Binding IsData, Mode=OneWay}"
+                              Command="{Binding SelectScopeCommand}" CommandParameter="{x:Static vm:SearchScope.Data}" />
+              </StackPanel>
+              <Grid Grid.Column="1" ColumnDefinitions="*,140,160" ColumnSpacing="6" Margin="12,0,0,0" IsVisible="{Binding IsData}">
+                <ComboBox ItemsSource="{Binding Connections}" SelectedItem="{Binding SelectedConnection, Mode=TwoWay}" HorizontalAlignment="Stretch"
+                          AutomationProperties.Name="Connection to search" ToolTip.Tip="The connection whose tables are searched (connected when needed)">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBox Grid.Column="1" Text="{Binding SchemaFilter}" Watermark="Schema (all)" AutomationProperties.Name="Schema filter"
+                         ToolTip.Tip="Only the tables of this schema" />
+                <TextBox Grid.Column="2" Text="{Binding TableFilter}" Watermark="Table name contains" AutomationProperties.Name="Table name filter"
+                         ToolTip.Tip="Only the tables whose name contains this text" />
+              </Grid>
+              <TextBlock Grid.Column="1" Classes="dim small" Margin="12,0,0,0" VerticalAlignment="Center" IsVisible="{Binding IsScripts}"
+                         Text="Open scripts (including unsaved text) and the script library" />
+            </Grid>
+
+            <Border Classes="banner info" IsVisible="{Binding IsData}">
+              <Grid ColumnDefinitions="Auto,*">
+                <PathIcon Classes="bi" Data="{StaticResource IconInfo}" Margin="0,0,8,0" VerticalAlignment="Top" />
+                <TextBlock Grid.Column="1" TextWrapping="Wrap"
+                           Text="Searching the data of a large database can take a while: every table is read once, read-only, up to 4 at a time, and the first 20 matching rows of each are kept. Results appear as they are found. Press Stop at any time; what was found stays listed." />
+              </Grid>
+            </Border>
+          </StackPanel>
+        </Border>
+
+        <ProgressBar DockPanel.Dock="Top" Classes="thin" IsIndeterminate="{Binding IsRunning}" IsVisible="{Binding IsRunning}" />
+
+        <Panel MinHeight="140">
+          <ListBox x:Name="ResultList" ItemsSource="{Binding Rows}" Margin="0,6" Background="Transparent" BorderThickness="0"
+                   AutomationProperties.Name="Search results">
+            <ListBox.DataTemplates>
+              <DataTemplate DataType="vm:SearchHeaderRow">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="0,6,0,0">
+                  <PathIcon Classes="dim" Data="{Binding IconKey, Converter={x:Static views:Icons.ByKey}}" Width="14" Height="14" Margin="0,0,8,0" />
+                  <TextBlock Grid.Column="1" Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="2" Classes="faint small" Text="{Binding Detail}" Margin="8,0,0,0" TextTrimming="CharacterEllipsis"
+                             VerticalAlignment="Center" IsVisible="{Binding HasDetail}" />
+                  <Border Grid.Column="3" Classes="badge warn" Margin="8,0,0,0" IsVisible="{Binding IsUnsaved}">
+                    <TextBlock Classes="small" Text="unsaved" />
+                  </Border>
+                  <TextBlock Grid.Column="4" Classes="faint small" Text="{Binding CountText}" Margin="12,0,0,0" VerticalAlignment="Center" />
+                </Grid>
+              </DataTemplate>
+              <DataTemplate DataType="vm:SearchHitRow">
+                <Grid ColumnDefinitions="Auto,Auto,*">
+                  <TextBlock Classes="faint small" Text="{Binding LineLabel}" Width="40" TextAlignment="Right" Margin="0,0,12,0"
+                             VerticalAlignment="Center" FontFamily="{StaticResource DbxMonoFont}" IsVisible="{Binding HasLine}" />
+                  <Border Grid.Column="1" Classes="badge" Margin="0,0,10,0" IsVisible="{Binding HasBadge}" VerticalAlignment="Center">
+                    <TextBlock Classes="small" Text="{Binding Badge}" />
+                  </Border>
+                  <views:MatchText Grid.Column="2" Source="{Binding Text}" MatchStart="{Binding MatchStart}" MatchLength="{Binding MatchLength}"
+                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="12.5" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.DataTemplates>
+          </ListBox>
+          <StackPanel Classes="empty" Margin="0,24" IsVisible="{Binding IsEmptyState}">
+            <PathIcon Data="{StaticResource IconSearch}" />
+            <TextBlock Classes="dim" Text="{Binding EmptyHint}" TextWrapping="Wrap" />
+          </StackPanel>
+        </Panel>
+      </DockPanel>
+    </Border>
+  </Border>
+</UserControl>

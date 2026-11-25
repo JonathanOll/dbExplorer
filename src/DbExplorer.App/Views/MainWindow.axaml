@@ -118,6 +118,9 @@
             <MenuItem Header="Go to _table…" Command="{Binding ShowTablePickerCommand}" InputGesture="Ctrl+T" />
             <MenuItem Header="Go to table in _all connections…" Command="{Binding ShowAllTablesPickerCommand}" InputGesture="Ctrl+Shift+P" />
             <MenuItem Header="Go to _column…" Command="{Binding JumpToColumnCommand}" IsEnabled="{Binding HasActiveTable}" InputGesture="Ctrl+L" />
+            <MenuItem Header="Search in scripts and _data…" Command="{Binding ShowSearchCommand}" InputGesture="Ctrl+Alt+F">
+              <MenuItem.Icon><PathIcon Data="{StaticResource IconSearch}" /></MenuItem.Icon>
+            </MenuItem>
             <Separator />
             <MenuItem Header="Ne_xt tab" Command="{Binding NextTabCommand}" InputGesture="Ctrl+Tab" />
             <MenuItem Header="_Previous tab" Command="{Binding PreviousTabCommand}" InputGesture="Ctrl+Shift+Tab" />
@@ -764,6 +767,15 @@
       <ContentControl.DataTemplates>
         <DataTemplate DataType="vm:QuickOpenViewModel">
           <views:QuickOpenOverlay />
+        </DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
+
+    <!-- Search in scripts and data (Ctrl+Alt+F): created on demand -->
+    <ContentControl Content="{Binding SearchOverlay}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+      <ContentControl.DataTemplates>
+        <DataTemplate DataType="vm:SearchViewModel">
+          <views:SearchOverlay />
         </DataTemplate>
       </ContentControl.DataTemplates>
     </ContentControl>

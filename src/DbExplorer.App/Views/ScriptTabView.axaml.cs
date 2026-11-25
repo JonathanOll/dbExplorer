@@ -132,6 +132,8 @@ public partial class ScriptTabView : UserControl
         }
         UpdateElapsedTimer();
         RefreshMarks();
+        // A search result opened this tab before its editor existed: select the hit now that the text is in.
+        if (_vm.TakePendingReveal() is { } reveal) Dispatcher.UIThread.Post(() => OnRevealRequested(reveal.Start, reveal.End), DispatcherPriority.Loaded);
     }
 
     private void OnEditorTextChanged(object? sender, EventArgs e)
@@ -198,6 +200,7 @@ public partial class ScriptTabView : UserControl
     // "Go to statement": select it in the editor and bring it into view.
     private void OnRevealRequested(int start, int end)
     {
+        _vm?.TakePendingReveal();   // shown now: nothing is left for a later attach
         var length = Editor.Document.TextLength;
         start = Math.Clamp(start, 0, length);
         end = Math.Clamp(end, start, length);

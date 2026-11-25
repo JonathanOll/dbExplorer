@@ -24,6 +24,7 @@ public static class ShortcutCatalog
         new("Navigate", [
             new("Ctrl+T", "Go to a table of the selected connection"),
             new("Ctrl+Shift+P", "Go to a table in any connection"),
+            new("Ctrl+Alt+F", "Search in scripts and in the data of a database"),
             new("Ctrl+F", "Filter the navigator (while it has the focus)"),
             new("Ctrl+B", "Hide or show the navigator"),
             new("Enter", "Connect, or open the selected table"),
