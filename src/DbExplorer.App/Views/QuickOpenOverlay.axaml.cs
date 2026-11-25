@@ -91,6 +91,7 @@ public partial class QuickOpenOverlay : UserControl
         {
             case Key.Down: _vm.MoveDown(); break;
             case Key.Up: _vm.MoveUp(); break;
+            case Key.Tab when _vm.HasScopes: _vm.SwitchScope(); break;
             case Key.PageDown: _vm.MoveBy(8); break;
             case Key.PageUp: _vm.MoveBy(-8); break;
             case Key.Escape: _vm.Cancel(); break;

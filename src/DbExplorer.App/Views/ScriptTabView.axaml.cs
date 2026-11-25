@@ -271,6 +271,51 @@ public partial class ScriptTabView : UserControl
 
     // ---- results ----
 
+    private ResultSetViewModel? _exportSet;
+
+    private ResultGrid? GridOf(ResultSetViewModel set) =>
+        this.GetVisualDescendants().OfType<ResultGrid>().FirstOrDefault(g => ReferenceEquals(g.ItemsSource, set.Rows));
+
+    // The selected rows in the order of the result, or null when none are selected (then all rows are used).
+    private IReadOnlyList<object?[]>? SelectedRowsOf(ResultSetViewModel set)
+    {
+        if (GridOf(set)?.Grid.SelectedItems is not { Count: > 0 } items) return null;
+        var picked = new HashSet<object>(items.Cast<object>(), ReferenceEqualityComparer.Instance);
+        return set.Rows.Where(picked.Contains).ToList();
+    }
+
+    private void OnResultSelectionChanged(object? sender, EventArgs e)
+    {
+        if (sender is ResultGrid { DataContext: ResultSetViewModel set } grid) set.SelectedCount = grid.Grid.SelectedItems.Count;
+    }
+
+    private async void OnCopyResultClick(object? sender, RoutedEventArgs e)
+    {
+        if (_vm is not { } vm || (sender as Control)?.DataContext is not ResultSetViewModel set) return;
+        try
+        {
+            var text = vm.CopyText(set, SelectedRowsOf(set));
+            if (TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard) await clipboard.SetTextAsync(text);
+        }
+        catch (Exception)
+        {
+            // the clipboard can be busy: nothing to report for a copy
+        }
+    }
+
+    // The menu items do not inherit the data context of the button: the button says which set the menu is about.
+    private void OnExportMenuClick(object? sender, RoutedEventArgs e) => _exportSet = (sender as Control)?.DataContext as ResultSetViewModel;
+
+    private void OnExportCsvClick(object? sender, RoutedEventArgs e) => Export(ExportFormat.Csv);
+
+    private void OnExportJsonClick(object? sender, RoutedEventArgs e) => Export(ExportFormat.Json);
+
+    private void Export(ExportFormat format)
+    {
+        if (_vm is not { } vm || _exportSet is not { } set) return;
+        _ = RunSafe(vm, () => vm.ExportAsync(set, format, SelectedRowsOf(set)));
+    }
+
     private void OnRaiseLimitClick(object? sender, RoutedEventArgs e)
     {
         if (_vm is { } vm) _ = RunSafe(vm, vm.RaiseRowLimitAndRerunAsync);

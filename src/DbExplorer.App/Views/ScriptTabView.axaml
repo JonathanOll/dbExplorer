@@ -46,6 +46,24 @@
   </UserControl.DataTemplates>
 
   <UserControl.Resources>
+    <!-- Copy and Export of one result set, with the counter of selected rows. In the result line for one set, in the set header for several. -->
+    <DataTemplate x:Key="ResultSetActions" x:DataType="vm:ResultSetViewModel">
+      <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+        <TextBlock Classes="dim small" Text="{Binding SelectionText}" IsVisible="{Binding HasSelection}" Margin="0,0,6,0" VerticalAlignment="Center" />
+        <Button Classes="ghost" MinHeight="24" Padding="8,0" Content="Copy" Click="OnCopyResultClick"
+                ToolTip.Tip="{Binding CopyTip}" AutomationProperties.Name="Copy the rows" />
+        <DropDownButton Classes="ghost" MinHeight="24" Padding="8,0" Content="Export" Click="OnExportMenuClick"
+                        ToolTip.Tip="Export as CSV or JSON: the selected rows, or all rows" AutomationProperties.Name="Export the rows">
+          <DropDownButton.Flyout>
+            <MenuFlyout Placement="TopEdgeAlignedRight">
+              <MenuItem Header="Export as CSV…" Click="OnExportCsvClick" />
+              <MenuItem Header="Export as JSON…" Click="OnExportJsonClick" />
+            </MenuFlyout>
+          </DropDownButton.Flyout>
+        </DropDownButton>
+      </StackPanel>
+    </DataTemplate>
+
     <!-- What one statement (or one member of a group run) produced: result line, error banner, result grids. -->
     <DataTemplate x:Key="StatementResultContent" x:DataType="vm:StatementResultViewModel">
       <DockPanel>
@@ -53,17 +71,19 @@
         <Border DockPanel.Dock="Bottom" Classes="toolbar strip" BorderThickness="0,1,0,0">
           <!-- the detail sits in the star column: its text can never be cut by a stale arrange width -->
           <Grid ColumnDefinitions="Auto,*,Auto">
-            <TextBlock Text="{Binding StatusMain}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Classes="dim num" Margin="4,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+            <TextBlock Text="{Binding StatusMain}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center" Padding="0,0,6,0" />
+            <TextBlock Grid.Column="1" Classes="dim num" Margin="2,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                        Text="{Binding StatusDetail, StringFormat='· {0}'}" />
-            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding IsTruncated}">
-              <Border Classes="badge warn">
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+              <ContentControl Content="{Binding SingleSet}" ContentTemplate="{StaticResource ResultSetActions}"
+                              IsVisible="{Binding SingleSet, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <Border Classes="badge warn" IsVisible="{Binding IsTruncated}">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                   <PathIcon Data="{StaticResource IconWarning}" Width="11" Height="11" />
                   <TextBlock Text="{Binding TruncatedNotice}" FontSize="11.5" />
                 </StackPanel>
               </Border>
-              <Button Classes="ghost" MinHeight="24" Padding="8,0" Content="Raise limit" Click="OnRaiseLimitClick"
+              <Button Classes="ghost" MinHeight="24" Padding="8,0" Content="Raise limit" Click="OnRaiseLimitClick" IsVisible="{Binding IsTruncated}"
                       ToolTip.Tip="Multiply the row limit by 10 and run again" />
             </StackPanel>
           </Grid>
@@ -107,9 +127,12 @@
               <DataTemplate x:DataType="vm:ResultSetViewModel">
                 <DockPanel>
                   <Border DockPanel.Dock="Top" Classes="toolbar strip" MinHeight="26" BorderThickness="0,1,0,1" IsVisible="{Binding ShowTitle}">
-                    <TextBlock Classes="dim small" Text="{Binding Title}" VerticalAlignment="Center" />
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Classes="dim small" Text="{Binding Title}" VerticalAlignment="Center" />
+                      <ContentControl Grid.Column="1" Content="{Binding}" ContentTemplate="{StaticResource ResultSetActions}" />
+                    </Grid>
                   </Border>
-                  <views:ResultGrid Columns="{Binding Columns}" ItemsSource="{Binding Rows}" />
+                  <views:ResultGrid Columns="{Binding Columns}" ItemsSource="{Binding Rows}" SelectedRowsChanged="OnResultSelectionChanged" />
                 </DockPanel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>

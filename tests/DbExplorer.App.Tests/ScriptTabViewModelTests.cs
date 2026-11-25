@@ -19,6 +19,15 @@ internal sealed class FakeScriptFiles : IScriptFiles
     }
 
     public Task<string?> PickOpenAsync() => Task.FromResult(OpenPath);
+
+    public string? ExportPath { get; set; }
+    public (string Name, string Extension)? LastExport { get; private set; }
+
+    public Task<string?> PickExportAsync(string suggestedName, string extension)
+    {
+        LastExport = (suggestedName, extension);
+        return Task.FromResult(ExportPath);
+    }
 }
 
 /// <summary>A temp SQLite database (table t with 3 rows), a real session manager and the pieces a script tab needs.</summary>

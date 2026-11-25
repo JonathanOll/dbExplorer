@@ -24,6 +24,9 @@ public static class MainShortcuts
         bool Ready() => commitOpenEdit?.Invoke() ?? true;
         switch (key, modifiers)
         {
+            case (Key.B, KeyModifiers.Control):
+                main.ToggleNavigatorCommand.Execute(null);
+                return true;
             case (Key.F1, KeyModifiers.None):
                 main.ShowShortcutsCommand.Execute(null);
                 return true;

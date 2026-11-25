@@ -58,10 +58,44 @@ public sealed class PlaceholderNodeViewModel : TreeNodeViewModel
     public override string Title => "Loading…";
 }
 
-public sealed class FolderNodeViewModel(string name) : TreeNodeViewModel
+public sealed class FolderNodeViewModel : TreeNodeViewModel
 {
-    public string Name { get; } = name;
+    private List<ConnectionNodeViewModel> _watched = [];
+
+    public FolderNodeViewModel(string name)
+    {
+        Name = name;
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(IsExpanded)) OnPropertyChanged(nameof(CountText));
+        };
+    }
+
+    public string Name { get; }
     public override string Title => Name;
+
+    /// <summary>How many connections of the folder are connected.</summary>
+    public int ConnectedCount => Children.OfType<ConnectionNodeViewModel>().Count(c => c.IsConnected);
+
+    /// <summary>"(3)", or "(3 · 1 connected)" while the folder is collapsed and something in it is connected.</summary>
+    public string CountText => !IsExpanded && ConnectedCount > 0 ? $"({Children.Count} · {ConnectedCount} connected)" : $"({Children.Count})";
+
+    /// <summary>Follows the connection state of the current children (call after they were replaced).</summary>
+    public void WatchChildren()
+    {
+        foreach (var old in _watched) old.PropertyChanged -= OnChildChanged;
+        _watched = Children.OfType<ConnectionNodeViewModel>().ToList();
+        foreach (var child in _watched) child.PropertyChanged += OnChildChanged;
+        OnPropertyChanged(nameof(ConnectedCount));
+        OnPropertyChanged(nameof(CountText));
+    }
+
+    private void OnChildChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ConnectionNodeViewModel.IsConnected)) return;
+        OnPropertyChanged(nameof(ConnectedCount));
+        OnPropertyChanged(nameof(CountText));
+    }
 
     /// <summary>Owner whose commands the context menu binds to.</summary>
     public ConnectionTreeViewModel? Tree { get; set; }

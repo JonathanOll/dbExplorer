@@ -30,6 +30,13 @@ public partial class MainWindow : Window
         tree.AddHandler(DragDrop.DragLeaveEvent, (_, _) => ClearDropTarget());
         this.FindControl<TextBox>("FilterBox")!.KeyDown += OnFilterKeyDown;
         this.FindControl<GridSplitter>("NavSplitter")!.DoubleTapped += OnNavigatorSplitterDoubleTapped;
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is MainViewModel main) main.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(MainViewModel.IsNavigatorVisible)) ShowNavigator(main.IsNavigatorVisible);
+            };
+        };
         this.FindControl<TabControl>("DocTabs")!.AddHandler(PointerReleasedEvent, OnDocTabsPointerReleased, RoutingStrategies.Tunnel);
     }
 
@@ -83,6 +90,7 @@ public partial class MainWindow : Window
     public void ApplyPlacement(WindowPlacement placement)
     {
         _bounds = new NormalBoundsTracker(placement);
+        if (placement.NavWidth is { } saved) SetNavigatorWidth(saved);
         Width = placement.Width;
         Height = placement.Height;
         if (placement.X is { } x && placement.Y is { } y)
@@ -115,7 +123,8 @@ public partial class MainWindow : Window
     private void SaveWindowState()
     {
         if (StateFile is not { } file) return;
-        if (_bounds.Placement(_lastShownState == WindowState.Maximized) is { } placement) WindowStateStore.TrySave(file, placement);
+        if (_bounds.Placement(_lastShownState == WindowState.Maximized) is { } placement)
+            WindowStateStore.TrySave(file, placement with { NavWidth = CurrentNavigatorWidth() });
     }
 
     // Closing the window asks every tab (MainViewModel.ConfirmExitAsync). With nothing to ask the answer is immediate and
@@ -283,9 +292,45 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnNavigatorSplitterDoubleTapped(object? sender, TappedEventArgs e)
+    private const double DefaultNavigatorWidth = 304;
+    private double _navWidth = DefaultNavigatorWidth;   // the width to come back to when the navigator is shown again
+
+    private ColumnDefinition NavColumn => ((Grid)this.FindControl<GridSplitter>("NavSplitter")!.Parent!).ColumnDefinitions[0];
+
+    private double CurrentNavigatorWidth() =>
+        DataContext is MainViewModel { IsNavigatorVisible: false } ? _navWidth : Math.Round(NavColumn.ActualWidth > 0 ? NavColumn.ActualWidth : _navWidth);
+
+    private void SetNavigatorWidth(double width)
     {
-        if (sender is Control { Parent: Grid grid }) grid.ColumnDefinitions[0].Width = new GridLength(304);
+        _navWidth = Math.Clamp(width, NavColumn.MinWidth, NavColumn.MaxWidth);
+        NavColumn.Width = new GridLength(_navWidth);
+    }
+
+    // Double-click on the splitter: back to the default width.
+    private void OnNavigatorSplitterDoubleTapped(object? sender, TappedEventArgs e) => SetNavigatorWidth(DefaultNavigatorWidth);
+
+    // Ctrl+B: hides the navigator (the editor gets its width) or brings it back at its last width.
+    private void ShowNavigator(bool visible)
+    {
+        var grid = (Grid)this.FindControl<GridSplitter>("NavSplitter")!.Parent!;
+        var nav = grid.ColumnDefinitions[0];
+        var split = grid.ColumnDefinitions[1];
+        if (visible)
+        {
+            nav.MinWidth = 220;
+            nav.Width = new GridLength(_navWidth);
+            split.Width = new GridLength(5);
+        }
+        else
+        {
+            if (nav.ActualWidth > 0) _navWidth = Math.Round(nav.ActualWidth);
+            nav.MinWidth = 0;
+            nav.Width = new GridLength(0);
+            split.Width = new GridLength(0);
+        }
+        grid.Children.OfType<Border>().First().IsVisible = visible;
+        this.FindControl<GridSplitter>("NavSplitter")!.IsVisible = visible;
+        if (!visible) this.FindControl<TabControl>("DocTabs")?.Focus();
     }
 
     private void OnShortcutsScrimPressed(object? sender, PointerPressedEventArgs e) =>

@@ -15,6 +15,9 @@ public interface IScriptFiles
 
     /// <summary>Asks which script file to open; null when cancelled.</summary>
     Task<string?> PickOpenAsync();
+
+    /// <summary>Asks where to export a result (<paramref name="extension"/> without the dot, e.g. "csv"); null when cancelled or unsupported.</summary>
+    Task<string?> PickExportAsync(string suggestedName, string extension) => Task.FromResult<string?>(null);
 }
 
 /// <summary>What a script tab needs from the shell.</summary>
@@ -228,6 +231,50 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         }
         RowLimit = (int)Math.Min((long)RowLimit * 10, MaxRowLimit);
         return _lastRunWasGroup ? RunOnGroupAsync(_lastGroupWhole) : RunAsync(_lastStatements);
+    }
+
+    /// <summary>
+    /// Copy of a result set: the text to put on the clipboard (header and the <paramref name="selected"/> rows, or all rows when
+    /// none are selected), tab separated.
+    /// </summary>
+    public string CopyText(ResultSetViewModel set, IReadOnlyList<object?[]>? selected)
+    {
+        var rows = selected is { Count: > 0 } ? selected : set.Rows;
+        _status.Info($"Copied {StatementResultViewModel.RowsText(rows.Count)} with the column names.");
+        return ResultExport.ToTsv(set.Columns, rows);
+    }
+
+    /// <summary>
+    /// Export of a result set to a CSV or JSON file chosen by the user: the <paramref name="selected"/> rows, or all rows when none
+    /// are selected. Says what was written (and that it is limited to the row limit) in the status bar; never throws.
+    /// </summary>
+    public async Task ExportAsync(ResultSetViewModel set, ExportFormat format, IReadOnlyList<object?[]>? selected)
+    {
+        if (_hooks.Files is not { } files)
+        {
+            _status.Error("Cannot export: no file dialog available.");
+            return;
+        }
+        var extension = format == ExportFormat.Csv ? "csv" : "json";
+        var baseName = FilePath is { } path ? Path.GetFileNameWithoutExtension(path) : $"Script {_number}";
+        var name = $"{baseName} result{(set.Index > 1 ? " " + set.Index : "")}.{extension}";
+        var target = await files.PickExportAsync(name, extension);
+        if (target is null) return;
+
+        var rows = selected is { Count: > 0 } ? selected : set.Rows;
+        try
+        {
+            var text = format == ExportFormat.Csv ? ResultExport.ToCsv(set.Columns, rows) : ResultExport.ToJson(set.Columns, rows);
+            // CSV gets a byte order mark so a spreadsheet reads accents right; JSON must not have one.
+            await File.WriteAllTextAsync(target, text, new System.Text.UTF8Encoding(format == ExportFormat.Csv));
+        }
+        catch (Exception e)
+        {
+            _status.Error($"Cannot export to {target}: {e.Message}");
+            return;
+        }
+        _status.Info($"Exported {StatementResultViewModel.RowsText(rows.Count)} to {target}"
+                     + (set.Truncated && selected is not { Count: > 0 } ? $" (the result is limited to the first {RowLimit:N0} rows)." : "."));
     }
 
     /// <summary>Raised when the view should select a range of the text and bring it into view (Go to statement).</summary>
