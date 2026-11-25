@@ -57,7 +57,7 @@ internal sealed class FakeDbCommand(FakeDbConnection connection) : DbCommand
 
     [System.Diagnostics.CodeAnalysis.AllowNull]
     public override string CommandText { get; set; } = "";
-    public override int CommandTimeout { get; set; }
+    public override int CommandTimeout { get; set; } = 30;   // the providers' default
     public override CommandType CommandType { get; set; }
     public override bool DesignTimeVisible { get; set; }
     public override UpdateRowSource UpdatedRowSource { get; set; }

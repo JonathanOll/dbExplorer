@@ -237,6 +237,7 @@ public sealed class SqlServerDriver : IDbDriver
     {
         await using var cmd = c.CreateCommand();
         cmd.CommandText = sql;
+        cmd.CommandTimeout = 0;   // schema load on a big or busy server: no automatic timeout
         var rows = new List<T>();
         await using var reader = await cmd.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct)) rows.Add(map(reader));

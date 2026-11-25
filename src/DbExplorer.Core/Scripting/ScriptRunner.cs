@@ -114,6 +114,7 @@ public static class ScriptRunner
             await using var cmd = c.CreateCommand();
             cmd.Transaction = transaction;
             cmd.CommandText = stmt.Text;
+            Querying.CommandTimeouts.Unbounded(cmd);   // the statement ends or the user cancels it
             pump = new CancelPump(cmd);
             using var cancelRegistration = ct.Register(pump.OnCancel);
 

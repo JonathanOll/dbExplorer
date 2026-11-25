@@ -165,6 +165,7 @@ public static class TableDataLoader
         var cmd = connection.CreateCommand();
         cmd.Transaction = tx;
         cmd.CommandText = spec.Sql;
+        CommandTimeouts.Unbounded(cmd);   // a slow page or count runs until it ends or the user cancels
         foreach (var p in spec.Params)
             cmd.Parameters.Add(ParameterTyping.Create(cmd, p));
         return cmd;

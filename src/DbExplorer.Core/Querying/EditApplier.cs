@@ -51,6 +51,7 @@ public static class EditApplier
                 await using var cmd = c.CreateCommand();
                 cmd.Transaction = tx;
                 cmd.CommandText = stmt.Command.Sql;
+                CommandTimeouts.Unbounded(cmd);   // a lock wait ends when the lock frees or the user cancels
                 foreach (var p in stmt.Command.Params)
                     cmd.Parameters.Add(ParameterTyping.Create(cmd, p));
 
