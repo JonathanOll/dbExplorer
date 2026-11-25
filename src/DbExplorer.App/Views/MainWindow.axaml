@@ -59,6 +59,84 @@
 
   <Grid>
     <DockPanel>
+      <!-- Menu bar: everything the app does, in the usual places (the shortcuts are shown, Alt+letter opens a menu) -->
+      <Border DockPanel.Dock="Top" Background="{DynamicResource DbxWindowBg}" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1">
+        <Menu x:Name="MainMenu" Padding="4,0" AutomationProperties.Name="Main menu">
+          <MenuItem Header="_File">
+            <MenuItem Header="_New SQL script" Command="{Binding NewScriptTabCommand}" InputGesture="Ctrl+N" />
+            <MenuItem Header="_Open script file…" Command="{Binding OpenScriptFileCommand}" InputGesture="Ctrl+O" />
+            <MenuItem Header="_Save script" Command="{Binding ActiveScript.SaveCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Ctrl+S" />
+            <Separator />
+            <MenuItem Header="_Close tab" Command="{Binding CloseActiveTabCommand}" InputGesture="Ctrl+W" />
+            <MenuItem Header="_Reopen closed tab" Command="{Binding ReopenClosedTabCommand}" InputGesture="Ctrl+Shift+T" />
+            <Separator />
+            <MenuItem Header="E_xit" Click="OnExitMenuClick" InputGesture="Alt+F4" />
+          </MenuItem>
+
+          <MenuItem Header="_Connections" SubmenuOpened="OnConnectionsMenuOpened">
+            <MenuItem Header="New _connection…" Command="{Binding Tree.AddConnectionCommand}">
+              <MenuItem.Icon><PathIcon Data="{StaticResource IconDatabaseAdd}" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="New _folder…" Command="{Binding Tree.AddFolderCommand}">
+              <MenuItem.Icon><PathIcon Data="{StaticResource IconFolderAdd}" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="New _group of databases…" Command="{Binding Tree.NewGroupCommand}">
+              <MenuItem.Icon><PathIcon Data="{StaticResource IconGroupAdd}" /></MenuItem.Icon>
+            </MenuItem>
+            <Separator />
+            <MenuItem Header="_Import from DBeaver…" Command="{Binding Tree.ImportFromDBeaverCommand}">
+              <MenuItem.Icon><PathIcon Data="{StaticResource IconImport}" /></MenuItem.Icon>
+            </MenuItem>
+            <Separator />
+            <MenuItem Header="_Refresh the schema" Command="{Binding Tree.RefreshSelectedCommand}" InputGesture="F5" />
+            <MenuItem Header="Collapse _all" Command="{Binding Tree.CollapseAllCommand}" />
+            <Separator />
+            <MenuItem Header="_Upgrade database…" Command="{Binding OpenUpgradeCommand}" />
+          </MenuItem>
+
+          <MenuItem Header="_View">
+            <MenuItem Header="_Navigator" ToggleType="CheckBox" IsChecked="{Binding IsNavigatorVisible, Mode=OneWay}" Command="{Binding ToggleNavigatorCommand}" InputGesture="Ctrl+B" />
+            <MenuItem Header="Show _folders" ToggleType="CheckBox" IsChecked="{Binding Tree.ShowFolders, Mode=OneWay}" Command="{Binding Tree.ToggleFoldersCommand}"
+                      ToolTip.Tip="Off: the connections are listed flat, without their folders" />
+            <MenuItem Header="Show _groups" ToggleType="CheckBox" IsChecked="{Binding Tree.ShowGroups, Mode=OneWay}" Command="{Binding Tree.ToggleGroupsCommand}" />
+            <Separator />
+            <MenuItem Header="Go to _table…" Command="{Binding ShowTablePickerCommand}" InputGesture="Ctrl+T" />
+            <MenuItem Header="Go to table in _all connections…" Command="{Binding ShowAllTablesPickerCommand}" InputGesture="Ctrl+Shift+P" />
+            <MenuItem Header="Go to _column…" Command="{Binding JumpToColumnCommand}" IsEnabled="{Binding HasActiveTable}" InputGesture="Ctrl+L" />
+            <Separator />
+            <MenuItem Header="Ne_xt tab" Command="{Binding NextTabCommand}" InputGesture="Ctrl+Tab" />
+            <MenuItem Header="_Previous tab" Command="{Binding PreviousTabCommand}" InputGesture="Ctrl+Shift+Tab" />
+          </MenuItem>
+
+          <MenuItem Header="_Script">
+            <MenuItem Header="_Run statement" Command="{Binding ActiveScript.RunStatementCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Ctrl+Enter" />
+            <MenuItem Header="Run _all" Command="{Binding ActiveScript.RunScriptCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="F5" />
+            <MenuItem Header="S_top" Command="{Binding ActiveScript.CancelCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Escape" />
+            <Separator />
+            <MenuItem Header="_Estimated execution plan" Command="{Binding ActiveScript.ShowEstimatedPlanCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Ctrl+L" />
+            <MenuItem Header="Include actual _plan" ToggleType="CheckBox" IsChecked="{Binding ActiveScript.ActualPlanEnabled, Mode=TwoWay, FallbackValue=False}"
+                      IsEnabled="{Binding ActiveScript.CanUseActualPlan, FallbackValue=False}" InputGesture="Ctrl+M" />
+            <MenuItem Header="Include _statistics (SQL Server)" ToggleType="CheckBox" IsChecked="{Binding ActiveScript.StatisticsEnabled, Mode=TwoWay, FallbackValue=False}"
+                      IsEnabled="{Binding ActiveScript.CanUseStatistics, FallbackValue=False}" />
+          </MenuItem>
+
+          <MenuItem Header="_Tools">
+            <MenuItem Header="_Options…" Command="{Binding OpenOptionsCommand}">
+              <MenuItem.Icon><PathIcon Data="{StaticResource IconSettings}" /></MenuItem.Icon>
+            </MenuItem>
+            <MenuItem Header="_Upgrade database…" Command="{Binding OpenUpgradeCommand}" />
+          </MenuItem>
+
+          <MenuItem Header="_Help">
+            <MenuItem Header="_Keyboard shortcuts" Command="{Binding ShowShortcutsCommand}" InputGesture="F1">
+              <MenuItem.Icon><PathIcon Data="{StaticResource IconKeyboard}" /></MenuItem.Icon>
+            </MenuItem>
+            <Separator />
+            <MenuItem Header="Check for _updates automatically" ToggleType="CheckBox" IsChecked="{Binding Update.AutoCheckEnabled, Mode=TwoWay}" />
+          </MenuItem>
+        </Menu>
+      </Border>
+
       <!-- Config problem (read-only config mode): always visible, above everything -->
       <Border DockPanel.Dock="Top" Classes="banner error"
               IsVisible="{Binding Banner, Converter={x:Static ObjectConverters.IsNotNull}}">
@@ -359,6 +437,8 @@
                                 ToolTip.Tip="A group needs at least 2 databases to switch between them or compare them. Drag a connection onto it to add one." />
                       <StackPanel.ContextMenu>
                         <ContextMenu>
+                          <MenuItem Header="Connect all" Command="{Binding Tree.ConnectGroupCommand}" CommandParameter="{Binding}" FontWeight="SemiBold" />
+                          <Separator />
                           <MenuItem Header="Check schema differences" Command="{Binding Tree.CheckSchemaDifferencesCommand}" CommandParameter="{Binding Group}">
                             <MenuItem.Icon><PathIcon Data="{StaticResource IconSchema}" /></MenuItem.Icon>
                           </MenuItem>
@@ -375,7 +455,7 @@
                     </StackPanel>
                   </TreeDataTemplate>
 
-                  <TreeDataTemplate DataType="vm:GroupMemberNodeViewModel">
+                  <TreeDataTemplate DataType="vm:GroupMemberNodeViewModel" ItemsSource="{Binding Children}">
                     <Border Background="Transparent">
                       <views:ConnectionRow DataContext="{Binding Target}" />
                       <Border.ContextMenu>

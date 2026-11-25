@@ -59,10 +59,49 @@ public sealed partial class GroupNodeViewModel(ConnectionGroup group) : TreeNode
 /// A member of a group: a shortcut to the real connection node (same object, so its connected state, colour and read-only
 /// flag are always the connection's own). Activating it connects that connection.
 /// </summary>
-public sealed class GroupMemberNodeViewModel(ConnectionNodeViewModel target, ConnectionGroup group) : TreeNodeViewModel
+public sealed class GroupMemberNodeViewModel : TreeNodeViewModel
 {
-    public ConnectionNodeViewModel Target { get; } = target;
-    public ConnectionGroup Group { get; } = group;
+    public GroupMemberNodeViewModel(ConnectionNodeViewModel target, ConnectionGroup group)
+    {
+        Target = target;
+        Group = group;
+        MirrorChildren();
+        target.PropertyChanged += OnTargetChanged;
+        PropertyChanged += OnSelfChanged;
+    }
+
+    public ConnectionNodeViewModel Target { get; }
+    public ConnectionGroup Group { get; }
     public override string Title => Target.Title;
     public ConnectionTreeViewModel? Tree { get; set; }
+
+    /// <summary>
+    /// The member shows the schema of the real connection: the very same child nodes (schemas, tables), so opening a table from
+    /// here or from the connection is one thing. Until the connection is open a "Loading…" child stands in, so the expander
+    /// is there: expanding the member connects it.
+    /// </summary>
+    private void MirrorChildren()
+    {
+        if (Target.Children.Count > 0) Children = Target.Children;
+        else SetChildren([new PlaceholderNodeViewModel()]);
+    }
+
+    private void OnTargetChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(Children)) MirrorChildren();
+    }
+
+    private void OnSelfChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(IsExpanded) || !IsExpanded || Target.IsConnecting) return;
+        if (Target.IsConnected) Target.IsExpanded = true;   // realizes tables a big schema has not created yet; the children are shared
+        else if (Tree is { } tree) _ = tree.OpenGroupMemberAsync(this);
+    }
+
+    /// <summary>Stops following the connection: the tree calls it when it replaces this node (the connection outlives it).</summary>
+    public void Detach()
+    {
+        Target.PropertyChanged -= OnTargetChanged;
+        PropertyChanged -= OnSelfChanged;
+    }
 }

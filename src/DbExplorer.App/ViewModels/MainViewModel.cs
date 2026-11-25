@@ -81,6 +81,13 @@ public partial class MainViewModel : ObservableObject
     public bool IsEmptyState => Tabs.Count == 0;
 
     /// <summary>The connection the status bar names: the one of the active tab, else the one selected in the navigator.</summary>
+    /// <summary>The active tab when it is a script (the Script menu acts on it); null otherwise.</summary>
+    public ScriptTabViewModel? ActiveScript => ActiveTab as ScriptTabViewModel;
+
+    public bool HasActiveScript => ActiveTab is ScriptTabViewModel;
+
+    public bool HasActiveTable => ActiveTab is TableTabViewModel;
+
     public ConnectionConfig? CurrentConnection => ActiveTab?.Connection ?? Tree.SelectedConnection;
 
     /// <summary>The navigator node of <see cref="CurrentConnection"/> (its state and tooltip): what the status bar shows.</summary>
@@ -202,6 +209,9 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasTarget));
         OnPropertyChanged(nameof(WelcomeHint));
         OnPropertyChanged(nameof(WindowTitle));
+        OnPropertyChanged(nameof(ActiveScript));
+        OnPropertyChanged(nameof(HasActiveScript));
+        OnPropertyChanged(nameof(HasActiveTable));
         // A restored table tab connects and loads when it is first selected (never before).
         if (!_restoringTabs && newValue is TableTabViewModel { IsDeferred: true } deferred) _ = deferred.EnsureLoadedAsync();
         ScheduleSessionSave();

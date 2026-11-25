@@ -85,13 +85,16 @@ public partial class ConnectionTreeViewModel : ObservableObject
             if (text.Length == 0)
             {
                 node.IsShown = true;
-                foreach (var child in node.Children) Apply(child, text, false);
+                if (node is not GroupMemberNodeViewModel)
+                    foreach (var child in node.Children) Apply(child, text, false);
                 return true;
             }
 
             var self = node is not PlaceholderNodeViewModel && node.Title.Contains(text, StringComparison.OrdinalIgnoreCase);
             var below = false;
-            foreach (var child in node.Children) below |= Apply(child, text, ancestorMatches || self);
+            // A group member shares its child nodes with the connection: they are filtered once, through the connection.
+            if (node is not GroupMemberNodeViewModel)
+                foreach (var child in node.Children) below |= Apply(child, text, ancestorMatches || self);
             var shown = ancestorMatches || self || below;
             node.IsShown = shown;
             if (below && !self && !ancestorMatches) node.IsExpanded = true;
@@ -229,19 +232,21 @@ public partial class ConnectionTreeViewModel : ObservableObject
                     .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
                     .Select(c => _connectionNodes[c.Id]));
             folder.WatchChildren();
-            Nodes.Add(folder);
+            if (Config.ShowFolders) Nodes.Add(folder);
         }
 
         foreach (var gone in _folderNodes.Keys.Where(k => !seenFolders.ContainsKey(k)).ToList())
             _folderNodes.Remove(gone);
 
+        // Folders hidden (View menu): every connection is listed flat, so none becomes unreachable.
         foreach (var c in Config.Connections
-                     .Where(c => string.IsNullOrWhiteSpace(c.Folder))
+                     .Where(c => !Config.ShowFolders || string.IsNullOrWhiteSpace(c.Folder))
                      .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase))
             Nodes.Add(_connectionNodes[c.Id]);
 
         // The Groups section comes last: its members repeat connections that already sit in a folder above.
-        if (BuildGroupsSection() is { } groupsSection) Nodes.Add(groupsSection);
+        var groupsSection = BuildGroupsSection();
+        if (groupsSection is not null && Config.ShowGroups) Nodes.Add(groupsSection);
         OnPropertyChanged(nameof(IsEmpty));
         ApplyFilter();
     }
@@ -264,6 +269,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
                 _groupNodes[group.Id] = node = new GroupNodeViewModel(group) { Tree = this };
             node.Group = group;
 
+            foreach (var old in node.Children.OfType<GroupMemberNodeViewModel>()) old.Detach();
             var members = GroupRules.MembersOf(Config, group);
             node.Kind = members.Count > 0 ? members[0].Kind : null;
             node.Children = new ObservableCollection<TreeNodeViewModel>(
@@ -819,6 +825,56 @@ public partial class ConnectionTreeViewModel : ObservableObject
     private void RemoveMember(GroupMemberNodeViewModel? member)
     {
         if (member is not null) RemoveFromGroup(member.Target.Config, member.Group);
+    }
+
+    /// <summary>View menu: the folder nodes are shown (on) or the connections are listed flat (off).</summary>
+    public bool ShowFolders => Config.ShowFolders;
+
+    /// <summary>View menu: the Groups section is shown.</summary>
+    public bool ShowGroups => Config.ShowGroups;
+
+    [RelayCommand]
+    private void ToggleFolders()
+    {
+        Config.ShowFolders = !Config.ShowFolders;
+        SaveSetting();
+        OnPropertyChanged(nameof(ShowFolders));
+        Rebuild();
+    }
+
+    [RelayCommand]
+    private void ToggleGroups()
+    {
+        Config.ShowGroups = !Config.ShowGroups;
+        SaveSetting();
+        OnPropertyChanged(nameof(ShowGroups));
+        Rebuild();
+    }
+
+    /// <summary>Members connected at the same time by <see cref="ConnectGroupAsync"/>.</summary>
+    private const int GroupConnectParallelism = 4;
+
+    /// <summary>
+    /// Double-click (or Enter) on a group: connects every member, a few at a time, and opens the group. A member that cannot
+    /// connect shows its own error; the others carry on.
+    /// </summary>
+    [RelayCommand]
+    public async Task ConnectGroupAsync(GroupNodeViewModel? group)
+    {
+        if (group is null) return;
+        group.IsExpanded = true;
+        var members = group.Children.OfType<GroupMemberNodeViewModel>().Select(m => m.Target).Where(t => !t.IsConnected).ToList();
+        if (members.Count == 0) return;
+
+        using var gate = new SemaphoreSlim(GroupConnectParallelism);
+        await Task.WhenAll(members.Select(async node =>
+        {
+            await gate.WaitAsync();
+            try { await ConnectAsync(node); }
+            finally { gate.Release(); }
+        }));
+        var connected = group.Children.OfType<GroupMemberNodeViewModel>().Count(m => m.Target.IsConnected);
+        _status.Info($"Group '{group.Title}': {connected} of {group.Children.Count} databases connected.");
     }
 
     /// <summary>Activating a group member connects the real connection (failures end up in its node and the status bar).</summary>

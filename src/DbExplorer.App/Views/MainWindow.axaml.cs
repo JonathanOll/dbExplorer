@@ -108,6 +108,12 @@ public partial class MainWindow : Window
     }
 
     // The only place besides Options-OK that looks at the dbupdate folder: on demand, never at launch.
+    private void OnExitMenuClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
+
+    // The Upgrade entries follow the same availability as the settings menu's.
+    private void OnConnectionsMenuOpened(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        (DataContext as MainViewModel)?.RefreshUpgradeAvailability();
+
     private void OnSettingsFlyoutOpening(object? sender, EventArgs e) =>
         (DataContext as MainViewModel)?.RefreshUpgradeAvailability();
 
@@ -371,6 +377,9 @@ public partial class MainWindow : Window
                 break;
             case GroupMemberNodeViewModel member:
                 await tree.OpenGroupMemberAsync(member);
+                break;
+            case GroupNodeViewModel group:
+                await tree.ConnectGroupAsync(group);
                 break;
         }
     }
