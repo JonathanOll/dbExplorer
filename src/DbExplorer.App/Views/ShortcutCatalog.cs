@@ -51,6 +51,7 @@ public static class ShortcutCatalog
             new("F5", "Run the script"),
             new("Ctrl+Shift+Enter", "Run the statement on the whole group"),
             new("Ctrl+Shift+F5", "Run the script on the group"),
+            new("Ctrl+Space", "Complete tables, columns and keywords"),
         ]),
         new("Linked databases", [
             new("Ctrl+Alt+PageDown", "Next database of the group"),

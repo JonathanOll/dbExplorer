@@ -30,13 +30,16 @@ public interface IScriptFiles
 /// refuses to close (its text would be lost without asking).</param>
 /// <param name="Switch">Lets the tab switch between the members of its connection's group; without it the tab never switches.
 /// When given, connecting resolves the session through it too, so it follows the connection the tab was switched to.</param>
+/// <param name="FindSession">The session of a connection if it is already open, or null. Never connects: the autocomplete uses it
+/// to read the loaded schema of a restored tab.</param>
 public sealed record ScriptTabHooks(
     Func<CancellationToken, Task<Session?>> ResolveSession,
     IScriptFiles? Files = null,
     ScriptSessionStore? Store = null,
     StatusModel? Status = null,
     IEditDialogs? Dialogs = null,
-    GroupSwitchHooks? Switch = null);
+    GroupSwitchHooks? Switch = null,
+    Func<Guid, Session?>? FindSession = null);
 
 /// <summary>
 /// A SQL script editor on one connection. Runs the statement under the caret / the selection (Ctrl+Enter) or the
@@ -189,6 +192,13 @@ public sealed partial class ScriptTabViewModel : TabViewModel
 
     /// <summary>The selected range (start inclusive, end exclusive) in <see cref="Text"/>; null or empty when nothing is selected.</summary>
     public (int Start, int End)? Selection { get; set; }
+
+    /// <summary>
+    /// What the autocomplete may offer: the schema already loaded for this tab's connection. Null when the connection is not
+    /// open (or its schema is not loaded): then only keywords and functions are offered. Never connects, never queries.
+    /// </summary>
+    public ICompletionSchema? CompletionSchema =>
+        (_session ?? _hooks.FindSession?.Invoke(Connection.Id)) is { } session ? new TableListSchema(session.Schema) : null;
 
     /// <summary>
     /// Called when a fresh editor is attached (the tab control recreates the view on every tab switch): a new editor has

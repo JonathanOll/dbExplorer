@@ -602,7 +602,7 @@ public partial class MainViewModel : ObservableObject
     private ScriptTabViewModel CreateScriptTab(ConnectionConfig connection, SavedScript? restored)
     {
         var hooks = new ScriptTabHooks(
-            ct => ResolveScriptSessionAsync(connection.Id, ct), _scriptFiles, _scriptStore, Status, _scriptDialogs, SwitchHooks);
+            ct => ResolveScriptSessionAsync(connection.Id, ct), _scriptFiles, _scriptStore, Status, _scriptDialogs, SwitchHooks, Tree.FindSession);
         return new ScriptTabViewModel(connection, Tree.FindSession(connection.Id), hooks, ++_scriptCounter, restored);
     }
 
