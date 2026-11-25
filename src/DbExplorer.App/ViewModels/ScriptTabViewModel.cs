@@ -312,6 +312,38 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         RevealRequested?.Invoke(result.StartOffset, result.EndOffset);
     }
 
+    private (int Start, int End)? _pendingReveal;
+
+    /// <summary>
+    /// Selects <paramref name="length"/> characters from the 0-based <paramref name="column"/> of the 1-based <paramref name="line"/>
+    /// (a search result), clamped to the text. A tab whose editor is not showing yet keeps the request until the view attaches
+    /// (<see cref="TakePendingReveal"/>).
+    /// </summary>
+    public void RevealLine(int line, int column, int length)
+    {
+        var text = Text;
+        var offset = 0;
+        for (var l = 1; l < line && offset < text.Length; l++)
+        {
+            var end = text.AsSpan(offset).IndexOfAny('\r', '\n');
+            if (end < 0) { offset = text.Length; break; }
+            offset += end + (text[offset + end] == '\r' && offset + end + 1 < text.Length && text[offset + end + 1] == '\n' ? 2 : 1);
+        }
+        var start = Math.Min(text.Length, offset + Math.Max(0, column));
+        var stop = Math.Min(text.Length, start + Math.Max(0, length));
+        _pendingReveal = (start, stop);
+        CaretOffset = start;
+        RevealRequested?.Invoke(start, stop);
+    }
+
+    /// <summary>A reveal asked while no editor showed this tab, once (the view applies it after loading the text).</summary>
+    public (int Start, int End)? TakePendingReveal()
+    {
+        var pending = _pendingReveal;
+        _pendingReveal = null;
+        return pending;
+    }
+
     /// <summary>The statement results still point at the text in the editor (it was not edited since the run).</summary>
     public bool ResultsMatchText => _runText == Text;
 

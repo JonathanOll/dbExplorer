@@ -173,6 +173,11 @@ current-cell frame: 2 px accent, inside the cell).
   with its state dot and a tooltip, a shortcuts button (`F1`, one list shared with the welcome page: `ShortcutCatalog`) and Settings.
 - **Quick open**: shadowed card, search box, table name (matched letters in bold) + schema, a connection badge, an empty state, a
   result counter ("50 of 1,284"), keyboard-hint footer. `Ctrl+T` connects first when needed.
+- **Search** (`Ctrl+Alt+F`, `SearchOverlay`): a card like quick open that stays up while a search runs: search box with the `Aa` /
+  `ab` / `.*` toggles (scripts) or the match-mode combo (data), one accent Search button that becomes Stop while running, scope
+  chips (Scripts | Data), the data filters (connection, schema, table name) and an info banner about long searches, a thin progress
+  bar, results grouped under file / table headers (unsaved badge, match count), the hit in bold, a status line with spinner and key
+  hints, a warn band when results are capped. Scenes: `search`, `search-data`.
 - **Dialogs**: shared `DialogHeader` / `DialogFooter` (`DialogParts.cs`): icon tile, title, subtitle; footer with verb buttons
   ("Add connection", "Create group", "Save"). Inline field errors (`TextBox.error` + `TextBlock.fielderror`). Destructive
   confirmations use `ConfirmRequest` with `DialogTone.Danger`: a red verb button, a red icon, Cancel is the default and focused.

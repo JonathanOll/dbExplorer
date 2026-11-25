@@ -244,10 +244,29 @@ The plan tab, one chip per statement when a run has several (with its share of t
 Plans are per run and not run on a group. The `Time` colouring needs an actual plan. The SQL Server parser reads the
 standard showplan XML by local names (any schema version) and skips what it does not know.
 
+## Search in scripts and data
+
+`Ctrl+Alt+F` (or View > Search in scripts and data…) opens one search overlay with two scopes. Enter searches, the arrow keys
+select a result, Enter opens it, Esc closes (the last results are shown again the next time).
+
+- **Scripts**: full-text search in the open script tabs (their current, possibly unsaved text, marked *unsaved*) and in every
+  `.sql` file of the script library. Options: match case (`Aa`), whole word (`ab`), regular expression (`.*`; an invalid pattern
+  is explained under the box, and a pattern that backtracks for more than a second on a line gives up on that line). Files over
+  5 MB, binary and unreadable files are skipped and counted in the status line. Results stream in, grouped by script, at most
+  2,000 matches (then a "more results are not shown" notice). A result opens the script at that line with the match selected.
+- **Data**: finds a value in the data of a connection (connected on demand): match mode *Contains* / *Is exactly* / *Starts with*,
+  an optional schema and an optional table-name filter. Each table is read once with a bounded, read-only, parameterised query
+  (text columns, and number, GUID and date columns the text can match, compared as text; binary columns are never read; views
+  are skipped), up to 4 tables at a time, 20 rows per table, a table that takes more than 2 minutes is abandoned and listed.
+  The status line shows the progress ("table 12 of 140") and Stop ends the search keeping what was found. A result shows the row
+  (key and leading columns, the matching cell in bold); it opens the table filtered on that column and value. Searching a large
+  database can take a while: the overlay says so.
+
 ## Keyboard shortcuts
 
 | Shortcut | Where | Action |
 | --- | --- | --- |
+| `Ctrl+Alt+F` | anywhere | Search in scripts (open tabs and library) and in the data of a connection |
 | `Ctrl+T` | anywhere | Quick open a table/view of the active connection |
 | `Ctrl+Shift+P` | anywhere | Quick open a table/view across all connections (metadata cache) |
 | `Ctrl+Shift+T` | anywhere | Reopen the last closed tab (like a browser; press again to go further back; up to 50 are remembered; a table keeps its filters, a script its text) |

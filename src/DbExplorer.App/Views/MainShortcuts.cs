@@ -20,7 +20,7 @@ public static class MainShortcuts
     /// (Ctrl+W, Ctrl+Tab, F5); a refused commit swallows the chord and does nothing.</param>
     public static bool Handle(MainViewModel main, Key key, KeyModifiers modifiers, Func<bool>? commitOpenEdit = null)
     {
-        var overlay = main.QuickOpen is not null;
+        var overlay = main.QuickOpen is not null || main.SearchOverlay is not null;
         bool Ready() => commitOpenEdit?.Invoke() ?? true;
         switch (key, modifiers)
         {
@@ -41,6 +41,10 @@ public static class MainShortcuts
                 return true;
             case (Key.P, KeyModifiers.Control | KeyModifiers.Shift):
                 main.ShowAllTablesPickerCommand.Execute(null);
+                return true;
+            // Ctrl+Shift+F is the SQL formatter; Ctrl+Alt+F opens the search of scripts and data (also while the overlay is open: it refocuses).
+            case (Key.F, KeyModifiers.Control | KeyModifiers.Alt):
+                main.ShowSearchCommand.Execute(null);
                 return true;
             case (Key.N, KeyModifiers.Control):
                 main.NewScriptTabCommand.Execute(null);

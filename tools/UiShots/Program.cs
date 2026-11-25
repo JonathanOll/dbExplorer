@@ -343,6 +343,8 @@ internal static class Scenes
         ("group-run-differences", GroupRunDifferences),
         ("script-library", ScriptLibraryScene),
         ("save-script-dialog", SaveScriptDialogScene),
+        ("search", SearchScripts),
+        ("search-data", SearchData),
     ];
 
     private static string Theme = "light";
@@ -354,7 +356,7 @@ internal static class Scenes
         foreach (var (name, run) in All)
         {
             if (only is not null && !only.Contains(name)) continue;
-            using var demo = new Demo(emptyConfig: false, withGroups: name.StartsWith("group"), withLibrary: name is "script-library" or "save-script-dialog");
+            using var demo = new Demo(emptyConfig: false, withGroups: name.StartsWith("group"), withLibrary: name is "script-library" or "save-script-dialog" or "search" or "search-data");
             try
             {
                 var window = await run(demo);
@@ -604,6 +606,34 @@ internal static class Scenes
         var path = Path.Combine(d.Library!.Root, "Reports", "Best customers.sql");
         await d.Main.OpenScriptPathAsync(path);
         d.Tree.SelectedNode = d.Tree.FindScriptNode(path);
+        await Settle();
+        return null;
+    }
+
+    // Search overlay: scripts scope (an unsaved tab and the library), then the data scope.
+    private static async Task<Window?> SearchScripts(Demo d)
+    {
+        await Open(d);
+        var draft = d.Main.NewScript()!;
+        draft.Text = "-- draft, not saved yet\nSELECT * FROM orders WHERE status = 'late';\n";
+        d.Main.ShowSearch(SearchScope.Scripts);
+        var search = d.Main.SearchOverlay!;
+        search.Query = "orders";
+        await search.SearchAsync();
+        search.MoveDown();
+        search.MoveDown();
+        await Settle();
+        return null;
+    }
+
+    private static async Task<Window?> SearchData(Demo d)
+    {
+        await Open(d);
+        d.Main.ShowSearch(SearchScope.Data);
+        var search = d.Main.SearchOverlay!;
+        search.Query = "customer1";
+        await search.SearchAsync();
+        search.MoveDown();
         await Settle();
         return null;
     }
