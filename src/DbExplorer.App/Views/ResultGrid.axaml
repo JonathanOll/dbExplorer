@@ -57,7 +57,7 @@
             CanUserReorderColumns="False"
             AutoGenerateColumns="False"
             SelectionMode="Extended"
-            GridLinesVisibility="Horizontal"
+            GridLinesVisibility="All"
             HorizontalScrollBarVisibility="Auto"
             VerticalScrollBarVisibility="Auto"
             Background="{DynamicResource DbxContentBg}"

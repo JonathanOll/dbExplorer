@@ -84,13 +84,13 @@
       <!-- Data grid -->
       <SolidColorBrush x:Key="DbxGridHeaderBg" Color="#F5F7FA" />
       <SolidColorBrush x:Key="DbxGridFilterBg" Color="#FBFCFD" />
-      <SolidColorBrush x:Key="DbxGridLine" Color="#EDEFF3" />
-      <SolidColorBrush x:Key="DbxGridZebra" Color="#FAFBFD" />
+      <SolidColorBrush x:Key="DbxGridLine" Color="#E1E5EC" />
+      <SolidColorBrush x:Key="DbxGridZebra" Color="#F2F5FA" />
       <SolidColorBrush x:Key="DbxColumnFlash" Color="#FFE27A" />
       <SolidColorBrush x:Key="DbxColumnFlashHeader" Color="#FFC933" />
-      <SolidColorBrush x:Key="DbxRowHover" Color="#F1F4FA" />
-      <SolidColorBrush x:Key="DbxRowSelected" Color="#DCE5FD" />
-      <SolidColorBrush x:Key="DbxRowSelectedInactive" Color="#E8EDF8" />
+      <SolidColorBrush x:Key="DbxRowHover" Color="#E4ECFA" />
+      <SolidColorBrush x:Key="DbxRowSelected" Color="#CFDCFB" />
+      <SolidColorBrush x:Key="DbxRowSelectedInactive" Color="#E0E7F5" />
       <!-- Grid cell states (translucent: they read over zebra and selection) and editor -->
       <SolidColorBrush x:Key="DbxCellEdited" Color="#55F2B600" />
       <SolidColorBrush x:Key="DbxCellNew" Color="#4429A329" />
@@ -363,13 +363,13 @@
       <!-- Data grid -->
       <SolidColorBrush x:Key="DbxGridHeaderBg" Color="#252930" />
       <SolidColorBrush x:Key="DbxGridFilterBg" Color="#1D2025" />
-      <SolidColorBrush x:Key="DbxGridLine" Color="#2B2F36" />
-      <SolidColorBrush x:Key="DbxGridZebra" Color="#22252C" />
+      <SolidColorBrush x:Key="DbxGridLine" Color="#343942" />
+      <SolidColorBrush x:Key="DbxGridZebra" Color="#2A2E37" />
       <SolidColorBrush x:Key="DbxColumnFlash" Color="#6E5B12" />
       <SolidColorBrush x:Key="DbxColumnFlashHeader" Color="#9A7F10" />
-      <SolidColorBrush x:Key="DbxRowHover" Color="#262A33" />
-      <SolidColorBrush x:Key="DbxRowSelected" Color="#2C3A6E" />
-      <SolidColorBrush x:Key="DbxRowSelectedInactive" Color="#2A3050" />
+      <SolidColorBrush x:Key="DbxRowHover" Color="#323848" />
+      <SolidColorBrush x:Key="DbxRowSelected" Color="#34478C" />
+      <SolidColorBrush x:Key="DbxRowSelectedInactive" Color="#2C3558" />
       <!-- Grid cell states (translucent: they read over zebra and selection) and editor -->
       <SolidColorBrush x:Key="DbxCellEdited" Color="#55F2B600" />
       <SolidColorBrush x:Key="DbxCellNew" Color="#5538C26A" />
