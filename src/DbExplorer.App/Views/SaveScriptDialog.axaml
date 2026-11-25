@@ -1,0 +1,73 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbExplorer.App.ViewModels"
+        xmlns:views="using:DbExplorer.App.Views"
+        x:Class="DbExplorer.App.Views.SaveScriptDialog"
+        x:DataType="vm:SaveScriptViewModel"
+        Title="Save script"
+        Width="520" Height="520" MinWidth="460" MinHeight="460"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel>
+    <views:DialogFooter DockPanel.Dock="Bottom">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <Button Content="Choose another location…" Click="OnOtherLocationClick"
+                ToolTip.Tip="Pick any folder on this computer with the system file dialog" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+          <Button Content="Save" Classes="accent" IsDefault="True" Click="OnOkClick" IsEnabled="{Binding CanSave}" MinWidth="88"
+                  HorizontalContentAlignment="Center" ToolTip.Tip="Type a valid name first" ToolTip.ShowOnDisabled="True" />
+          <Button Content="Cancel" IsCancel="True" Click="OnCancelClick" MinWidth="88" HorizontalContentAlignment="Center" />
+        </StackPanel>
+      </Grid>
+    </views:DialogFooter>
+
+    <views:DialogHeader DockPanel.Dock="Top" Icon="{StaticResource IconSave}" Title="Save script"
+                        Subtitle="Scripts in your library are listed in the navigator and in File > Recent scripts." />
+
+    <Grid Background="{DynamicResource DbxContentBg}" RowDefinitions="Auto,Auto,*" Margin="0">
+      <StackPanel Margin="24,20,24,10" Spacing="4">
+        <Label Content="_Name" Target="{Binding #NameBox}" Foreground="{DynamicResource DbxTextDim}" Padding="0" />
+        <TextBox x:Name="NameBox" Text="{Binding Name}" Classes.error="{Binding HasError}" AutomationProperties.Name="Script name" />
+        <TextBlock Classes="fielderror" Text="{Binding Error}" IsVisible="{Binding HasError}" />
+        <TextBlock Classes="dim small" Text="{Binding Hint}" TextWrapping="Wrap" IsVisible="{Binding Hint, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+
+      <Grid Grid.Row="1" Margin="24,6,24,6" ColumnDefinitions="*,Auto">
+        <TextBlock Classes="section" Text="FOLDER" VerticalAlignment="Center" Margin="0" />
+        <Button Grid.Column="1" Classes="ghost" Click="OnNewFolderClick" Command="{Binding BeginNewFolderCommand}" Padding="8,2" MinHeight="26">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconFolderAdd}" Width="14" Height="14" />
+            <TextBlock Text="New folder…" />
+          </StackPanel>
+        </Button>
+      </Grid>
+
+      <Grid Grid.Row="2" Margin="24,0,24,20" RowDefinitions="Auto,*">
+        <!-- inline "new folder" row: created under the selected folder -->
+        <StackPanel IsVisible="{Binding IsCreatingFolder}" Margin="0,0,0,8" Spacing="4">
+          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
+            <TextBox x:Name="FolderBox" Text="{Binding NewFolderName}" Watermark="Folder name, created inside the selected folder"
+                     Classes.error="{Binding HasFolderError}" AutomationProperties.Name="New folder name" KeyDown="OnFolderBoxKeyDown" />
+            <Button Grid.Column="1" Content="Create" Command="{Binding CreateFolderCommand}" />
+            <Button Grid.Column="2" Content="Cancel" Command="{Binding CancelNewFolderCommand}" />
+          </Grid>
+          <TextBlock Classes="fielderror" Text="{Binding FolderError}" IsVisible="{Binding HasFolderError}" />
+        </StackPanel>
+
+        <Border Grid.Row="1" Classes="surface" ClipToBounds="True">
+          <ListBox x:Name="FolderList" ItemsSource="{Binding Folders}" SelectedItem="{Binding SelectedFolder}" Background="Transparent"
+                   BorderThickness="0" AutomationProperties.Name="Library folders" DoubleTapped="OnFolderDoubleTapped">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:SaveFolderItem">
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="{Binding Indent, Converter={x:Static views:SaveScriptDialog.IndentMargin}}">
+                  <PathIcon Data="{StaticResource IconFolder}" Width="15" Height="15" Foreground="{DynamicResource DbxIconFolder}" />
+                  <TextBlock Text="{Binding Display}" VerticalAlignment="Center" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+      </Grid>
+    </Grid>
+  </DockPanel>
+</Window>

@@ -47,7 +47,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
     public ObservableCollection<TreeNodeViewModel> Nodes { get; } = new();
 
     /// <summary>True while nothing is configured: the navigator shows its empty state instead of a blank tree.</summary>
-    public bool IsEmpty => Nodes.Count == 0;
+    public bool IsEmpty => Nodes.All(n => n is ScriptsSectionNodeViewModel);
 
     /// <summary>The navigator filter box: connections, folders, groups and the tables of the opened connections that contain it.</summary>
     [ObservableProperty] private string _filterText = "";
@@ -90,6 +90,8 @@ public partial class ConnectionTreeViewModel : ObservableObject
                 return true;
             }
 
+            // Script folders list their content when first opened: while filtering, the library is searched whole.
+            if (node is ScriptFolderNodeViewModel { HasUnrealizedChildren: true } scriptFolder) scriptFolder.RealizeChildren();
             var self = node is not PlaceholderNodeViewModel && node.Title.Contains(text, StringComparison.OrdinalIgnoreCase);
             var below = false;
             // A group member shares its child nodes with the connection: they are filtered once, through the connection.
@@ -133,7 +135,14 @@ public partial class ConnectionTreeViewModel : ObservableObject
     private static bool Contains(TreeNodeViewModel parent, TreeNodeViewModel target) =>
         parent.Children.Any(c => ReferenceEquals(c, target) || Contains(c, target));
 
-    partial void OnSelectedNodeChanged(TreeNodeViewModel? value) => OnPropertyChanged(nameof(SelectedConnection));
+    partial void OnSelectedNodeChanged(TreeNodeViewModel? value)
+    {
+        OnPropertyChanged(nameof(SelectedConnection));
+        if (SelectedConnection is { } connection) LastSelectedConnection = connection;
+    }
+
+    /// <summary>The connection that was last selected: a script of the library (not tied to a connection) opens on it.</summary>
+    public ConnectionConfig? LastSelectedConnection { get; private set; }
 
     /// <summary>The node of the connection that owns the selection (the selection itself, or its connection ancestor).</summary>
     private ConnectionNodeViewModel? SelectedConnectionNode =>
@@ -247,6 +256,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
         // The Groups section comes last: its members repeat connections that already sit in a folder above.
         var groupsSection = BuildGroupsSection();
         if (groupsSection is not null && Config.ShowGroups) Nodes.Add(groupsSection);
+        AddScriptsSection();
         OnPropertyChanged(nameof(IsEmpty));
         ApplyFilter();
     }

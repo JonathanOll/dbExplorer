@@ -35,6 +35,7 @@ public class ConfigStore(string path, ISecretProtector protector)
             AutoUpdateCheck = config.AutoUpdateCheck,
             ShowFolders = config.ShowFolders,
             ShowGroups = config.ShowGroups,
+            ShowScripts = config.ShowScripts,
             DbUpdatePath = config.DbUpdatePath
         };
         if (normalized.Groups.Any(g => g is null || g.Name is null || g.ConnectionIds is null)

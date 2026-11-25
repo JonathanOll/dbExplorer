@@ -66,6 +66,15 @@
             <MenuItem Header="_New SQL script" Command="{Binding NewScriptTabCommand}" InputGesture="Ctrl+N" />
             <MenuItem Header="_Open script file…" Command="{Binding OpenScriptFileCommand}" InputGesture="Ctrl+O" />
             <MenuItem Header="_Save script" Command="{Binding ActiveScript.SaveCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Ctrl+S" />
+            <MenuItem Header="Save script _as…" Command="{Binding SaveScriptAsCommand}" IsEnabled="{Binding HasActiveScript}"
+                      ToolTip.Tip="Choose any file with the system file dialog" />
+            <Separator />
+            <!-- the entries are built when the submenu opens (OnRecentMenuOpened); this one only makes it a submenu -->
+            <MenuItem x:Name="RecentMenu" Header="Recent _scripts" SubmenuOpened="OnRecentMenuOpened">
+              <MenuItem Header="No recent scripts" IsEnabled="False" />
+            </MenuItem>
+            <MenuItem Header="Open script _library folder" Command="{Binding OpenLibraryFolderCommand}"
+                      ToolTip.Tip="Show the folder that holds the scripts of the navigator in the file manager" />
             <Separator />
             <MenuItem Header="_Close tab" Command="{Binding CloseActiveTabCommand}" InputGesture="Ctrl+W" />
             <MenuItem Header="_Reopen closed tab" Command="{Binding ReopenClosedTabCommand}" InputGesture="Ctrl+Shift+T" />
@@ -99,6 +108,8 @@
             <MenuItem Header="Show _folders" ToggleType="CheckBox" IsChecked="{Binding Tree.ShowFolders, Mode=OneWay}" Command="{Binding Tree.ToggleFoldersCommand}"
                       ToolTip.Tip="Off: the connections are listed flat, without their folders" />
             <MenuItem Header="Show _groups" ToggleType="CheckBox" IsChecked="{Binding Tree.ShowGroups, Mode=OneWay}" Command="{Binding Tree.ToggleGroupsCommand}" />
+            <MenuItem Header="Show _scripts" ToggleType="CheckBox" IsChecked="{Binding Tree.ShowScripts, Mode=OneWay}" Command="{Binding Tree.ToggleScriptsCommand}"
+                      ToolTip.Tip="The script library: your saved scripts and their folders" />
             <Separator />
             <MenuItem Header="Go to _table…" Command="{Binding ShowTablePickerCommand}" InputGesture="Ctrl+T" />
             <MenuItem Header="Go to table in _all connections…" Command="{Binding ShowAllTablesPickerCommand}" InputGesture="Ctrl+Shift+P" />
@@ -327,7 +338,7 @@
             </Border>
 
             <Border DockPanel.Dock="Top" Padding="8,8,8,4" IsVisible="{Binding !Tree.IsEmpty}">
-              <TextBox x:Name="FilterBox" Text="{Binding Tree.FilterText, Mode=TwoWay}" Watermark="Filter connections and tables…"
+              <TextBox x:Name="FilterBox" Text="{Binding Tree.FilterText, Mode=TwoWay}" Watermark="Filter connections, tables and scripts…"
                        AutomationProperties.Name="Filter the navigator">
                 <TextBox.InnerRightContent>
                   <Button Theme="{StaticResource DbxToolButton}" Classes="close" Tag="{StaticResource IconClose}" MinWidth="22" MinHeight="22" Padding="4"
@@ -465,6 +476,84 @@
                         </ContextMenu>
                       </Border.ContextMenu>
                     </Border>
+                  </TreeDataTemplate>
+
+                  <!-- Scripts: the script library, real folders and .sql files -->
+                  <TreeDataTemplate DataType="vm:ScriptsSectionNodeViewModel" ItemsSource="{Binding Children}">
+                    <StackPanel Orientation="Horizontal" Spacing="7" Background="Transparent">
+                      <PathIcon Classes="dim" Data="{StaticResource IconScript}" Width="15" Height="15" />
+                      <TextBlock Text="{Binding Title}" FontWeight="Medium" VerticalAlignment="Center" />
+                      <TextBlock Classes="faint small" VerticalAlignment="Center" IsVisible="{Binding !IsLibraryEmpty}"
+                                 Text="{Binding Children.Count, Converter={x:Static views:Icons.CountInParens}}" />
+                      <TextBlock Classes="faint small" VerticalAlignment="Center" IsVisible="{Binding IsLibraryEmpty}"
+                                 Text="empty: right-click to add a folder" />
+                      <StackPanel.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="New folder…" Command="{Binding Tree.NewScriptFolderCommand}" CommandParameter="{Binding}">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconFolderAdd}" /></MenuItem.Icon>
+                          </MenuItem>
+                          <MenuItem Header="New script…" Command="{Binding Tree.NewScriptHereCommand}" CommandParameter="{Binding}" />
+                          <Separator />
+                          <MenuItem Header="Refresh" Command="{Binding Tree.RefreshScriptsCommand}">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconRefresh}" /></MenuItem.Icon>
+                          </MenuItem>
+                          <MenuItem Header="Open library folder" Command="{Binding Tree.OpenLibraryFolderCommand}" />
+                        </ContextMenu>
+                      </StackPanel.ContextMenu>
+                    </StackPanel>
+                  </TreeDataTemplate>
+
+                  <TreeDataTemplate DataType="vm:ScriptFolderNodeViewModel" ItemsSource="{Binding Children}">
+                    <StackPanel Orientation="Horizontal" Spacing="7" Background="Transparent" ToolTip.Tip="{Binding Path}">
+                      <Panel Width="16" Height="16" VerticalAlignment="Center">
+                        <PathIcon Data="{StaticResource IconFolder}" Width="15" Height="15" Foreground="{DynamicResource DbxIconFolder}"
+                                  IsVisible="{Binding !IsExpanded}" />
+                        <PathIcon Data="{StaticResource IconFolderOpen}" Width="15" Height="15" Foreground="{DynamicResource DbxIconFolder}"
+                                  IsVisible="{Binding IsExpanded}" />
+                      </Panel>
+                      <TextBlock Text="{Binding Title}" FontWeight="Medium" VerticalAlignment="Center" />
+                      <StackPanel.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="New script here…" Command="{Binding Tree.NewScriptHereCommand}" CommandParameter="{Binding}">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconScript}" /></MenuItem.Icon>
+                          </MenuItem>
+                          <MenuItem Header="New folder…" Command="{Binding Tree.NewScriptFolderCommand}" CommandParameter="{Binding}">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconFolderAdd}" /></MenuItem.Icon>
+                          </MenuItem>
+                          <Separator />
+                          <MenuItem Header="Rename…" Command="{Binding Tree.RenameScriptNodeCommand}" CommandParameter="{Binding}" InputGesture="F2" />
+                          <MenuItem Header="Move to folder…" Command="{Binding Tree.MoveScriptNodeCommand}" CommandParameter="{Binding}" />
+                          <MenuItem Header="Show in Explorer" Command="{Binding Tree.ShowScriptInExplorerCommand}" CommandParameter="{Binding}" />
+                          <Separator />
+                          <MenuItem Classes="danger" Header="Delete folder" Command="{Binding Tree.DeleteScriptNodeCommand}" CommandParameter="{Binding}" InputGesture="Delete">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconDelete}" /></MenuItem.Icon>
+                          </MenuItem>
+                        </ContextMenu>
+                      </StackPanel.ContextMenu>
+                    </StackPanel>
+                  </TreeDataTemplate>
+
+                  <TreeDataTemplate DataType="vm:ScriptFileNodeViewModel">
+                    <StackPanel Orientation="Horizontal" Spacing="7" Background="Transparent" ToolTip.Tip="{Binding Tooltip}">
+                      <PathIcon Classes="dim" Data="{StaticResource IconScript}" Width="14" Height="14" />
+                      <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                      <StackPanel.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="Open" Command="{Binding Tree.OpenScriptCommand}" CommandParameter="{Binding}" FontWeight="SemiBold" InputGesture="Enter" />
+                          <Separator />
+                          <MenuItem Header="Rename…" Command="{Binding Tree.RenameScriptNodeCommand}" CommandParameter="{Binding}" InputGesture="F2" />
+                          <MenuItem Header="Duplicate" Command="{Binding Tree.DuplicateScriptCommand}" CommandParameter="{Binding}" />
+                          <MenuItem Header="Move to folder…" Command="{Binding Tree.MoveScriptNodeCommand}" CommandParameter="{Binding}" />
+                          <Separator />
+                          <MenuItem Header="Copy path" Command="{Binding Tree.CopyScriptPathCommand}" CommandParameter="{Binding}" />
+                          <MenuItem Header="Show in Explorer" Command="{Binding Tree.ShowScriptInExplorerCommand}" CommandParameter="{Binding}" />
+                          <Separator />
+                          <MenuItem Classes="danger" Header="Delete" Command="{Binding Tree.DeleteScriptNodeCommand}" CommandParameter="{Binding}" InputGesture="Delete">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconDelete}" /></MenuItem.Icon>
+                          </MenuItem>
+                        </ContextMenu>
+                      </StackPanel.ContextMenu>
+                    </StackPanel>
                   </TreeDataTemplate>
 
                   <TreeDataTemplate DataType="vm:SchemaNodeViewModel" ItemsSource="{Binding Children}">

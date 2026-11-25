@@ -24,4 +24,7 @@ public sealed class EditDialogService(Window owner) : IEditDialogs
 
     public async Task<string[]?> ShowVirtualKeyDialogAsync(VirtualKeyDialogViewModel viewModel) =>
         await new VirtualKeyDialog(viewModel).ShowDialog<string[]?>(owner);
+
+    public async Task<bool> ShowSaveScriptAsync(SaveScriptViewModel viewModel) =>
+        await new SaveScriptDialog(viewModel).ShowDialog<bool>(owner);
 }

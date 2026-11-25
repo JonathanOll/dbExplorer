@@ -20,6 +20,12 @@ public interface IEditDialogs
 
     /// <summary>Shows the virtual key dialog; the chosen key columns (<c>["*"]</c> = all), or null when cancelled.</summary>
     Task<string[]?> ShowVirtualKeyDialogAsync(VirtualKeyDialogViewModel viewModel);
+
+    /// <summary>
+    /// Shows the "Save script" dialog (name and library folder); true when the user confirmed or chose another location (the view
+    /// model then says which). Implementations without the dialog keep the default: the save falls back to the file picker.
+    /// </summary>
+    Task<bool> ShowSaveScriptAsync(SaveScriptViewModel viewModel) => Task.FromResult(false);
 }
 
 /// <summary>One selectable column of the virtual key dialog.</summary>

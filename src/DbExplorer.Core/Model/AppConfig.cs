@@ -18,6 +18,9 @@ public record AppConfig(
     /// <summary>View menu: the navigator shows the Groups section. Missing in old files: on.</summary>
     public bool ShowGroups { get; set; } = true;
 
+    /// <summary>View menu: the navigator shows the Scripts section (the script library). Missing in old files: on.</summary>
+    public bool ShowScripts { get; set; } = true;
+
     /// <summary>Folder with the n2f dbupdate scripts; null switches the upgrade feature off. Missing in old files: null.</summary>
     public string? DbUpdatePath { get; set; }
 

@@ -49,6 +49,11 @@ internal sealed class FakeEditDialogs : IEditDialogs
         LastKeyDialog = viewModel;
         return Task.FromResult(KeyResult);
     }
+
+    /// <summary>Plays the user of the "Save script" dialog; its answer is the result (true = Save or another location, false = Cancel).</summary>
+    public Func<SaveScriptViewModel, bool>? OnSaveScript { get; set; }
+
+    public Task<bool> ShowSaveScriptAsync(SaveScriptViewModel viewModel) => Task.FromResult(OnSaveScript?.Invoke(viewModel) ?? false);
 }
 
 public class EditingViewModelTests : IDisposable

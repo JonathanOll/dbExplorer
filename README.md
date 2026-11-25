@@ -151,6 +151,28 @@ own runner and its own confirmation and is never reachable from Run on group.
 - While a group run is active, an ordinary run, a database switch and a second group run are refused in that tab.
 - Results are kept in memory: the row limit applies per database (default 1000, up to 100 000).
 
+## Script library
+
+![Script library in the navigator, dark](docs/ui/after/script-library-dark.png)
+
+Scripts you keep live in a **library**: plain `.sql` files in `%APPDATA%\dbExplorer\library\`, organised in real
+sub-folders (any depth). Nothing is stored twice: a script tab simply points at its file, so saving, autosave and "open in
+Explorer" work like for any file. The **Scripts** section of the navigator (View > Show scripts) lists it, folders first,
+names in natural order (`q2` before `q10`).
+
+- **Open**: double-click or `Enter` on a script. It opens on the active (or last selected) connection; a script that is
+  already open just gets its tab back.
+- **Save**: `Ctrl+S` on a script that was never saved asks for a **name and a library folder** (with **New folder...**); a
+  name that exists is never overwritten (`name (2).sql`). **Choose another location...** uses the system file dialog, as does
+  File > **Save script as...** at any time. A script that already has a file keeps saving silently to it.
+- **Organise** (right-click, `F2` rename, `Delete`): rename, duplicate, move to a folder (or drag it onto a folder), delete (asks;
+  a folder says how many scripts it holds; files are deleted for good), new script / new folder here, copy path, show in
+  Explorer, refresh, open the library folder. Names cannot contain `\ / : * ? " < > |` or `..`; nothing leaves the library
+  folder and a move or rename never overwrites. An open tab follows its file when it is renamed or moved.
+- **Recent scripts**: File > **Recent scripts** lists the last 20 scripts opened or saved (library or not), most recent
+  first, the full path as tooltip; files that are gone are dropped. Kept in `recent-scripts.json`.
+- The navigator filter box also matches script names.
+
 ## Execution statistics
 
 SQL Server script tabs have a **Statistics** check box in the toolbar (hidden for PostgreSQL and SQLite). With it on, the
@@ -234,11 +256,12 @@ standard showplan XML by local names (any schema version) and skips what it does
 | `Ctrl+M` | script tab | Include the actual execution plan in the next runs (switch) |
 | `Ctrl+N` | anywhere | New script tab on the active (or selected) connection |
 | `Ctrl+O` | anywhere | Open a script file in a script tab |
+| `Enter` / `F2` / `Delete` | navigator, a script or script folder | Open / rename / delete it (see [Script library](#script-library)) |
 | `Ctrl+Enter` | script tab | Run the statement under the cursor (ends at `;`, a `GO` line or a blank line) or the selection |
 | `F5` | script tab | Run the whole script; in a table tab: reload the data |
 | `Ctrl+Shift+Enter` | script tab on a connection in a group | Run the statement under the cursor / the selection on **every database of the group** (read-only, see [Linked database groups](#linked-database-groups)); in a script tab that is not in a group the status bar only says so (no ordinary run) |
 | `Ctrl+Shift+F5` | script tab on a connection in a group | Run the whole script on every database of the group (read-only) |
-| `Ctrl+S` | script tab / table tab | Save the script to a file / review the SQL and apply staged edits |
+| `Ctrl+S` | script tab / table tab | Save the script (the first time: name and library folder) / review the SQL and apply staged edits |
 | `Ctrl+W` | anywhere | Close the active tab |
 | `Ctrl+Tab` | anywhere | Next tab |
 | `Ctrl+Shift+Tab` | anywhere | Previous tab |
@@ -436,6 +459,8 @@ Everything lives in `%APPDATA%\dbExplorer`:
 | `config.json` | folders, connections (passwords DPAPI-encrypted for the current Windows user), virtual keys, linked groups, the automatic-update setting, the N2F dbupdate folder (`DbUpdatePath`, empty = upgrade off) |
 | `cache\` | per-connection metadata cache (schema/table/column names) used by `Ctrl+Shift+P` |
 | `scripts\` | unsaved script tabs, restored at the next start |
+| `library\` | the script library: your saved `.sql` scripts and their folders ([Script library](#script-library)) |
+| `recent-scripts.json` | the last 20 scripts opened or saved |
 | `window.json` | size, position and maximised state of the main window |
 | `session.json` | the open tabs (order, active tab, table filters / WHERE / sort, script files); delete it to forget them (only unsaved scripts then come back) |
 

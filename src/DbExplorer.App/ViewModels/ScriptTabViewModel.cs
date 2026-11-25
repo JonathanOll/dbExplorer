@@ -33,6 +33,8 @@ public interface IScriptFiles
 /// When given, connecting resolves the session through it too, so it follows the connection the tab was switched to.</param>
 /// <param name="FindSession">The session of a connection if it is already open, or null. Never connects: the autocomplete uses it
 /// to read the loaded schema of a restored tab.</param>
+/// <param name="Library">The script library: with it (and a dialog), the first save of a script asks for a name and a library folder.</param>
+/// <param name="FileUsed">Told the path of every script file opened or saved (recent scripts, library refresh).</param>
 public sealed record ScriptTabHooks(
     Func<CancellationToken, Task<Session?>> ResolveSession,
     IScriptFiles? Files = null,
@@ -40,7 +42,9 @@ public sealed record ScriptTabHooks(
     StatusModel? Status = null,
     IEditDialogs? Dialogs = null,
     GroupSwitchHooks? Switch = null,
-    Func<Guid, Session?>? FindSession = null);
+    Func<Guid, Session?>? FindSession = null,
+    ScriptLibrary? Library = null,
+    Action<string>? FileUsed = null);
 
 /// <summary>
 /// A SQL script editor on one connection. Runs the statement under the caret / the selection (Ctrl+Enter) or the
@@ -877,22 +881,74 @@ public sealed partial class ScriptTabViewModel : TabViewModel
 
     // ---- files ----
 
-    /// <summary>Ctrl+S: writes the script to <paramref name="path"/>, else to its file, else to the file the user picks.</summary>
+    /// <summary>
+    /// Ctrl+S: writes the script to <paramref name="path"/>, else to its file, else (never saved) to the library through the
+    /// "Save script" dialog, or to the file the user picks when there is no library or the user asks for another location.
+    /// </summary>
     [RelayCommand]
     public async Task SaveAsync(string? path = null)
     {
         path ??= FilePath;
+        string? reserved = null;   // an empty library file taken for this save: removed again when the save does not happen
         if (path is null)
         {
-            if (_hooks.Files is not { } files)
+            if (_hooks.Library is { } library && _hooks.Dialogs is { } dialogs)
             {
-                _status.Error("Cannot save: no file dialog available.");
-                return;
+                var dialog = new SaveScriptViewModel(library, $"Script {_number}");
+                if (!await dialogs.ShowSaveScriptAsync(dialog)) return;
+                path = dialog.UseFilePicker ? null : dialog.SavedPath;
+                reserved = path;
+                if (path is null && !dialog.UseFilePicker) return;
             }
-            path = await files.PickSaveAsync($"Script {_number}.sql");
-            if (path is null) return;
+            if (path is null && !await PickSavePathAsync(p => path = p)) return;
         }
+        try
+        {
+            await WriteAsync(path!);
+        }
+        finally
+        {
+            // Cancelled or failed after the dialog: do not leave an empty script behind in the library.
+            if (reserved is not null && !string.Equals(FilePath, reserved, StringComparison.OrdinalIgnoreCase)) DropReservation(reserved);
+        }
+    }
 
+    /// <summary>"Save as…": always asks for a file with the platform picker, then saves there (the tab follows the new file).</summary>
+    [RelayCommand]
+    public async Task SaveAsAsync()
+    {
+        string? path = null;
+        if (!await PickSavePathAsync(p => path = p)) return;
+        await WriteAsync(path!);
+    }
+
+    private async Task<bool> PickSavePathAsync(Action<string> chosen)
+    {
+        if (_hooks.Files is not { } files)
+        {
+            _status.Error("Cannot save: no file dialog available.");
+            return false;
+        }
+        var picked = await files.PickSaveAsync(FilePath is { } current ? Path.GetFileName(current) : $"Script {_number}.sql");
+        if (picked is null) return false;
+        chosen(picked);
+        return true;
+    }
+
+    private void DropReservation(string path)
+    {
+        try
+        {
+            if (new FileInfo(path) is { Exists: true, Length: 0 }) File.Delete(path);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // an empty file stays: harmless
+        }
+    }
+
+    private async Task WriteAsync(string path)
+    {
         var text = Text;
         var converted = false;
         try
@@ -916,6 +972,20 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         _status.Info(converted
             ? $"Saved {path} (converted to UTF-8: the text has characters the file's encoding cannot hold)"
             : $"Saved {path}");
+        _hooks.FileUsed?.Invoke(path);
+    }
+
+    /// <summary>
+    /// The file of this tab was renamed or moved (<paramref name="newPath"/>) or deleted (null): the tab follows it, so the next save
+    /// goes to the file's new place instead of recreating the old one. After a delete the text stays as unsaved work.
+    /// </summary>
+    public void FollowFile(string? newPath)
+    {
+        FilePath = newPath;
+        if (newPath is not null) return;
+        _savedText = "";
+        IsDirty = !string.IsNullOrWhiteSpace(Text);
+        if (IsDirty) SchedulePersist();
     }
 
     /// <summary>Loads a file into the editor, replacing the text. A file that cannot be read leaves the tab as it was.</summary>
@@ -942,6 +1012,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         IsDirty = false;
         DiscardPersisted(keepOpen: true);
         _status.Info($"Opened {path}");
+        _hooks.FileUsed?.Invoke(path);
     }
 
     private static string? TryReadFile(string path, out System.Text.Encoding? encoding)

@@ -44,7 +44,8 @@ public abstract partial class TreeNodeViewModel : ObservableObject
         if (value) RealizeChildren();
     }
 
-    private void RealizeChildren()
+    /// <summary>Creates the real children now when they are still lazy (the navigator filter searches them).</summary>
+    public void RealizeChildren()
     {
         if (_lazyChildren is not { } factory) return;
         _lazyChildren = null;

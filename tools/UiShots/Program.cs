@@ -157,7 +157,7 @@ internal sealed class Demo : IDisposable
     public ConnectionConfig NotesArchive { get; }
 
     /// <param name="withGroups">Adds the linked-group scenes' data: three SQLite "notes" databases (one file missing) and two engine groups.</param>
-    public Demo(bool emptyConfig = false, bool withGroups = false)
+    public Demo(bool emptyConfig = false, bool withGroups = false, bool withLibrary = false)
     {
         Directory.CreateDirectory(Dir);
         var shopFile = Path.Combine(Dir, "shop.db");
@@ -216,7 +216,31 @@ internal sealed class Demo : IDisposable
         Main = new MainViewModel(Tree, status, cache);
         Main.UseTableTabs(Sessions, new QuietEditDialogs());
         Main.UseScriptTabs(new NoFiles(), null, new QuietEditDialogs());
+        if (withLibrary)
+        {
+            Library = new DbExplorer.Core.Scripting.ScriptLibrary(Path.Combine(Dir, "library"));
+            SeedLibrary();
+            Main.UseScriptLibrary(Library, new DbExplorer.Core.Scripting.RecentScripts(Path.Combine(Dir, "recent-scripts.json")));
+        }
         Window.DataContext = Main;
+    }
+
+    public DbExplorer.Core.Scripting.ScriptLibrary? Library { get; }
+
+    /// <summary>A few folders and scripts, like a user's library after some weeks.</summary>
+    private void SeedLibrary()
+    {
+        var lib = Library!;
+        var reports = lib.CreateFolder(null, "Reports");
+        lib.SaveNew(reports, "Best customers", "SELECT c.name, count(*) AS orders\nFROM orders o JOIN customers c ON c.id = o.customer_id\nGROUP BY c.id ORDER BY orders DESC LIMIT 10;\n");
+        lib.SaveNew(reports, "Monthly sales", "SELECT strftime('%Y-%m', created) AS month, sum(total) FROM orders GROUP BY month;\n");
+        lib.SaveNew(reports, "Orders by status", "SELECT status, count(*) FROM orders GROUP BY status;\n");
+        var maintenance = lib.CreateFolder(null, "Maintenance");
+        lib.SaveNew(maintenance, "Rebuild indexes", "REINDEX;\n");
+        lib.SaveNew(maintenance, "Check integrity", "PRAGMA integrity_check;\n");
+        lib.CreateFolder(lib.CreateFolder(null, "Migrations"), "2025");
+        lib.SaveNew(null, "Scratch", "SELECT 1;\n");
+        lib.SaveNew(null, "Slow orders", "SELECT * FROM orders WHERE total > 90;\n");
     }
 
     private static Guid Det(string name) => new(System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes(name)));
@@ -317,6 +341,8 @@ internal static class Scenes
         ("group-switch-script", GroupSwitchScript),
         ("group-run", GroupRun),
         ("group-run-differences", GroupRunDifferences),
+        ("script-library", ScriptLibraryScene),
+        ("save-script-dialog", SaveScriptDialogScene),
     ];
 
     private static string Theme = "light";
@@ -328,7 +354,7 @@ internal static class Scenes
         foreach (var (name, run) in All)
         {
             if (only is not null && !only.Contains(name)) continue;
-            using var demo = new Demo(emptyConfig: false, withGroups: name.StartsWith("group"));
+            using var demo = new Demo(emptyConfig: false, withGroups: name.StartsWith("group"), withLibrary: name is "script-library" or "save-script-dialog");
             try
             {
                 var window = await run(demo);
@@ -569,6 +595,32 @@ internal static class Scenes
     }
 
     // The navigator with the Groups section: three groups (one with an unreachable member, one under-populated), expanded.
+    // The Scripts section with a few folders open and one of its scripts open in a tab.
+    private static async Task<Window?> ScriptLibraryScene(Demo d)
+    {
+        await Open(d);
+        var section = d.Tree.Nodes.OfType<ScriptsSectionNodeViewModel>().First();
+        foreach (var folder in section.Children.OfType<ScriptFolderNodeViewModel>().Where(f => f.Title is "Reports" or "Maintenance")) folder.IsExpanded = true;
+        var path = Path.Combine(d.Library!.Root, "Reports", "Best customers.sql");
+        await d.Main.OpenScriptPathAsync(path);
+        d.Tree.SelectedNode = d.Tree.FindScriptNode(path);
+        await Settle();
+        return null;
+    }
+
+    // The first save of a script: a name and a folder of the library.
+    private static async Task<Window?> SaveScriptDialogScene(Demo d)
+    {
+        await Open(d);
+        var script = d.Main.NewScript()!;
+        script.Text = "SELECT status, count(*) FROM orders GROUP BY status;\n";
+        var vm = new SaveScriptViewModel(d.Library!, "Script 1", Path.Combine(d.Library!.Root, "Reports")) { Name = "Orders by status" };
+        var dialog = new SaveScriptDialog(vm);
+        dialog.Show(d.Window);
+        await Settle();
+        return dialog;
+    }
+
     private static async Task<Window?> GroupsTree(Demo d)
     {
         await Open(d);

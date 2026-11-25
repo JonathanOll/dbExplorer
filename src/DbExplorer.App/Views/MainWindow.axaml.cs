@@ -13,6 +13,8 @@ public partial class MainWindow : Window
     private static readonly DataFormat<string> ConnectionFormat = DataFormat.CreateStringApplicationFormat("dbx-connection-id");
     private Point? _dragStart;
     private ConnectionNodeViewModel? _dragNode;
+    private static readonly DataFormat<string> ScriptFormat = DataFormat.CreateStringApplicationFormat("dbx-script-path");
+    private string? _dragScriptPath;
 
     public MainWindow()
     {
@@ -113,6 +115,39 @@ public partial class MainWindow : Window
     // The Upgrade entries follow the same availability as the settings menu's.
     private void OnConnectionsMenuOpened(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
         (DataContext as MainViewModel)?.RefreshUpgradeAvailability();
+
+    // File > Recent scripts: the last scripts opened or saved (name, the full path as a tooltip), then Clear. Built when the submenu
+    // opens so the list is read (and the files that are gone dropped) only when it is looked at.
+    private void OnRecentMenuOpened(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel main || sender is not MenuItem menu || !ReferenceEquals(sender, e.Source)) return;
+        main.RefreshRecentScripts();
+        var items = new List<object>();
+        foreach (var recent in main.RecentItems)
+        {
+            var item = new MenuItem
+            {
+                Header = new TextBlock { Text = recent.Name, TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis, MaxWidth = 420 },
+                Command = main.OpenRecentScriptCommand,
+                CommandParameter = recent.Path,
+            };
+            ToolTip.SetTip(item, recent.Path);
+            items.Add(item);
+        }
+        if (items.Count == 0)
+        {
+            var none = new MenuItem { Header = "No recent scripts yet", IsEnabled = false };
+            ToolTip.SetTip(none, "Scripts you open or save appear here.");
+            ToolTip.SetShowOnDisabled(none, true);
+            items.Add(none);
+        }
+        else
+        {
+            items.Add(new Separator());
+            items.Add(new MenuItem { Header = "Clear recent scripts", Command = main.ClearRecentScriptsCommand });
+        }
+        menu.ItemsSource = items;
+    }
 
     private void OnSettingsFlyoutOpening(object? sender, EventArgs e) =>
         (DataContext as MainViewModel)?.RefreshUpgradeAvailability();
@@ -266,6 +301,7 @@ public partial class MainWindow : Window
             case ConnectionNodeViewModel c: tree.EditConnectionCommand.Execute(c); break;
             case FolderNodeViewModel f: tree.RenameFolderCommand.Execute(f); break;
             case GroupNodeViewModel g: tree.RenameGroupCommand.Execute(g.Group); break;
+            case ScriptFileNodeViewModel or ScriptFolderNodeViewModel: tree.RenameScriptNodeCommand.Execute(node); break;
         }
     }
 
@@ -278,6 +314,7 @@ public partial class MainWindow : Window
             case FolderNodeViewModel f: tree.DeleteFolderCommand.Execute(f); break;
             case GroupNodeViewModel g: tree.DeleteGroupCommand.Execute(g.Group); break;
             case GroupMemberNodeViewModel m: tree.RemoveMemberCommand.Execute(m); break;
+            case ScriptFileNodeViewModel or ScriptFolderNodeViewModel: tree.DeleteScriptNodeCommand.Execute(node); break;
         }
     }
 
@@ -381,6 +418,9 @@ public partial class MainWindow : Window
             case GroupNodeViewModel group:
                 await tree.ConnectGroupAsync(group);
                 break;
+            case ScriptFileNodeViewModel script:
+                await tree.OpenScriptAsync(script);   // reports failures to the status bar itself
+                break;
         }
     }
 
@@ -401,13 +441,15 @@ public partial class MainWindow : Window
     private void OnTreePointerPressed(object? sender, PointerPressedEventArgs e)
     {
         var point = e.GetCurrentPoint(this);
-        _dragNode = point.Properties.IsLeftButtonPressed ? NodeAt(e.Source) as ConnectionNodeViewModel : null;
-        _dragStart = _dragNode is null ? null : e.GetPosition(this);
+        var pressed = point.Properties.IsLeftButtonPressed ? NodeAt(e.Source) : null;
+        _dragNode = pressed as ConnectionNodeViewModel;
+        _dragScriptPath = pressed switch { ScriptFileNodeViewModel f => f.Path, ScriptFolderNodeViewModel d => d.Path, _ => null };
+        _dragStart = _dragNode is null && _dragScriptPath is null ? null : e.GetPosition(this);
     }
 
     private async void OnTreePointerMoved(object? sender, PointerEventArgs e)
     {
-        if (_dragStart is not { } start || _dragNode is not { } node) return;
+        if (_dragStart is not { } start || (_dragNode is null && _dragScriptPath is null)) return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) { _dragStart = null; return; }
         var delta = e.GetPosition(this) - start;
         if (Math.Abs(delta.X) < 6 && Math.Abs(delta.Y) < 6) return;
@@ -416,7 +458,8 @@ public partial class MainWindow : Window
         await Safe(async () =>
         {
             var transfer = new DataTransfer();
-            transfer.Add(DataTransferItem.Create(ConnectionFormat, node.Config.Id.ToString()));
+            if (_dragNode is { } node) transfer.Add(DataTransferItem.Create(ConnectionFormat, node.Config.Id.ToString()));
+            else transfer.Add(DataTransferItem.Create(ScriptFormat, _dragScriptPath!));
             await DragDrop.DoDragDropAsync(e, transfer, DragDropEffects.Move);
         });
     }
@@ -427,6 +470,14 @@ public partial class MainWindow : Window
     // Over the Groups header: refused. Elsewhere: the root. The container that would receive the drop is outlined.
     private void OnTreeDragOver(object? sender, DragEventArgs e)
     {
+        if (e.DataTransfer.Contains(ScriptFormat))
+        {
+            // A script or script folder: only the Scripts section takes it (a folder, or the section for the top level).
+            var scriptTarget = ScriptDropContainerAt(e.Source);
+            e.DragEffects = scriptTarget is null ? DragDropEffects.None : DragDropEffects.Move;
+            SetDropTarget(scriptTarget);
+            return;
+        }
         if (!e.DataTransfer.Contains(ConnectionFormat))
         {
             e.DragEffects = DragDropEffects.None;
@@ -439,7 +490,7 @@ public partial class MainWindow : Window
         {
             FolderNodeViewModel => DragDropEffects.Move,
             GroupNodeViewModel => DragDropEffects.Link,
-            _ when IsInGroupsSection(e.Source) => DragDropEffects.None,
+            _ when IsInGroupsSection(e.Source) || ScriptDropContainerAt(e.Source) is not null => DragDropEffects.None,
             _ => DragDropEffects.Move,
         };
         SetDropTarget(e.DragEffects == DragDropEffects.None ? null : target);
@@ -475,9 +526,32 @@ public partial class MainWindow : Window
         return false;
     }
 
+    // The folder (or the section header, = top level) of the library a drop at the visual would land in; null outside the section.
+    private static TreeViewItem? ScriptDropContainerAt(object? source)
+    {
+        for (var item = (source as Visual)?.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+             item is not null;
+             item = item.FindAncestorOfType<TreeViewItem>())
+            if (item.DataContext is ScriptFolderNodeViewModel or ScriptsSectionNodeViewModel) return item;
+        return null;
+    }
+
     private void OnTreeDrop(object? sender, DragEventArgs e)
     {
+        var scriptTarget = ScriptDropContainerAt(e.Source)?.DataContext;
         ClearDropTarget();
+        if (e.DataTransfer.TryGetValue(ScriptFormat) is { } scriptPath)
+        {
+            e.Handled = true;
+            if (Tree is { } scripts && scriptTarget is not null)
+                scripts.MoveScriptNode(scriptPath, (scriptTarget as ScriptFolderNodeViewModel)?.Path);
+            return;
+        }
+        if (scriptTarget is not null)
+        {
+            e.Handled = true;   // a connection dropped on the Scripts section: nothing to do
+            return;
+        }
         if (Tree is not { } tree || e.DataTransfer.TryGetValue(ConnectionFormat) is not { } text || !Guid.TryParse(text, out var id)) return;
         var connection = tree.Config.Connections.FirstOrDefault(c => c.Id == id);
 
