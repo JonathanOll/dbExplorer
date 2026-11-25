@@ -48,7 +48,8 @@ public static class MainShortcuts
             case (Key.O, KeyModifiers.Control):
                 main.OpenScriptFileCommand.Execute(null);
                 return true;
-            case (Key.L, KeyModifiers.Control):
+            // In a script tab Ctrl+L is "estimated plan": it belongs to the editor, which sees the key first.
+            case (Key.L, KeyModifiers.Control) when main.ActiveTab is not ScriptTabViewModel:
                 main.JumpToColumnCommand.Execute(null);
                 return true;
             case (Key.W, KeyModifiers.Control) when !overlay && main.ActiveTab is not null:

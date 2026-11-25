@@ -70,6 +70,14 @@
         </Grid>
       </Border>
 
+      <!-- While the background check runs (a second or two): a quiet info band, gone as soon as there is an answer -->
+      <Border DockPanel.Dock="Top" Classes="banner info" IsVisible="{Binding Update.IsChecking}">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <PathIcon Classes="bi spin" Data="{StaticResource IconRefresh}" Width="14" Height="14" VerticalAlignment="Center" />
+          <TextBlock Text="Checking for updates…" VerticalAlignment="Center" />
+        </StackPanel>
+      </Border>
+
       <!-- New version: info band with "Update and restart" / "Later"; red with the reason when the update failed (Retry / Dismiss) -->
       <Border DockPanel.Dock="Top" Classes="banner" Classes.info="{Binding !Update.IsFailed}" Classes.error="{Binding Update.IsFailed}"
               IsVisible="{Binding Update.IsVisible}">

@@ -40,6 +40,46 @@ public class UpdateViewModelTests : IDisposable
 
     // ---- the check ----
 
+    private sealed class SlowChecker(TaskCompletionSource<UpdateCheckResult> gate) : IUpdateChecker
+    {
+        public Task<UpdateCheckResult> CheckAsync(CancellationToken ct) => gate.Task;
+    }
+
+    [Fact]
+    public async Task WhileChecking_TheBandSaysSo_AndItGoesWhenTheAnswerIsIn()
+    {
+        var gate = new TaskCompletionSource<UpdateCheckResult>();
+        var vm = new UpdateViewModel(new SlowChecker(gate), _downloader, _applier, () => Path.Combine(_dir, "staging")) { Host = _host };
+        Assert.False(vm.IsChecking);
+
+        var check = vm.CheckAsync();
+        Assert.True(vm.IsChecking);
+        Assert.False(vm.IsVisible);   // the "update available" banner is another band
+
+        gate.SetResult(new UpdateCheckResult.UpToDate(new AppVersion(1, 2, 0), new AppVersion(1, 2, 0)));
+        await check;
+        Assert.False(vm.IsChecking);
+    }
+
+    [Fact]
+    public async Task ACheckThatFails_StillClearsTheCheckingBand()
+    {
+        _checker.Throw = true;
+        var vm = Vm();
+        await vm.CheckAsync();
+        Assert.False(vm.IsChecking);
+    }
+
+    [Fact]
+    public async Task NoCheck_NoCheckingBand()
+    {
+        var vm = Vm(suppressed: true);
+        await vm.CheckAsync();
+        Assert.False(vm.IsChecking);
+        Assert.Equal(0, _checker.Calls);
+    }
+
+
     [Fact]
     public async Task NewerRelease_MakesTheBannerAvailable()
     {

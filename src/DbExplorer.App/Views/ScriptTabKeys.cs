@@ -24,6 +24,12 @@ public enum ScriptKeyAction
 
     /// <summary>Ctrl+Space: opens the completion list at the caret.</summary>
     Complete,
+
+    /// <summary>Ctrl+L: the estimated execution plan of the selection or the statement at the caret (nothing runs).</summary>
+    EstimatedPlan,
+
+    /// <summary>Ctrl+M: switches "Actual plan" on or off for the next runs.</summary>
+    ToggleActualPlan,
 }
 
 /// <summary>One line of the shortcuts flyout.</summary>
@@ -48,6 +54,8 @@ public static class ScriptTabKeys
         (Key.OemQuestion or Key.Divide, KeyModifiers.Control) => ScriptKeyAction.ToggleComment,
         (Key.F6, KeyModifiers.None) => ScriptKeyAction.SwitchPane,
         (Key.Space, KeyModifiers.Control) => ScriptKeyAction.Complete,
+        (Key.L, KeyModifiers.Control) => ScriptKeyAction.EstimatedPlan,
+        (Key.M, KeyModifiers.Control) => ScriptKeyAction.ToggleActualPlan,
         _ => ScriptKeyAction.None,
     };
 
@@ -58,6 +66,8 @@ public static class ScriptTabKeys
         new("Run the whole script", "F5"),
         new("Run the statement on the group", "Ctrl+Shift+Enter"),
         new("Run the whole script on the group", "Ctrl+Shift+F5"),
+        new("Show the estimated execution plan (nothing runs)", "Ctrl+L"),
+        new("Include the actual execution plan in the next runs", "Ctrl+M"),
         new("Stop the run", "Esc"),
         new("Save the script", "Ctrl+S"),
         new("Open a script file", "Ctrl+O"),

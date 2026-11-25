@@ -26,6 +26,9 @@ public interface IResultTab
 
     /// <summary>Spoken name of the tab, with the failure said in words.</summary>
     string AutomationName { get; }
+
+    /// <summary>The tab is an execution plan: it gets its own icon.</summary>
+    bool IsPlan => false;
 }
 
 public enum GridTabKind { Statistics, Messages }

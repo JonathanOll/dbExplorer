@@ -268,7 +268,8 @@ public class ShortcutTests : ShellTestBase
         var main = NewMain();
         Assert.True(MainShortcuts.Handle(main, Key.N, KeyModifiers.Control));   // new script on the selected connection
         Assert.IsType<ScriptTabViewModel>(main.ActiveTab);
-        Assert.True(MainShortcuts.Handle(main, Key.L, KeyModifiers.Control));
+        // In a script tab Ctrl+L is the editor's "estimated plan": the window leaves it alone (Ctrl+L jumps to a column in a table tab).
+        Assert.False(MainShortcuts.Handle(main, Key.L, KeyModifiers.Control));
         Assert.True(MainShortcuts.Handle(main, Key.T, KeyModifiers.Control));
         Assert.True(MainShortcuts.Handle(main, Key.T, KeyModifiers.Control | KeyModifiers.Shift));
         Assert.True(MainShortcuts.Handle(main, Key.O, KeyModifiers.Control));

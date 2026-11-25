@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DbExplorer.Core.Model;
+using DbExplorer.Core.Plans;
 using DbExplorer.Core.Scripting;
 using DbExplorer.Core.Sessions;
 
@@ -142,8 +143,10 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     private IReadOnlyList<ScriptStatement> _lastStatements = [];
     private string _runText = "";
     private bool _lastRunWasGroup;
+    private PlanMode _lastPlanRequest;   // what the last run asked for explicitly (Ctrl+L), not the toggle
     private bool _lastGroupWhole;
     private int _totalStatements;
+    private bool _estimatedRun;   // the run in progress (or the last one) asked for the estimated plan: nothing ran
 
     /// <param name="session">The live session, or null (restored tab): it is resolved through the hooks on first run.</param>
     /// <param name="number">The N of "Script N" in the title.</param>
@@ -240,7 +243,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel
             return Task.CompletedTask;
         }
         RowLimit = (int)Math.Min((long)RowLimit * 10, MaxRowLimit);
-        return _lastRunWasGroup ? RunOnGroupAsync(_lastGroupWhole) : RunAsync(_lastStatements);
+        return _lastRunWasGroup ? RunOnGroupAsync(_lastGroupWhole) : RunAsync(_lastStatements, _lastPlanRequest);
     }
 
     /// <summary>
@@ -353,12 +356,36 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     /// <summary>The tab's connection is SQL Server, the only engine with STATISTICS IO / TIME.</summary>
     public bool CanUseStatistics => Connection.Kind == DbKind.SqlServer;
 
+    // ---- execution plans ----
+
+    /// <summary>
+    /// "Actual plan" toggle: every run also returns the plan the statements ran with (SQL Server: STATISTICS XML, PostgreSQL:
+    /// EXPLAIN ANALYZE, whose rows are not returned). Not for SQLite, which has only the estimated plan. Per tab, not remembered.
+    /// </summary>
+    [NotifyPropertyChangedFor(nameof(ActualPlanTip))]
+    [ObservableProperty] private bool _actualPlanEnabled;
+
+    /// <summary>The engine can give the plan a statement really ran with.</summary>
+    public bool CanUseActualPlan => Connection.Kind != DbKind.Sqlite;
+
+    public string ActualPlanTip => Connection.Kind switch
+    {
+        DbKind.Postgres => "Run the statements and show the plan they ran with, with real rows and times (EXPLAIN ANALYZE: the rows themselves are not returned)",
+        _ => "Run the statements and show the plan they ran with, with real row counts and times, next to the results",
+    };
+
+    /// <summary>Ctrl+L: the plan the optimizer would use for the selection or the statement at the caret. Nothing is run.</summary>
+    [RelayCommand]
+    public Task ShowEstimatedPlanAsync() => RunAsync(StatementsAtCaretOrSelection(Connection.Kind), PlanMode.Estimated);
+
     protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
         if (e.PropertyName == nameof(Connection))
         {
             OnPropertyChanged(nameof(CanUseStatistics));
+            OnPropertyChanged(nameof(CanUseActualPlan));
+            OnPropertyChanged(nameof(ActualPlanTip));
             OnPropertyChanged(nameof(IsReadOnly));
             OnPropertyChanged(nameof(ConnectionDescription));
         }
@@ -427,7 +454,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         CancelGroup();
     }
 
-    private async Task RunAsync(IReadOnlyList<ScriptStatement> statements)
+    private async Task RunAsync(IReadOnlyList<ScriptStatement> statements, PlanMode planRequest = PlanMode.None)
     {
         if (IsRunning)
         {
@@ -457,6 +484,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         RunSummary = null;
         _lastStatements = statements;
         _lastRunWasGroup = false;
+        _lastPlanRequest = planRequest;
         _runText = Text;    // the result tabs point into this text
         _totalStatements = statements.Count;
         RunStartedAt = DateTime.Now;
@@ -486,8 +514,13 @@ public sealed partial class ScriptTabViewModel : TabViewModel
 
             var maxRows = RowLimit;
             // The connection's current flag (it can be toggled while connected) and its kind drive the guard.
-            var statistics = StatisticsEnabled && session.Config.Kind == DbKind.SqlServer;
-            var options = new ScriptOptions(maxRows, session.Config.ReadOnly, session.Config.Kind, statistics);
+            var kind = session.Config.Kind;
+            var planMode = PlanCapture.Effective(kind, planRequest != PlanMode.None ? planRequest : ActualPlanEnabled ? PlanMode.Actual : PlanMode.None);
+            _estimatedRun = planMode == PlanMode.Estimated;
+            // An estimated plan runs nothing, so there is nothing to count or time.
+            var statistics = StatisticsEnabled && kind == DbKind.SqlServer && !_estimatedRun;
+            var options = new ScriptOptions(maxRows, session.Config.ReadOnly, kind, statistics, planMode);
+            var plans = new List<(QueryPlan Plan, PlanStatement Statement)>();
 
             // Everything that touches the database runs on the thread pool: some providers (SQLite) execute
             // synchronously, so the UI thread must never be the one calling them. Results flow back through a channel.
@@ -515,19 +548,43 @@ public sealed partial class ScriptTabViewModel : TabViewModel
 
             // Reading with the token lets Cancel return control at once even when the provider cannot interrupt a
             // running statement (SQLite finishes it in the background; its late results are dropped).
-            await foreach (var r in channel.Reader.ReadAllAsync(ct))
+            await foreach (var received in channel.Reader.ReadAllAsync(ct))
             {
-                var vm = new StatementResultViewModel(++ran, r, maxRows) { StartLine = LineOf(_runText, r.Statement.Start) };
-                Results.Add(vm);
-                ResultTabs.Add(vm);
-                SelectedResult = vm;
+                ran++;
+                var (r, plan) = PlanCapture.Extract(received, kind, planMode);
+                if (plan is not null)
+                    foreach (var st in plan.Statements)
+                    {
+                        st.ScriptStatement = ran;
+                        plans.Add((plan, st));
+                    }
+
+                // An estimated plan replaces the statement's tab: nothing ran, so it has no result to show.
+                if (!(_estimatedRun && plan is not null))
+                {
+                    var vm = new StatementResultViewModel(ran, r, maxRows) { StartLine = LineOf(_runText, r.Statement.Start) };
+                    Results.Add(vm);
+                    ResultTabs.Add(vm);
+                    SelectedResult = vm;
+                }
                 if (ran < _totalStatements) RunProgressText = $"Running statement {ran + 1} of {_totalStatements}";
             }
 
             if (await producer is { } failure) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
             if (statistics && Results.Count > 0) AddStatisticsTabs();
+            if (planMode != PlanMode.None && plans.Count > 0)
+            {
+                var planTab = new PlanResultTab(plans, planMode, kind);
+                ResultTabs.Add(planTab);
+                // Estimated: the plan is the answer. Actual: the rows stay in front, the plan is one click away.
+                if (_estimatedRun || Results.Count == 0) SelectedResultTab = planTab;
+            }
+            else if (planMode != PlanMode.None && ran > 0 && Results.All(r => !r.HasError))
+            {
+                _status.Info("The server returned no plan for this statement.");
+            }
 
-            Report(ran, script.Reopened, script.ConnectionReset);
+            Report(ran, script.Reopened, script.ConnectionReset, plans.Count);
         }
         catch (OperationCanceledException)
         {
@@ -587,6 +644,10 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         {
             RunSummary = null;
         }
+        else if (_estimatedRun && failed is null)
+        {
+            RunSummary = $"Estimated plan for {Plural(total, "statement")} · nothing was run";
+        }
         else if (failed is not null)
         {
             var notRun = total - ran;
@@ -611,13 +672,17 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     public const string SessionResetNote =
         "(The connection of this tab was lost or reset: it was reopened, so open transactions, temp tables and variables are gone.)";
 
-    private void Report(int ran, bool reopened, bool reset)
+    private void Report(int ran, bool reopened, bool reset, int planCount = 0)
     {
         var note = reopened ? " " + SessionResetNote : "";
         if (Results.LastOrDefault(r => r.HasError) is { } failed)
         {
             SelectedResult = failed;
             _status.Error($"Statement {failed.Index} failed: {failed.Error}{note}");
+        }
+        else if (_estimatedRun)
+        {
+            _status.Info((planCount == 0 ? "No plan was returned." : planCount == 1 ? "Estimated plan ready, nothing was run." : $"Estimated plans ready for {planCount} statements, nothing was run.") + note);
         }
         else
         {

@@ -190,6 +190,38 @@ end of that statement are lost; a cancelled statement yields none. `SET STATISTI
 working as before but is only captured when the check box is on. The `DBX_MSSQL` integration tests check the capture and
 the French messages against a real server ([Integration tests](#integration-tests-against-real-databases)).
 
+## Execution plans
+
+![Actual execution plan, dark](docs/ui/after/plan-sqlserver-dark.png)
+
+The script toolbar has a **Plan** button (`Ctrl+L`) and an **Actual plan** switch (`Ctrl+M`), like SSMS:
+
+- **Estimated plan** (`Ctrl+L`): the plan the optimizer would use for the selection or the statement at the caret. Nothing is run,
+  so it is allowed on a read-only connection, even for a write statement. SQL Server: `SET SHOWPLAN_XML`. PostgreSQL:
+  `EXPLAIN (FORMAT JSON)`. SQLite: `EXPLAIN QUERY PLAN` (no cost or row counts: a tree of scans and searches).
+- **Actual plan** (switch on, then run as usual): the statements run, the rows stay in their tabs, and an **Execution plan**
+  tab is added with the real row counts and times. SQL Server: `SET STATISTICS XML` (the rows past the row limit are read
+  and dropped so that the plan, which the server sends last, is received). PostgreSQL: `EXPLAIN (ANALYZE, BUFFERS)`, which
+  runs the statement but does not return its rows. SQLite has no actual plan.
+
+The plan tab, one chip per statement when a run has several (with its share of the batch):
+
+- **Canvas**: the root on the left, data flowing right to left, one card per operator (icon of its family, object, rows
+  actual / estimated, a cost bar and its share of the statement). Arrows are as thick as the rows they carry and show the
+  count; the path from the selected operator to the root is lit. Colour the bars by **Cost**, **Time** or **Rows**.
+  Click to select, arrow keys walk the tree, `Ctrl+wheel` or `Ctrl +` / `Ctrl -` zoom, `Ctrl+0` or **Fit** shows it all,
+  drag the background to pan. It opens on the costliest operator.
+- **Properties**: everything the server says about the selected operator (costs, rows, times, I/O, object, predicates, seek
+  predicates, output columns, buffers...) plus the statement's own (parallelism, memory grant, parameters, timings).
+- **Top operators**: the costliest first; a click finds it in the plan.
+- **Issues**: the warnings (spills to tempdb or disk, no join predicate, missing statistics, implicit conversions), the
+  operators whose row estimate is 10 times off (where the error starts, not every operator above it), scans that an index
+  could turn into seeks, key lookups, and SQL Server's **missing index** hints with a ready `CREATE INDEX` (**Copy**).
+- **Copy plan** and **Save plan...**: the plan as the server sent it. A SQL Server `.sqlplan` opens in SSMS.
+
+Plans are per run and not run on a group. The `Time` colouring needs an actual plan. The SQL Server parser reads the
+standard showplan XML by local names (any schema version) and skips what it does not know.
+
 ## Keyboard shortcuts
 
 | Shortcut | Where | Action |
@@ -198,6 +230,8 @@ the French messages against a real server ([Integration tests](#integration-test
 | `Ctrl+Shift+P` | anywhere | Quick open a table/view across all connections (metadata cache) |
 | `Ctrl+Shift+T` | anywhere | Reopen the last closed tab (like a browser; press again to go further back; up to 50 are remembered; a table keeps its filters, a script its text) |
 | `Ctrl+L` | table tab | Fuzzy-search a column and scroll to it |
+| `Ctrl+L` | script tab | Show the estimated execution plan of the selection / the statement under the cursor (nothing runs) |
+| `Ctrl+M` | script tab | Include the actual execution plan in the next runs (switch) |
 | `Ctrl+N` | anywhere | New script tab on the active (or selected) connection |
 | `Ctrl+O` | anywhere | Open a script file in a script tab |
 | `Ctrl+Enter` | script tab | Run the statement under the cursor (ends at `;`, a `GO` line or a blank line) or the selection |

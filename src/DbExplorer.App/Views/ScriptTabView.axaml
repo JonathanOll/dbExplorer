@@ -29,6 +29,9 @@
     <DataTemplate DataType="vm:StatementResultViewModel" x:DataType="vm:StatementResultViewModel">
       <ContentControl Content="{Binding}" ContentTemplate="{StaticResource StatementResultContent}" />
     </DataTemplate>
+    <DataTemplate DataType="vm:PlanResultTab" x:DataType="vm:PlanResultTab">
+      <views:PlanView />
+    </DataTemplate>
     <DataTemplate DataType="vm:GridResultTab" x:DataType="vm:GridResultTab">
       <DockPanel>
         <Border DockPanel.Dock="Bottom" Classes="toolbar strip" BorderThickness="0,1,0,0">
@@ -223,6 +226,22 @@
                         ToolTip.Tip="SQL Server: capture STATISTICS IO and TIME on the next runs and show the Statistics and Messages tabs" />
 
           <Border Classes="vsep" />
+          <!-- Execution plans: the estimated one runs nothing; the actual one rides along with every run -->
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconSchema}" Content="Plan"
+                  Command="{Binding ShowEstimatedPlanCommand}" IsEnabled="{Binding CanRun}" ToolTip.ShowOnDisabled="True"
+                  AutomationProperties.Name="Show the estimated execution plan">
+            <ToolTip.Tip>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Show the estimated plan of the selection or the statement at the caret. Nothing is run." IsVisible="{Binding CanRun}" />
+                <TextBlock Text="{Binding RunDisabledReason}" IsVisible="{Binding !CanRun}" />
+                <Border Classes="kbd" IsVisible="{Binding CanRun}"><TextBlock Text="Ctrl+L" /></Border>
+              </StackPanel>
+            </ToolTip.Tip>
+          </Button>
+          <ToggleButton Classes="segment" Content="Actual plan" IsChecked="{Binding ActualPlanEnabled}" IsVisible="{Binding CanUseActualPlan}"
+                        VerticalAlignment="Center" Margin="4,0,0,0" ToolTip.Tip="{Binding ActualPlanTip}" AutomationProperties.Name="Include the actual execution plan" />
+
+          <Border Classes="vsep" />
           <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconFileOpen}"
                   Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).OpenScriptFileCommand}"
                   AutomationProperties.Name="Open a script file">
@@ -359,7 +378,7 @@
       <Grid Grid.Row="2" Background="{DynamicResource DbxContentBg}">
         <Grid IsVisible="{Binding GroupRun, Converter={x:Static ObjectConverters.IsNull}}">
           <!-- Nothing ran yet: what to do, not only which keys -->
-          <StackPanel Classes="empty" IsVisible="{Binding !Results.Count}">
+          <StackPanel Classes="empty" IsVisible="{Binding !ResultTabs.Count}">
             <PathIcon Data="{StaticResource IconPlay}" />
             <TextBlock Classes="h2" Text="Run a query to see its results" />
             <TextBlock Classes="dim" Text="Select some text to run just that part." />
@@ -377,7 +396,7 @@
             </Grid>
           </StackPanel>
 
-          <DockPanel IsVisible="{Binding !!Results.Count}">
+          <DockPanel IsVisible="{Binding !!ResultTabs.Count}">
             <!-- How the run went, for a script of several statements or a cancelled one -->
             <Border DockPanel.Dock="Top" Classes="toolbar strip" IsVisible="{Binding HasRunSummary}">
               <Grid ColumnDefinitions="Auto,*">
@@ -402,6 +421,7 @@
                     <PathIcon Classes="bad" Data="{StaticResource IconError}" Width="12" Height="12" IsVisible="{Binding ShowFailure}" />
                     <PathIcon Classes="warn" Data="{StaticResource IconLock}" Width="12" Height="12" IsVisible="{Binding IsBlocked}" />
                     <PathIcon Classes="dim" Data="{StaticResource IconCount}" Width="12" Height="12" IsVisible="{Binding IsGrid}" />
+                    <PathIcon Classes="run" Data="{StaticResource IconSchema}" Width="12" Height="12" IsVisible="{Binding IsPlan}" />
                     <TextBlock Text="{Binding Header}" TextTrimming="CharacterEllipsis" MaxWidth="260" />
                   </StackPanel>
                 </DataTemplate>

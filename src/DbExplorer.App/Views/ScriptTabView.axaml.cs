@@ -433,6 +433,11 @@ public partial class ScriptTabView : UserControl
             case ScriptKeyAction.RunStatementOnGroup: action = vm.RunStatementOnGroupAsync; break;
             case ScriptKeyAction.RunScriptOnGroup: action = vm.RunScriptOnGroupAsync; break;
             case ScriptKeyAction.Save: action = () => vm.SaveAsync(null); break;
+            case ScriptKeyAction.EstimatedPlan: action = vm.ShowEstimatedPlanAsync; break;
+            case ScriptKeyAction.ToggleActualPlan:
+                if (vm.CanUseActualPlan) vm.ActualPlanEnabled = !vm.ActualPlanEnabled;
+                e.Handled = true;
+                return;
             case ScriptKeyAction.Cancel:
                 vm.Cancel();   // also cancels a group run
                 e.Handled = true;

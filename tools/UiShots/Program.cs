@@ -300,6 +300,8 @@ internal static class Scenes
         ("table-structure", TableStructure),
         ("script", s => Script(s, false)),
         ("script-error", s => Script(s, true)),
+        ("plan-sqlite", PlanSqlite),
+        ("plan-sqlserver", PlanSqlServer),
         ("quick-open", QuickOpen),
         ("connection-dialog", ConnectionDialogScene),
         ("sql-preview", SqlPreview),
@@ -460,6 +462,42 @@ internal static class Scenes
         d.Window.Show();
         Pump();
         await script.RunScriptAsync();
+        await Settle();
+        await Task.Delay(100);
+        Pump();
+        return null;
+    }
+
+    // A real estimated plan (SQLite's EXPLAIN QUERY PLAN: no cost, a tree of scans and searches)
+    private static async Task<Window?> PlanSqlite(Demo d)
+    {
+        await Open(d);
+        var script = d.Main.NewScript()!;
+        script.Text = "SELECT c.name, count(*) AS orders, round(sum(o.total), 2) AS total\nFROM orders o\nJOIN customers c ON c.id = o.customer_id\nWHERE o.status <> 'open'\nGROUP BY c.id\nORDER BY total DESC\nLIMIT 8";
+        d.Window.Show();
+        Pump();
+        await script.ShowEstimatedPlanAsync();
+        await Settle();
+        await Task.Delay(100);
+        Pump();
+        return null;
+    }
+
+    // A SQL Server actual plan built from a showplan document: costs, times, a spill, a bad estimate and a missing index
+    private static async Task<Window?> PlanSqlServer(Demo d)
+    {
+        await Open(d);
+        var script = d.Main.NewScript()!;
+        script.Text = "SELECT TOP 8 c.name, SUM(o.total) AS total\nFROM orders o JOIN customers c ON c.id = o.customer_id\nWHERE o.status <> 'open' AND o.total > 100\nGROUP BY c.id, c.name ORDER BY total DESC";
+        d.Window.Show();
+        Pump();
+        var plan = DbExplorer.Core.Plans.ShowplanParser.Parse(PlanSample.Xml(), DbExplorer.Core.Plans.PlanMode.Actual);
+        var tab = new PlanResultTab(plan.Statements.Select(st => (plan, st)).ToList(), DbExplorer.Core.Plans.PlanMode.Actual, DbKind.SqlServer);
+        script.ResultTabs.Add(tab);
+        script.SelectedResultTab = tab;
+        tab.Selected!.SelectedNode = tab.Selected.Nodes.First(n => n.Node.Id == 4);
+        await Settle();
+        if (Environment.GetEnvironmentVariable("DBX_ZOOM") is { } z) { tab.Zoom = double.Parse(z, System.Globalization.CultureInfo.InvariantCulture); }
         await Settle();
         await Task.Delay(100);
         Pump();

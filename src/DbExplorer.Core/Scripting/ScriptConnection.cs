@@ -156,8 +156,16 @@ public sealed class ScriptConnection : IDisposable
             var statistics = o.Statistics && Session.Driver.Kind == Model.DbKind.SqlServer;
             o = o with { Statistics = statistics };
             var statisticsOn = false;
+            var plan = Plans.PlanCapture.Effective(Session.Driver.Kind, o.Plan);
+            o = o with { Plan = plan, Kind = o.Kind ?? Session.Driver.Kind };
+            var planOn = false;
             try
             {
+                if (plan != Plans.PlanMode.None && Plans.PlanCapture.OnSql(Session.Driver.Kind, plan) is not null)
+                {
+                    await Plans.PlanCapture.EnableAsync(connection, Session.Driver.Kind, plan, ct).ConfigureAwait(false);
+                    planOn = true;
+                }
                 if (statistics)
                 {
                     await StatisticsSession.EnableAsync(connection, ct).ConfigureAwait(false);
@@ -176,6 +184,8 @@ public sealed class ScriptConnection : IDisposable
                 // A cancelled statement or a truncated result set (the command is aborted) may leave the connection unusable.
                 if (ct.IsCancellationRequested) _suspect = true;
                 await TearDownReadOnlyContextAsync(connection, tx, o).ConfigureAwait(false);
+                // First: while SHOWPLAN_XML is on, nothing else would run on this connection (not even the probe).
+                if (planOn && !await Plans.PlanCapture.DisableAsync(connection, Session.Driver.Kind, plan).ConfigureAwait(false)) _suspect = true;
                 if (statisticsOn && !await StatisticsSession.DisableAsync(connection).ConfigureAwait(false)) _suspect = true;
                 // Probe now, not at the next run: the abort (PostgreSQL: the cancel request fails a statement inside the user's
                 // transaction, which then aborts it) must be reported by THIS run, while the user still knows what ran.

@@ -1,0 +1,313 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DbExplorer.App.ViewModels"
+             xmlns:views="using:DbExplorer.App.Views"
+             x:Class="DbExplorer.App.Views.PlanView"
+             x:DataType="vm:PlanResultTab"
+             Focusable="True">
+  <UserControl.Styles>
+    <!-- one operator: a card; the cost bar says how much of the metric it takes, the border says what is selected -->
+    <Style Selector="Border.plannode">
+      <Setter Property="Background" Value="{DynamicResource DbxSurface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Border.plannode:pointerover"><Setter Property="BorderBrush" Value="{DynamicResource DbxBorderStrong}" /></Style>
+    <Style Selector="Border.plannode.path"><Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" /></Style>
+    <Style Selector="Border.plannode.selected">
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" />
+      <Setter Property="Background" Value="{DynamicResource DbxAccentSoft}" />
+    </Style>
+    <Style Selector="Border.tile">
+      <Setter Property="Width" Value="32" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Background" Value="{DynamicResource DbxHover}" />
+    </Style>
+    <Style Selector="Border.tile > PathIcon">
+      <Setter Property="Width" Value="18" />
+      <Setter Property="Height" Value="18" />
+      <Setter Property="Foreground" Value="{DynamicResource DbxIcon}" />
+    </Style>
+    <Style Selector="Border.plannode.selected Border.tile"><Setter Property="Background" Value="{DynamicResource DbxSurface}" /></Style>
+
+    <Style Selector="views|HeatBar">
+      <Setter Property="Track" Value="{DynamicResource DbxBorder}" />
+      <Setter Property="Fill" Value="{DynamicResource DbxTextFaint}" />
+    </Style>
+    <Style Selector="views|HeatBar.low"><Setter Property="Fill" Value="{DynamicResource DbxAccent}" /></Style>
+    <Style Selector="views|HeatBar.mid"><Setter Property="Fill" Value="{DynamicResource DbxWarn}" /></Style>
+    <Style Selector="views|HeatBar.high"><Setter Property="Fill" Value="{DynamicResource DbxError}" /></Style>
+
+    <Style Selector="TextBlock.cost"><Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+    <Style Selector="TextBlock.cost.mid"><Setter Property="Foreground" Value="{DynamicResource DbxWarnText}" /></Style>
+    <Style Selector="TextBlock.cost.high"><Setter Property="Foreground" Value="{DynamicResource DbxErrorText}" /></Style>
+    <Style Selector="PathIcon.warn"><Setter Property="Foreground" Value="{DynamicResource DbxWarn}" /></Style>
+    <Style Selector="PathIcon.hint"><Setter Property="Foreground" Value="{DynamicResource DbxInfo}" /></Style>
+    <Style Selector="PathIcon.bad"><Setter Property="Foreground" Value="{DynamicResource DbxError}" /></Style>
+
+    <!-- operators and statements of the lists are rows -->
+    <Style Selector="Button.planrow">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Padding" Value="10,5" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel>
+    <!-- Toolbar: colour by | zoom ... details, copy, save -->
+    <Border DockPanel.Dock="Top" Classes="toolbar">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding Selected.CanColour}">
+          <TextBlock Classes="dim small" Text="Colour by" VerticalAlignment="Center" Margin="4,0,4,0" />
+          <ToggleButton Classes="segment" Content="Cost" IsChecked="{Binding IsCost, Mode=TwoWay}" IsEnabled="{Binding Selected.CanColourByCost}" Click="OnMetricClick"
+                        ToolTip.ShowOnDisabled="True" ToolTip.Tip="Estimated cost of each operator: the optimizer's own measure of where the work is" />
+          <ToggleButton Classes="segment" Content="Time" IsChecked="{Binding IsTime, Mode=TwoWay}" IsEnabled="{Binding Selected.CanColourByTime}" Click="OnMetricClick"
+                        ToolTip.ShowOnDisabled="True" ToolTip.Tip="Time really spent in each operator. Only an actual plan has it." />
+          <ToggleButton Classes="segment" Content="Rows" IsChecked="{Binding IsRows, Mode=TwoWay}" IsEnabled="{Binding Selected.CanColourByRows}" Click="OnMetricClick"
+                        ToolTip.ShowOnDisabled="True" ToolTip.Tip="Rows each operator produces (log scale)" />
+          <Border Classes="vsep" />
+          </StackPanel>
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRemove}" Click="OnZoomOutClick" AutomationProperties.Name="Zoom out">
+            <ToolTip.Tip>
+              <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Zoom out" /><Border Classes="kbd"><TextBlock Text="Ctrl+-" /></Border></StackPanel>
+            </ToolTip.Tip>
+          </Button>
+          <TextBlock Classes="dim num" Text="{Binding ZoomText}" MinWidth="38" TextAlignment="Center" VerticalAlignment="Center" />
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconAdd}" Click="OnZoomInClick" AutomationProperties.Name="Zoom in">
+            <ToolTip.Tip>
+              <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Zoom in" /><Border Classes="kbd"><TextBlock Text="Ctrl++" /></Border></StackPanel>
+            </ToolTip.Tip>
+          </Button>
+          <Button Classes="ghost" MinHeight="28" Padding="8,0" Content="Fit" Click="OnFitClick" AutomationProperties.Name="Fit the plan to the window">
+            <ToolTip.Tip>
+              <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Fit the whole plan in the window" /><Border Classes="kbd"><TextBlock Text="Ctrl+0" /></Border></StackPanel>
+            </ToolTip.Tip>
+          </Button>
+        </StackPanel>
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+          <Button Classes="ghost" MinHeight="28" Padding="8,0" Content="Copy plan" Click="OnCopyPlanClick"
+                  ToolTip.Tip="Copy the plan as the server sent it (XML for SQL Server, JSON for PostgreSQL)" AutomationProperties.Name="Copy the plan text" />
+          <Button Classes="ghost" MinHeight="28" Padding="8,0" Content="Save plan…" Click="OnSavePlanClick"
+                  ToolTip.Tip="Save the plan to a file. A SQL Server .sqlplan file opens in SSMS and in Azure Data Studio." AutomationProperties.Name="Save the plan to a file" />
+          <Border Classes="vsep" />
+          <ToggleButton Classes="segment" Content="Details" IsChecked="{Binding ShowSidePanel, Mode=TwoWay}"
+                        ToolTip.Tip="Show or hide the panel with the properties, the costliest operators and the issues" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Several statements: one chip each, with its share of the batch -->
+    <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1" Padding="8,6,8,2" IsVisible="{Binding HasSeveralStatements}">
+      <ItemsControl ItemsSource="{Binding Statements}">
+        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:PlanStatementViewModel">
+            <Button Classes="ghost" MinHeight="26" Padding="10,0" Margin="0,0,6,4" Tag="{Binding}" Click="OnStatementClick" ToolTip.Tip="{Binding StatementPreview}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
+                <TextBlock Classes="dim" Text="{Binding Subtitle}" FontSize="11.5" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Border>
+
+    <!-- The statement the canvas shows -->
+    <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1" Padding="12,6">
+      <StackPanel Spacing="2">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="{Binding Selected.Title}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center" />
+          <TextBlock Classes="dim num" Text="{Binding Selected.Summary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <TextBlock Text="{Binding Selected.StatementPreview}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="11.5"
+                   Foreground="{DynamicResource DbxTextDim}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Selected.StatementText}" />
+      </StackPanel>
+    </Border>
+
+    <!-- A missing index is the one thing worth saying before the picture -->
+    <Border DockPanel.Dock="Top" Classes="banner warn" IsVisible="{Binding Selected.HasMissingIndex}">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <PathIcon Classes="bi" Data="{StaticResource IconWarning}" Margin="0,1,10,0" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding Selected.MissingIndexText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="12,0,0,0" VerticalAlignment="Center">
+          <Button Classes="ghost" MinHeight="26" Padding="8,0" Content="Copy CREATE INDEX" Click="OnCopyIndexClick" ToolTip.Tip="Copy the statement that creates the suggested index" />
+          <Button Classes="ghost" MinHeight="26" Padding="8,0" Content="Details" Click="OnShowIssuesClick" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid x:Name="Body">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" MinWidth="200" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="360" MinWidth="240" MaxWidth="720" />
+      </Grid.ColumnDefinitions>
+
+      <!-- The plan: the root on the left, data flowing right to left -->
+      <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Focusable="True" Background="{DynamicResource DbxContentBg}"
+                    AutomationProperties.Name="Execution plan">
+        <LayoutTransformControl x:Name="Zoomer" HorizontalAlignment="Left" VerticalAlignment="Top">
+          <Grid Width="{Binding Selected.CanvasWidth}" Height="{Binding Selected.CanvasHeight}">
+            <views:PlanEdges Statement="{Binding Selected}" />
+            <ItemsControl ItemsSource="{Binding Selected.Nodes}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl.Styles>
+                <Style Selector="ContentPresenter" x:DataType="vm:PlanNodeViewModel">
+                  <Setter Property="Canvas.Left" Value="{Binding X}" />
+                  <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                </Style>
+              </ItemsControl.Styles>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:PlanNodeViewModel">
+                  <Border Classes="plannode" Classes.selected="{Binding IsSelected}" Classes.path="{Binding IsOnPath}"
+                          Width="{Binding Width}" Height="{Binding Height}" ToolTip.Tip="{Binding ToolTipText}"
+                          AutomationProperties.Name="{Binding AutomationName}" PointerPressed="OnNodePressed" DoubleTapped="OnNodeDoubleTapped">
+                    <Grid RowDefinitions="*,Auto" Margin="0,0,0,0">
+                      <Grid ColumnDefinitions="Auto,*,Auto" Margin="8,7,8,2">
+                        <Border Classes="tile" VerticalAlignment="Top">
+                          <PathIcon Data="{Binding IconKey, Converter={x:Static views:Icons.ByKey}}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Spacing="0">
+                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12.5" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Classes="dim" Text="{Binding Subtitle}" FontSize="11" TextTrimming="CharacterEllipsis" IsVisible="{Binding Subtitle, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                          <TextBlock Classes="dim" Text="{Binding RowsText}" FontSize="11" TextTrimming="CharacterEllipsis" IsVisible="{Binding RowsText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        </StackPanel>
+                        <PathIcon Grid.Column="2" Classes="warn" Data="{StaticResource IconWarning}" Width="13" Height="13" VerticalAlignment="Top" Margin="4,0,0,0" IsVisible="{Binding HasWarning}" />
+                        <PathIcon Grid.Column="2" Classes="hint" Data="{StaticResource IconInfo}" Width="13" Height="13" VerticalAlignment="Top" Margin="4,0,0,0"
+                                  IsVisible="{Binding ShowHintOnly}" />
+                      </Grid>
+                      <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="8,0,8,7" IsVisible="{Binding HasCost}">
+                        <views:HeatBar Classes.low="{Binding IsLow}" Classes.mid="{Binding IsMid}" Classes.high="{Binding IsHigh}"
+                                       Value="{Binding Heat}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Classes="cost" Classes.mid="{Binding IsMid}" Classes.high="{Binding IsHigh}" Text="{Binding CostText}"
+                                   FontSize="11" Margin="8,0,0,0" MinWidth="26" TextAlignment="Right" />
+                      </Grid>
+                      <TextBlock Grid.Row="1" Classes="dim" FontSize="11" Margin="8,0,8,7" Text="{Binding TimeText}"
+                                 IsVisible="{Binding !HasCost}" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Grid>
+        </LayoutTransformControl>
+      </ScrollViewer>
+
+      <GridSplitter Grid.Column="1" ResizeDirection="Columns" Width="6" Background="Transparent" IsVisible="{Binding ShowSidePanel}"
+                    AutomationProperties.Name="Resize the details panel" />
+
+      <!-- Properties of the selected operator | the costliest operators | everything that looks wrong -->
+      <Border Grid.Column="2" x:Name="SidePanel" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="1,0,0,0" IsVisible="{Binding ShowSidePanel}">
+        <TabControl x:Name="SideTabs" Theme="{StaticResource DbxSubTabControl}" ItemContainerTheme="{StaticResource DbxSubTabItem}">
+          <TabItem Header="Properties">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Padding="12,8,12,6" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1">
+                <TextBlock Text="{Binding Selected.SelectedTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              </Border>
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                  <ItemsControl ItemsSource="{Binding Selected.SelectedIssues}" IsVisible="{Binding Selected.HasSelectedIssues}" Margin="8,8,8,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:PlanIssue">
+                        <Border Classes="banner" Classes.warn="{Binding IsWarning}" Classes.info="{Binding IsHintKind}" Margin="0,0,0,6" Padding="10,6">
+                          <StackPanel Spacing="2">
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="12" IsVisible="{Binding Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                          </StackPanel>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <ItemsControl ItemsSource="{Binding Selected.Properties}" Margin="0,4,0,12">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:PlanPropertyRow">
+                        <Grid>
+                          <TextBlock Classes="section" Text="{Binding Name}" IsVisible="{Binding IsHeader}" Margin="12,10,12,2" />
+                          <Grid ColumnDefinitions="128,*" Margin="12,2,12,2" IsVisible="{Binding IsEntry}">
+                            <TextBlock Classes="dim" Text="{Binding Name}" TextWrapping="Wrap" FontSize="12" Margin="0,0,8,0" />
+                            <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" FontSize="12" />
+                          </Grid>
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </ScrollViewer>
+            </DockPanel>
+          </TabItem>
+
+          <TabItem Header="Top operators">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <StackPanel>
+                <TextBlock Classes="dim small" TextWrapping="Wrap" Margin="12,10,12,4"
+                           Text="Where the work is, costliest first. Click one to find it in the plan." />
+                <ItemsControl ItemsSource="{Binding Selected.Top}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PlanTopRow">
+                      <Button Classes="planrow" Tag="{Binding Node}" Click="OnTopRowClick">
+                        <Grid ColumnDefinitions="22,*,Auto,Auto">
+                          <TextBlock Classes="dim num" Text="{Binding Rank}" VerticalAlignment="Center" />
+                          <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12.5" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Classes="dim" Text="{Binding Object}" FontSize="11" TextTrimming="CharacterEllipsis" IsVisible="{Binding Object, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="2" Classes="dim num" Text="{Binding Rows}" Margin="8,0,0,0" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="3" Classes="cost" Classes.mid="{Binding Node.IsMid}" Classes.high="{Binding Node.IsHigh}" Text="{Binding Share}"
+                                     Margin="10,0,0,0" MinWidth="38" TextAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <TabItem Header="{Binding Selected.IssueCount, StringFormat='Issues ({0})'}" x:Name="IssuesTab">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <StackPanel>
+                <StackPanel Classes="empty" IsVisible="{Binding Selected.HasNoIssues}" Margin="12,40,12,0">
+                  <PathIcon Data="{StaticResource IconCheck}" />
+                  <TextBlock Classes="dim" Text="Nothing suspicious: no warning, no missing index, no scan that an index would avoid." />
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding Selected.Issues}" Margin="8,8,8,8">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PlanIssue">
+                      <Border Classes="banner" Classes.warn="{Binding IsWarning}" Classes.info="{Binding IsHintKind}" Classes.error="False" Margin="0,0,0,6" Padding="10,8">
+                        <Grid ColumnDefinitions="Auto,*">
+                          <PathIcon Classes="bi" Data="{StaticResource IconWarning}" Margin="0,1,8,0" VerticalAlignment="Top" Width="14" Height="14" IsVisible="{Binding IsWarning}" />
+                          <PathIcon Classes="bi" Data="{StaticResource IconInfo}" Margin="0,1,8,0" VerticalAlignment="Top" Width="14" Height="14" IsVisible="{Binding IsHintKind}" />
+                          <PathIcon Classes="bi" Data="{StaticResource IconKey}" Margin="0,1,8,0" VerticalAlignment="Top" Width="14" Height="14" IsVisible="{Binding IsIndex}" />
+                          <StackPanel Grid.Column="1" Spacing="3">
+                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <SelectableTextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="12" IsVisible="{Binding !IsIndex}" />
+                            <SelectableTextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="12" IsVisible="{Binding IsIndex}"
+                                                 FontFamily="{DynamicResource DbxMonoFont}" />
+                            <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,2,0,0">
+                              <Button Classes="ghost" MinHeight="24" Padding="8,0" Content="Show in plan" Tag="{Binding Node}" Click="OnIssueShowClick" IsVisible="{Binding HasNode}" />
+                              <Button Classes="ghost" MinHeight="24" Padding="8,0" Content="Copy script" Tag="{Binding Script}" Click="OnIssueCopyClick" IsVisible="{Binding HasScript}" />
+                            </StackPanel>
+                          </StackPanel>
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+        </TabControl>
+      </Border>
+    </Grid>
+  </DockPanel>
+</UserControl>

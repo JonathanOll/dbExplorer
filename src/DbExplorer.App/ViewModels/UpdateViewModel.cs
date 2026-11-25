@@ -75,6 +75,9 @@ public partial class UpdateViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Text))]
     private string? _failure;
 
+    /// <summary>The background check is running: the window shows a "Checking for updates" band meanwhile.</summary>
+    [ObservableProperty] private bool _isChecking;
+
     /// <summary>The "check for updates automatically" setting, as flipped by the user.</summary>
     [ObservableProperty] private bool _autoCheckEnabled;
 
@@ -111,7 +114,8 @@ public partial class UpdateViewModel : ObservableObject
     /// </summary>
     public async Task CheckAsync(CancellationToken ct = default)
     {
-        if (_checker is null || !AutoCheckEnabled || _suppressed || State != UpdateState.Idle) return;
+        if (_checker is null || !AutoCheckEnabled || _suppressed || State != UpdateState.Idle || IsChecking) return;
+        IsChecking = true;
         try
         {
             var result = await Task.Run(() => _checker.CheckAsync(ct), ct);
@@ -129,6 +133,10 @@ public partial class UpdateViewModel : ObservableObject
         catch (Exception e)
         {
             Trace.WriteLine("Update check failed: " + e.Message);
+        }
+        finally
+        {
+            IsChecking = false;
         }
     }
 

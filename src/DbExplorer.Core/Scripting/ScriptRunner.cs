@@ -27,7 +27,11 @@ public sealed record StatementResult(
 /// captures the server's messages into <see cref="StatementResult.Messages"/>. Ignored for other kinds by
 /// <see cref="ScriptConnection"/> and the session overload of <see cref="ScriptRunner.RunAsync(Session, IReadOnlyList{ScriptStatement}, ScriptOptions, CancellationToken)"/>.
 /// The connection overload trusts it: the caller applies it only to SQL Server.</param>
-public sealed record ScriptOptions(int MaxRows = 1000, bool ReadOnly = false, DbKind? Kind = null, bool Statistics = false);
+/// <param name="Plan">Ask the server for the execution plan: <see cref="Plans.PlanMode.Estimated"/> runs nothing (the statement is only
+/// compiled), <see cref="Plans.PlanMode.Actual"/> runs it and adds the plan. The plan comes back as result sets that
+/// <see cref="Plans.PlanCapture.Extract"/> picks out. Needs <see cref="Kind"/>. SQL Server sets the option on the connection
+/// itself (<see cref="ScriptConnection"/> does it; the connection overload trusts the caller).</param>
+public sealed record ScriptOptions(int MaxRows = 1000, bool ReadOnly = false, DbKind? Kind = null, bool Statistics = false, Plans.PlanMode Plan = Plans.PlanMode.None);
 
 public static class ScriptRunner
 {
@@ -50,7 +54,8 @@ public static class ScriptRunner
             if (ct.IsCancellationRequested) yield break;
 
             capture?.Drain();
-            var result = o.ReadOnly && IsRefused(stmt, o)
+            // An estimated plan executes nothing, so a read-only connection may ask it for a write statement.
+            var result = o.ReadOnly && o.Plan != Plans.PlanMode.Estimated && IsRefused(stmt, o)
                 ? new StatementResult(stmt, [], null, TimeSpan.Zero, "Refused: this connection is read-only, write statements are not allowed.")
                 : await ExecuteAsync(c, transaction, stmt, o, ct);
 
@@ -76,7 +81,7 @@ public static class ScriptRunner
     {
         await using var connection = await session.OpenConnectionAsync(ct).ConfigureAwait(false);
         var statistics = o.Statistics && session.Driver.Kind == DbKind.SqlServer;
-        o = o with { Statistics = statistics };
+        o = o with { Statistics = statistics, Plan = Plans.PlanMode.None };   // plans are the script tab's: its own connection sets the option
         // Before the read-only transaction (a command needs cmd.Transaction while one is pending; SET options outlive it anyway).
         if (statistics) await StatisticsSession.EnableAsync(connection, ct).ConfigureAwait(false);
         var tx = o.ReadOnly
@@ -113,12 +118,17 @@ public static class ScriptRunner
         {
             await using var cmd = c.CreateCommand();
             cmd.Transaction = transaction;
-            cmd.CommandText = stmt.Text;
+            var planKind = o.Kind ?? DbKind.SqlServer;
+            if (o.Plan != Plans.PlanMode.None && Plans.PlanCapture.CannotPlan(stmt.Text, planKind) is { } cannot)
+                return new StatementResult(stmt, [], null, watch.Elapsed, cannot);
+            cmd.CommandText = Plans.PlanCapture.Wrap(stmt.Text, planKind, o.Plan);
             Querying.CommandTimeouts.Unbounded(cmd);   // the statement ends or the user cancels it
             pump = new CancelPump(cmd);
             using var cancelRegistration = ct.Register(pump.OnCancel);
 
             var sets = new List<ResultSet>();
+            // An actual SQL Server plan arrives after the rows: read them all (kept up to the limit) or the plan is never sent.
+            var drain = o.Plan == Plans.PlanMode.Actual && planKind == DbKind.SqlServer;
             int affected;
             await using (var reader = await cmd.ExecuteReaderAsync(ct))
             {
@@ -127,9 +137,9 @@ public static class ScriptRunner
                     ct.ThrowIfCancellationRequested();
                     if (reader.FieldCount == 0) continue;
 
-                    var set = await ReadSetAsync(reader, o.MaxRows, ct);
+                    var set = await ReadSetAsync(reader, o.MaxRows, ct, drain);
                     sets.Add(set);
-                    if (set.Truncated)
+                    if (set.Truncated && !drain)
                     {
                         // Do not drain the remaining rows (possibly millions): abort the command instead.
                         TryCancel(cmd);
@@ -168,7 +178,7 @@ public static class ScriptRunner
         return [.. raised, .. fromException.Where(m => !known.Contains(m.Text))];   // an event and the exception never say a line twice
     }
 
-    private static async Task<ResultSet> ReadSetAsync(DbDataReader reader, int maxRows, CancellationToken ct)
+    private static async Task<ResultSet> ReadSetAsync(DbDataReader reader, int maxRows, CancellationToken ct, bool drain = false)
     {
         var columns = new string[reader.FieldCount];
         for (var i = 0; i < columns.Length; i++) columns[i] = reader.GetName(i);
@@ -180,7 +190,8 @@ public static class ScriptRunner
             if (rows.Count >= maxRows)
             {
                 truncated = true;
-                break;
+                if (!drain) break;
+                continue;   // keep reading so the plan that follows is received; the extra rows are not kept
             }
             var values = new object[reader.FieldCount];
             reader.GetValues(values);
