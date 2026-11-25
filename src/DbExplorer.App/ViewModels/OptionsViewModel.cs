@@ -1,9 +1,10 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace DbExplorer.App.ViewModels;
 
 /// <summary>What the Options dialog hands back: the dbupdate folder, or null to switch the upgrade feature off.</summary>
-public sealed record OptionsResult(string? DbUpdatePath);
+public sealed record OptionsResult(string? DbUpdatePath, bool RecordHistory = true);
 
 /// <summary>
 /// The Options dialog: today one setting, the dbupdate folder of the n2f repo. Validation and the optional info line are
@@ -18,11 +19,52 @@ public sealed partial class OptionsViewModel : ObservableObject
     /// <param name="currentDbUpdatePath">The stored path (null when the feature is off).</param>
     /// <param name="validate">Returns an error message for an unusable folder, null when fine.</param>
     /// <param name="describe">Returns the info line shown for a valid folder (e.g. "147 version folders found"), or null.</param>
-    public OptionsViewModel(string? currentDbUpdatePath, Func<string, string?> validate, Func<string, string?>? describe = null)
+    /// <param name="recordHistory">The stored "record the query history" setting.</param>
+    /// <param name="clearHistory">Empties the history (the "Clear history" button); null hides the button.</param>
+    public OptionsViewModel(string? currentDbUpdatePath, Func<string, string?> validate, Func<string, string?>? describe = null,
+        bool recordHistory = true, Action? clearHistory = null)
     {
         _validate = validate;
         _describe = describe;
         _dbUpdatePath = currentDbUpdatePath ?? "";
+        _recordHistory = recordHistory;
+        _clearHistory = clearHistory;
+    }
+
+    private readonly Action? _clearHistory;
+
+    /// <summary>Record the statements run from script tabs in the query history.</summary>
+    [ObservableProperty]
+    private bool _recordHistory;
+
+    public bool CanClearHistory => _clearHistory is not null;
+
+    /// <summary>The button text: asks for a second click before the (immediate, not undoable) clearing.</summary>
+    [ObservableProperty]
+    private string _clearHistoryText = "Clear history…";
+
+    private bool _clearArmed;
+
+    /// <summary>"History cleared." once done; null before.</summary>
+    [ObservableProperty]
+    private string? _clearHistoryInfo;
+
+    /// <summary>First click arms the button, the second empties the history now (it does not wait for Save).</summary>
+    [RelayCommand]
+    private void ClearHistory()
+    {
+        if (_clearHistory is null) return;
+        if (!_clearArmed)
+        {
+            _clearArmed = true;
+            ClearHistoryText = "Click again to clear";
+            ClearHistoryInfo = null;
+            return;
+        }
+        _clearArmed = false;
+        _clearHistory();
+        ClearHistoryText = "Clear history…";
+        ClearHistoryInfo = "History cleared.";
     }
 
     [ObservableProperty]
@@ -145,7 +187,7 @@ public sealed partial class OptionsViewModel : ObservableObject
         ValidatePath();
         if (PathError is not null) return false;
         var path = DbUpdatePath.Trim();
-        Result = new OptionsResult(path.Length == 0 ? null : path);
+        Result = new OptionsResult(path.Length == 0 ? null : path, RecordHistory);
         return true;
     }
 }

@@ -26,6 +26,9 @@ public sealed record AppPaths(string DataDir, string DBeaverDir)
     /// <summary>The scripts opened or saved lately (JSON, up to 20).</summary>
     public string RecentScriptsFile => Path.Combine(DataDir, "recent-scripts.json");
 
+    /// <summary>The statements run from script tabs (JSON lines, at most 5000, read when the history opens).</summary>
+    public string HistoryFile => Path.Combine(DataDir, "history.jsonl");
+
     public const string Usage = "Usage: dbExplorer [--data-dir <path>] [--dbeaver-dir <path>] [--no-update-check]";
 
     /// <summary>

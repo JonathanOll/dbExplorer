@@ -38,6 +38,7 @@ public static class ShortcutCatalog
             new("Ctrl+Tab", "Next tab"),
             new("Ctrl+Shift+Tab", "Previous tab"),
             new("Ctrl+Shift+T", "Reopen the last closed tab"),
+            new("Ctrl+Shift+H", "Query history: search, re-open or re-run past statements"),
         ]),
         new("Table", [
             new("F5", "Reload"),

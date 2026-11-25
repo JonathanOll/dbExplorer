@@ -42,6 +42,9 @@ public static class MainShortcuts
             case (Key.P, KeyModifiers.Control | KeyModifiers.Shift):
                 main.ShowAllTablesPickerCommand.Execute(null);
                 return true;
+            case (Key.H, KeyModifiers.Control | KeyModifiers.Shift):
+                main.OpenHistoryCommand.Execute(null);
+                return true;
             case (Key.N, KeyModifiers.Control):
                 main.NewScriptTabCommand.Execute(null);
                 return true;

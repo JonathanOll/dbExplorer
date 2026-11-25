@@ -343,6 +343,7 @@ internal static class Scenes
         ("group-run-differences", GroupRunDifferences),
         ("script-library", ScriptLibraryScene),
         ("save-script-dialog", SaveScriptDialogScene),
+        ("history", HistoryScene),
     ];
 
     private static string Theme = "light";
@@ -715,6 +716,36 @@ internal static class Scenes
     }
 
     private static Task<Window?> GroupRunDifferences(Demo d) => GroupRunCore(d, differences: true);
+
+    // The query history window with a week of statements: one failed, one estimated plan, two connections.
+    private static async Task<Window?> HistoryScene(Demo d)
+    {
+        await Open(d);
+        var history = new DbExplorer.Core.Scripting.QueryHistory(Path.Combine(d.Dir, "history.jsonl"));
+        var now = DateTime.UtcNow;
+        void Add(DbExplorer.Core.Model.ConnectionConfig c, string sql, double minutesAgo, long ms, long? rows, string? error = null,
+            DbExplorer.Core.Plans.PlanMode plan = DbExplorer.Core.Plans.PlanMode.None) =>
+            history.Append(new DbExplorer.Core.Scripting.HistoryEntry(
+                Guid.NewGuid(), now.AddMinutes(-minutesAgo), c.Id, c.Name, c.Kind, c.Database, sql, ms, rows, error, plan));
+        Add(d.Shop, "SELECT status, count(*) AS n\nFROM orders\nGROUP BY status\nORDER BY n DESC;", 2400, 14, 4);
+        Add(d.Shop, "UPDATE orders SET status = 'shipped'\nWHERE status = 'paid' AND created < date('now', '-3 days');", 1500, 62, 37);
+        Add(d.Scratch, "CREATE TABLE tmp_report AS SELECT * FROM notes;", 300, 9, null);
+        Add(d.Shop, "SELECT c.name, count(*) AS orders\nFROM orders o JOIN customers c ON c.id = o.customer_id\nGROUP BY c.id ORDER BY orders DESC LIMIT 10;", 95, 1830, 10);
+        Add(d.Shop, "SELECT * FROM order_itemz WHERE order_id = 42;", 40, 3, null, "no such table: order_itemz");
+        Add(d.Scratch, "DELETE FROM notes WHERE pinned = 0;", 25, 0, null,
+            "Refused: this connection is read-only, write statements are not allowed.");
+        Add(d.Shop, "SELECT o.id, o.total, c.name\nFROM orders o JOIN customers c ON c.id = o.customer_id\nWHERE o.total > 90;", 6, 22, 128,
+            plan: DbExplorer.Core.Plans.PlanMode.Estimated);
+        Add(d.Shop, "SELECT * FROM audit_log ORDER BY id DESC LIMIT 100;", 0.2, 11, 100);
+        var vm = new DbExplorer.App.ViewModels.HistoryViewModel(
+            history, id => d.Tree.Config.Connections.Any(c => c.Id == id), d.Shop.Id, d.Dialogs, (_, _) => Task.CompletedTask, null);
+        await vm.LoadAsync();
+        vm.Selected = vm.Items.First(i => i.HasError);
+        var dialog = new HistoryDialog { DataContext = vm, Width = 980, Height = 640 };
+        dialog.Show(d.Window);
+        await Settle();
+        return dialog;
+    }
 
     private static async Task<Window?> ConfirmDialog(Demo d)
     {

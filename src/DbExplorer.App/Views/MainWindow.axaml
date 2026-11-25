@@ -112,6 +112,9 @@
             <MenuItem Header="Show _scripts" ToggleType="CheckBox" IsChecked="{Binding Tree.ShowScripts, Mode=OneWay}" Command="{Binding Tree.ToggleScriptsCommand}"
                       ToolTip.Tip="The script library: your saved scripts and their folders" />
             <Separator />
+            <MenuItem Header="Query _history…" Command="{Binding OpenHistoryCommand}" InputGesture="Ctrl+Shift+H">
+              <MenuItem.Icon><PathIcon Data="{StaticResource IconHistory}" /></MenuItem.Icon>
+            </MenuItem>
             <MenuItem Header="Go to _table…" Command="{Binding ShowTablePickerCommand}" InputGesture="Ctrl+T" />
             <MenuItem Header="Go to table in _all connections…" Command="{Binding ShowAllTablesPickerCommand}" InputGesture="Ctrl+Shift+P" />
             <MenuItem Header="Go to _column…" Command="{Binding JumpToColumnCommand}" IsEnabled="{Binding HasActiveTable}" InputGesture="Ctrl+L" />

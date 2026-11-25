@@ -48,6 +48,18 @@
           </StackPanel>
           <TextBlock Classes="dim small" Text="{Binding FeatureHint}" TextWrapping="Wrap" IsVisible="{Binding ShowHint}" />
         </Panel>
+
+        <Border Height="1" Background="{DynamicResource DbxBorderSubtle}" Margin="0,6" />
+        <TextBlock Classes="section" Text="QUERY HISTORY" Margin="0" />
+        <CheckBox Content="Record the statements I run from script tabs" IsChecked="{Binding RecordHistory}" />
+        <TextBlock Classes="dim small" TextWrapping="Wrap"
+                   Text="Kept on this computer in history.jsonl (the latest 5,000). Open it with Ctrl+Shift+H." />
+        <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding CanClearHistory}">
+          <Button Content="{Binding ClearHistoryText}" Command="{Binding ClearHistoryCommand}"
+                  ToolTip.Tip="Deletes the recorded statements at once, without waiting for Save" />
+          <TextBlock Classes="dim small" Text="{Binding ClearHistoryInfo}" VerticalAlignment="Center"
+                     IsVisible="{Binding ClearHistoryInfo, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </StackPanel>
       </StackPanel>
     </Border>
   </DockPanel>

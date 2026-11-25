@@ -189,7 +189,7 @@ dotnet run --project tools/UiShots -- --scroll 3        # scroll benchmark of a 
 ```
 
 Scenes: `empty`, `main-table`, `table-edit`, `table-structure`, `script`, `script-error`, `quick-open`, `connection-dialog`,
-`sql-preview`, `virtual-key`, `confirm-dialog`, `live-theme-switch` (flips the theme while the window shows),
+`sql-preview`, `virtual-key`, `history` (the Query history window), `confirm-dialog`, `live-theme-switch` (flips the theme while the window shows),
 `main-table-125` (1024x640 DIP, the 1280x800 window at 125 percent scaling), and for linked groups `groups-tree` (the Groups
 section of the navigator), `group-editor`, `group-editor-warning` (one member + a name clash: warning and error bands) and
 `group-schema-diff` (schema-difference report with an unreachable member), `group-switch-table` and `group-switch-script`

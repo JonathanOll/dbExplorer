@@ -599,6 +599,13 @@ public partial class ConnectionTreeViewModel : ObservableObject
         return SaveSetting();
     }
 
+    /// <summary>Switches the recording of the query history on or off; same contract as <see cref="SetAutoUpdateCheck"/>.</summary>
+    public bool SetRecordHistory(bool enabled)
+    {
+        Config.RecordHistory = enabled;
+        return SaveSetting();
+    }
+
     private bool SaveSetting()
     {
         if (!_persistenceEnabled)

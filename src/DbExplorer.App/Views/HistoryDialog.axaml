@@ -1,0 +1,171 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbExplorer.App.ViewModels"
+        xmlns:views="using:DbExplorer.App.Views"
+        x:Class="DbExplorer.App.Views.HistoryDialog"
+        x:DataType="vm:HistoryViewModel"
+        Title="Query history"
+        Width="980" Height="640" MinWidth="700" MinHeight="420"
+        WindowStartupLocation="CenterOwner">
+
+  <Window.Styles>
+    <Style Selector="ListBox.history ListBoxItem">
+      <Setter Property="Padding" Value="12,9" />
+      <Setter Property="Margin" Value="6,1" />
+    </Style>
+  </Window.Styles>
+
+  <DockPanel>
+    <views:DialogFooter DockPanel.Dock="Bottom">
+      <DockPanel>
+        <Button DockPanel.Dock="Left" Content="Clear all…" Command="{Binding ClearAllCommand}" Classes="ghost"
+                ToolTip.Tip="Delete the whole history (asks first)" />
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button Content="Close" IsCancel="True" Click="OnCloseClick" MinWidth="88" HorizontalContentAlignment="Center" />
+          <Button Content="Run again" Command="{Binding RunAgainCommand}" MinWidth="104" HorizontalContentAlignment="Center"
+                  ToolTip.Tip="Open the statement in a new script tab and run it" ToolTip.ShowOnDisabled="True" />
+          <Button Content="Open in new tab" Command="{Binding OpenCommand}" Classes="accent" MinWidth="128" HorizontalContentAlignment="Center"
+                  ToolTip.Tip="Open the statement in a new script tab (Enter)" ToolTip.ShowOnDisabled="True" />
+        </StackPanel>
+      </DockPanel>
+    </views:DialogFooter>
+
+    <views:DialogHeader DockPanel.Dock="Top" Icon="{StaticResource IconHistory}" Title="Query history" Subtitle="{Binding CountText}" />
+
+    <!-- Search and filter -->
+    <Border DockPanel.Dock="Top" Classes="toolbar" Padding="16,0" Height="52">
+      <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+        <Border Background="{DynamicResource DbxInputBg}" BorderBrush="{DynamicResource DbxBorder}" BorderThickness="1" CornerRadius="6"
+                Padding="10,0" Height="32" Margin="0,0,16,0">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <PathIcon Data="{StaticResource IconSearch}" Width="14" Height="14" Classes="dim" Margin="0,0,8,0" />
+            <TextBox x:Name="SearchBox" Grid.Column="1" Classes="bare" Text="{Binding SearchText, Mode=TwoWay}"
+                     Watermark="Search the SQL or the connection…" VerticalAlignment="Center" MinHeight="30"
+                     AutomationProperties.Name="Search the history" />
+            <Button Grid.Column="2" Classes="ghost" Padding="4" MinHeight="0" MinWidth="0" Click="OnClearSearchClick"
+                    IsVisible="{Binding SearchText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                    ToolTip.Tip="Clear the search" AutomationProperties.Name="Clear the search">
+              <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" />
+            </Button>
+          </Grid>
+        </Border>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+          <ToggleButton Classes="segment" Content="All" IsChecked="{Binding ShowAll, Mode=TwoWay}" />
+          <ToggleButton Classes="segment" Content="Errors" IsChecked="{Binding ShowErrors, Mode=TwoWay}"
+                        ToolTip.Tip="Only the statements that failed or were refused" />
+          <ToggleButton Classes="segment" Content="This connection" IsChecked="{Binding ShowThisConnection, Mode=TwoWay}"
+                        IsEnabled="{Binding CanFilterByConnection}" ToolTip.Tip="{Binding ThisConnectionTip}" ToolTip.ShowOnDisabled="True" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Border Background="{DynamicResource DbxContentBg}">
+      <Panel>
+        <!-- Nothing to show: not recorded yet, or no match -->
+        <StackPanel Classes="empty" IsVisible="{Binding IsEmpty}">
+          <PathIcon Data="{StaticResource IconHistory}" />
+          <TextBlock Classes="h2" Text="{Binding EmptyTitle}" />
+          <TextBlock Classes="dim" Text="{Binding EmptyHint}" TextWrapping="Wrap" TextAlignment="Center" />
+        </StackPanel>
+
+        <Grid ColumnDefinitions="360,Auto,*" IsVisible="{Binding HasItems}">
+          <ListBox x:Name="List" Classes="history" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected, Mode=TwoWay}"
+                   Background="Transparent" BorderThickness="0" Padding="0,6" DoubleTapped="OnListDoubleTapped"
+                   ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Recorded statements">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:HistoryItemViewModel">
+                <StackPanel Spacing="4">
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Border Width="3" Height="12" CornerRadius="2" Background="{Binding ChipColor}" VerticalAlignment="Center" Margin="0,0,7,0" />
+                    <TextBlock Grid.Column="1" Classes="dim small" Text="{Binding ConnectionName}" TextTrimming="CharacterEllipsis"
+                               VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Classes="faint small" Text="{Binding TimeAgo}" Margin="8,0,0,0" VerticalAlignment="Center"
+                               ToolTip.Tip="{Binding ExactTime}" />
+                  </Grid>
+                  <TextBlock Text="{Binding Preview}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12.5" MaxLines="2"
+                             TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Border Classes="badge error" IsVisible="{Binding HasError}">
+                      <TextBlock Text="Failed" FontSize="11.5" />
+                    </Border>
+                    <Border Classes="badge info" IsVisible="{Binding IsPlan}">
+                      <TextBlock Text="{Binding PlanText}" FontSize="11.5" />
+                    </Border>
+                    <TextBlock Classes="faint small" Text="{Binding DurationText}" VerticalAlignment="Center" />
+                    <TextBlock Classes="faint small" Text="{Binding RowsText}" IsVisible="{Binding HasRows}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+
+          <Border Grid.Column="1" Width="1" Background="{DynamicResource DbxBorderSubtle}" />
+
+          <!-- The selected statement in full -->
+          <Grid Grid.Column="2" RowDefinitions="Auto,Auto,*" Margin="20,16,20,16" IsVisible="{Binding HasSelection}">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="3">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Border Width="3" Height="14" CornerRadius="2" Background="{Binding Selected.ChipColor}" VerticalAlignment="Center" />
+                  <TextBlock Classes="title" Text="{Binding Selected.Where}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <TextBlock Classes="dim small" Text="{Binding Selected.ExactTime}" />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                  <Border Classes="badge">
+                    <TextBlock Text="{Binding Selected.DurationText}" FontSize="11.5" />
+                  </Border>
+                  <Border Classes="badge" IsVisible="{Binding Selected.HasRows}">
+                    <TextBlock Text="{Binding Selected.RowsText}" FontSize="11.5" />
+                  </Border>
+                  <Border Classes="badge info" IsVisible="{Binding Selected.IsPlan}">
+                    <TextBlock Text="{Binding Selected.PlanText}" FontSize="11.5" />
+                  </Border>
+                  <Border Classes="badge warn" IsVisible="{Binding !Selected.ConnectionExists}"
+                          ToolTip.Tip="This connection was deleted: the statement opens on the active connection">
+                    <TextBlock Text="Connection deleted" FontSize="11.5" />
+                  </Border>
+                </StackPanel>
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top">
+                <Button Classes="subtle" Command="{Binding CopySqlCommand}" ToolTip.Tip="Copy the SQL" AutomationProperties.Name="Copy the SQL">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" />
+                    <TextBlock Text="Copy SQL" />
+                  </StackPanel>
+                </Button>
+                <Button Classes="subtle" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete this entry (Delete)" AutomationProperties.Name="Delete this entry">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Data="{StaticResource IconDelete}" Width="13" Height="13" />
+                    <TextBlock Text="Delete" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </Grid>
+
+            <Border Grid.Row="1" Classes="banner error" Margin="0,12,0,0" IsVisible="{Binding Selected.HasError}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <PathIcon Classes="bi" Data="{StaticResource IconError}" />
+                <SelectableTextBlock Text="{Binding Selected.Error}" TextWrapping="Wrap" MaxWidth="520" VerticalAlignment="Center" />
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Row="2" Classes="surface" Margin="0,12,0,0" ClipToBounds="True">
+              <TextBox x:Name="SqlBox" Classes="bare" Text="{Binding Selected.Sql, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True"
+                       FontFamily="{DynamicResource DbxMonoFont}" FontSize="12.5" TextWrapping="NoWrap" Padding="12,10" VerticalContentAlignment="Top"
+                       ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                       AutomationProperties.Name="Full SQL of the selected statement" />
+            </Border>
+          </Grid>
+        </Grid>
+
+        <!-- Why the last action failed (a deleted connection with no active one, a clipboard error) -->
+        <Border Classes="banner info" VerticalAlignment="Bottom" Margin="16" IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <PathIcon Classes="bi" Data="{StaticResource IconInfo}" />
+            <TextBlock Text="{Binding Message}" TextWrapping="Wrap" VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
+      </Panel>
+    </Border>
+  </DockPanel>
+</Window>

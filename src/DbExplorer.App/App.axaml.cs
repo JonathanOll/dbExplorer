@@ -40,6 +40,8 @@ public class App : Application
             main.UseScriptTabs(new ScriptFiles(window), new Core.Scripting.ScriptSessionStore(paths.ScriptsDir), editDialogs);
             // The script library lives under the data folder; only its directory listing is read, when the tree is built.
             main.UseScriptLibrary(new Core.Scripting.ScriptLibrary(paths.LibraryDir), new Core.Scripting.RecentScripts(paths.RecentScriptsFile));
+            // Only stores the file path: the history is read when its window first opens.
+            main.UseHistory(new Core.Scripting.QueryHistory(paths.HistoryFile), new HistoryDialogService(window), dialogs);
             tree.RevealInShell = ShellLauncher.Reveal;
             tree.OpenFolderInShell = ShellLauncher.OpenFolder;
             // Only stores the dialog service and the clipboard delegate: the dbupdate folder is not read until the gear menu opens.

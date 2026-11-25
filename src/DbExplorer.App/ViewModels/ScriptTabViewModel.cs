@@ -35,6 +35,8 @@ public interface IScriptFiles
 /// to read the loaded schema of a restored tab.</param>
 /// <param name="Library">The script library: with it (and a dialog), the first save of a script asks for a name and a library folder.</param>
 /// <param name="FileUsed">Told the path of every script file opened or saved (recent scripts, library refresh).</param>
+/// <param name="History">Every statement that ran is appended to it (when <paramref name="RecordHistory"/> says so).</param>
+/// <param name="RecordHistory">The "record history" setting, read at each statement; null means on.</param>
 public sealed record ScriptTabHooks(
     Func<CancellationToken, Task<Session?>> ResolveSession,
     IScriptFiles? Files = null,
@@ -44,7 +46,9 @@ public sealed record ScriptTabHooks(
     GroupSwitchHooks? Switch = null,
     Func<Guid, Session?>? FindSession = null,
     ScriptLibrary? Library = null,
-    Action<string>? FileUsed = null);
+    Action<string>? FileUsed = null,
+    QueryHistory? History = null,
+    Func<bool>? RecordHistory = null);
 
 /// <summary>
 /// A SQL script editor on one connection. Runs the statement under the caret / the selection (Ctrl+Enter) or the
@@ -563,6 +567,8 @@ public sealed partial class ScriptTabViewModel : TabViewModel
                         plans.Add((plan, st));
                     }
 
+                RecordInHistory(session.Config, r, planMode);
+
                 // An estimated plan replaces the statement's tab: nothing ran, so it has no result to show.
                 if (!(_estimatedRun && plan is not null))
                 {
@@ -621,6 +627,16 @@ public sealed partial class ScriptTabViewModel : TabViewModel
             RunProgressText = null;
             IsRunning = false;
         }
+    }
+
+    /// <summary>One line of the query history for a statement that ran (a refused or failed one is recorded with its error). Never throws.</summary>
+    private void RecordInHistory(ConnectionConfig config, StatementResult r, PlanMode planMode)
+    {
+        if (_hooks.History is not { } history || !(_hooks.RecordHistory?.Invoke() ?? true)) return;
+        long? rows = r.Sets.Count > 0 ? r.Sets.Sum(s => (long)s.Rows.Count) : r.RowsAffected;
+        history.Append(new HistoryEntry(
+            Guid.NewGuid(), DateTime.UtcNow, config.Id, config.Name, config.Kind, config.Database, r.Statement.Text,
+            (long)r.Duration.TotalMilliseconds, rows, r.Error, planMode));
     }
 
     private static string Plural(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n:N0} {noun}s";

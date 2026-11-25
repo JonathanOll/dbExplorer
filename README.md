@@ -173,6 +173,24 @@ names in natural order (`q2` before `q10`).
   first, the full path as tooltip; files that are gone are dropped. Kept in `recent-scripts.json`.
 - The navigator filter box also matches script names.
 
+## Query history
+
+Every statement you run from a script tab is recorded (when it ran: the failed or read-only-refused one is recorded with its
+error, an estimated plan is marked as such). `Ctrl+Shift+H` or View > Query history opens the window:
+
+- a search box that filters live on the SQL and the connection name, and the chips **All**, **Errors** and **This connection**
+  (the connection of the active tab);
+- the list, newest first: connection colour chip, two-line SQL preview, time ago (exact time in the tooltip), duration, rows, a
+  *Failed* badge, an *Estimated / Actual plan* badge;
+- the full statement and the error on the right, with **Copy SQL** and **Delete**; **Open in new tab** (`Enter`, double click)
+  opens it on its connection (on the active one when that connection was deleted), **Run again** opens it and runs it;
+  **Clear all…** asks before deleting everything. `Down` goes from the search box to the list, `Delete` removes the entry, `Esc` closes.
+
+The history is a plain JSON-lines file (`history.jsonl` in the data folder), read only when the window opens, capped at the latest
+5,000 statements; a statement longer than 20,000 characters is cut with a marker. A damaged line is skipped, an unwritable file only
+means nothing is remembered. Tools > Options switches the recording off and has a "Clear history" button (setting `RecordHistory`).
+Group runs (one statement on every database) are not recorded.
+
 ## Execution statistics
 
 SQL Server script tabs have a **Statistics** check box in the toolbar (hidden for PostgreSQL and SQLite). With it on, the
@@ -251,6 +269,7 @@ standard showplan XML by local names (any schema version) and skips what it does
 | `Ctrl+T` | anywhere | Quick open a table/view of the active connection |
 | `Ctrl+Shift+P` | anywhere | Quick open a table/view across all connections (metadata cache) |
 | `Ctrl+Shift+T` | anywhere | Reopen the last closed tab (like a browser; press again to go further back; up to 50 are remembered; a table keeps its filters, a script its text) |
+| `Ctrl+Shift+H` | anywhere | Query history: search, filter, re-open or re-run the statements you ran (View > Query history) |
 | `Ctrl+L` | table tab | Fuzzy-search a column and scroll to it |
 | `Ctrl+L` | script tab | Show the estimated execution plan of the selection / the statement under the cursor (nothing runs) |
 | `Ctrl+M` | script tab | Include the actual execution plan in the next runs (switch) |
@@ -461,6 +480,7 @@ Everything lives in `%APPDATA%\dbExplorer`:
 | `scripts\` | unsaved script tabs, restored at the next start |
 | `library\` | the script library: your saved `.sql` scripts and their folders ([Script library](#script-library)) |
 | `recent-scripts.json` | the last 20 scripts opened or saved |
+| `history.jsonl` | the query history, one JSON line per statement, latest 5,000 ([Query history](#query-history)) |
 | `window.json` | size, position and maximised state of the main window |
 | `session.json` | the open tabs (order, active tab, table filters / WHERE / sort, script files); delete it to forget them (only unsaved scripts then come back) |
 
