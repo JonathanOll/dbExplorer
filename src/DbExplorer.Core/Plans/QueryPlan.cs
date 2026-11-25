@@ -93,6 +93,9 @@ public sealed class PlanNode
 
     public double? AverageRowSize { get; set; }
 
+    /// <summary>Pages read by this operator alone (SQL Server logical reads, PostgreSQL shared hit + read blocks); null when not reported.</summary>
+    public double? LogicalReads { get; set; }
+
     public bool Parallel { get; set; }
 
     public List<PlanProperty> Properties { get; } = [];

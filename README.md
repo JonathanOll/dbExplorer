@@ -241,6 +241,26 @@ The plan tab, one chip per statement when a run has several (with its share of t
   could turn into seeks, key lookups, and SQL Server's **missing index** hints with a ready `CREATE INDEX` (**Copy**).
 - **Copy plan** and **Save plan...**: the plan as the server sent it. A SQL Server `.sqlplan` opens in SSMS.
 
+**Comparing two plans** (before and after an index or a rewrite):
+
+![Plan comparison, dark](docs/ui/after/plan-compare-dark.png)
+
+- **Pin plan** keeps the plan on screen as the baseline of the script tab. A run clears the result tabs, but the pinned plan
+  stays: after the next run, **Compare with...** offers "Pinned plan" first. The menu also lists the other statements of the
+  tab. Without a pinned plan it says how to get one.
+- The comparison replaces the plan view (**Back to plan** returns): the baseline above (or on the left, **Side by side**) and
+  the new plan below, with the same cards. Operators are matched by structure (same operator on the same table first, an
+  index change counts as the same operator replaced), so every matched card carries a badge (`-85% cost`, `-550 ms`), an
+  operator that only exists on one side gets a dashed outline and an **Added** / **Removed** tag, and a scan turned into a
+  seek is tagged **Replaced**.
+- The header says it in words ("Cost 5.12 -> 2.32 (-55%); Clustered Index Scan on Orders replaced by Index Seek on Orders") and
+  shows the figures as chips: total cost, rows, execution and planning time, logical reads, operator count. Green with a
+  check or a down arrow is better, red with a warning or an up arrow is worse, a change of 10% or less is "no change"; row
+  counts are neutral. Colour is never the only signal: every chip and badge has an icon and a figure.
+- Click an operator on one side and its counterpart is selected on the other; **Differences** lists the name, object, cost,
+  share, rows, time, reads and every property that changed (before, after, change). Metrics a plan does not report are
+  skipped, so plans of different engines compare as far as they have figures in common.
+
 Plans are per run and not run on a group. The `Time` colouring needs an actual plan. The SQL Server parser reads the
 standard showplan XML by local names (any schema version) and skips what it does not know.
 

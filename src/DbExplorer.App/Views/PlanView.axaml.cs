@@ -182,6 +182,15 @@ public partial class PlanView : UserControl
         if (_tab is not null && (sender as Control)?.Tag is PlanStatementViewModel s) _tab.Selected = s;
     }
 
+    private void OnCompareOpening(object? sender, EventArgs e) => _tab?.RefreshCompareChoices();
+
+    private void OnCompareChoiceClick(object? sender, RoutedEventArgs e)
+    {
+        if (_tab is null || (sender as Control)?.Tag is not PlanCompareChoice choice) return;
+        CompareButton.Flyout?.Hide();
+        _tab.CompareWithCommand.Execute(choice);
+    }
+
     private void OnShowIssuesClick(object? sender, RoutedEventArgs e)
     {
         if (_tab is null) return;

@@ -51,7 +51,7 @@ public sealed record ScriptTabHooks(
 /// whole script (F5) off the UI thread, collects one <see cref="StatementResultViewModel"/> per executed statement and
 /// stops at the first error. Cancelling never throws. Unsaved text is kept in a <see cref="ScriptSessionStore"/>.
 /// </summary>
-public sealed partial class ScriptTabViewModel : TabViewModel
+public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
 {
     public const int DefaultRowLimit = 1000;
     public const int MinRowLimit = 1;
@@ -336,6 +336,20 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     /// </summary>
     public ObservableCollection<IResultTab> ResultTabs { get; } = new();
 
+    /// <summary>
+    /// The plan kept as the baseline of a comparison. It lives here, not in <see cref="ResultTabs"/>, because every run clears the
+    /// result tabs: the next run's plan tab offers to compare with it.
+    /// </summary>
+    [ObservableProperty] private PlanCompareSource? _pinnedPlan;
+
+    IEnumerable<PlanResultTab> IPlanCompareHost.PlanTabs => ResultTabs.OfType<PlanResultTab>();
+
+    public void PinPlan(PlanCompareSource? plan)
+    {
+        PinnedPlan = plan;
+        foreach (var tab in ResultTabs.OfType<PlanResultTab>()) tab.RefreshPin();
+    }
+
     /// <summary>The tab selected in the strip; follows <see cref="SelectedResult"/> when that is a statement's result.</summary>
     [ObservableProperty] private IResultTab? _selectedResultTab;
 
@@ -578,7 +592,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel
             if (statistics && Results.Count > 0) AddStatisticsTabs();
             if (planMode != PlanMode.None && plans.Count > 0)
             {
-                var planTab = new PlanResultTab(plans, planMode, kind);
+                var planTab = new PlanResultTab(plans, planMode, kind) { Host = this };
                 ResultTabs.Add(planTab);
                 // Estimated: the plan is the answer. Actual: the rows stay in front, the plan is one click away.
                 if (_estimatedRun || Results.Count == 0) SelectedResultTab = planTab;

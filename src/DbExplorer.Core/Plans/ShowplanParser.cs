@@ -214,6 +214,7 @@ public static partial class ShowplanParser
 
         node.ActualRows = Sum("ActualRows");
         node.Executions = Sum("ActualExecutions");
+        if (Has("ActualLogicalReads")) node.LogicalReads = Sum("ActualLogicalReads") + Sum("ActualLobLogicalReads");
         if (Has("ActualElapsedms")) node.ActualTimeMs = counters.Max(c => Number(Attr(c, "ActualElapsedms")) ?? 0);
 
         void Prop(string group, string name, string attr, string unit = "")

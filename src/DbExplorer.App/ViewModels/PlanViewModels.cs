@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using DbExplorer.Core.Model;
 using DbExplorer.Core.Plans;
 
@@ -136,6 +137,9 @@ public sealed partial class PlanNodeViewModel : ObservableObject
     public string? EdgeLabel { get; init; }
 
     public PlanNodeViewModel? Parent { get; internal set; }
+
+    /// <summary>Set when the plan is shown in a comparison: the card's badge, tag and outline.</summary>
+    public PlanCompareState? Compare { get; set; }
 
     internal static string FormatMs(double ms) =>
         ms >= 10_000 ? $"{ms / 1000:0.#} s" : ms >= 100 ? $"{ms:0} ms" : ms >= 1 ? $"{ms:0.#} ms" : $"{ms:0.###} ms";
@@ -501,6 +505,101 @@ public sealed partial class PlanResultTab : ObservableObject, IResultTab
     /// <summary>The properties / top / issues panel is shown.</summary>
     [ObservableProperty] private bool _showSidePanel = true;
 
+    // ---- comparison ----
+
+    /// <summary>The script tab that keeps the pinned baseline; null for a plan opened outside a script (tests).</summary>
+    public IPlanCompareHost? Host { get; set; }
+
+    /// <summary>The plan is shown against another one instead of alone.</summary>
+    [NotifyPropertyChangedFor(nameof(IsComparing))]
+    [ObservableProperty] private PlanCompareViewModel? _comparison;
+
+    public bool IsComparing => Comparison is not null;
+
+    public PlanCompareSource? Pinned => Host?.PinnedPlan;
+
+    public bool HasPinned => Pinned is not null;
+
+    /// <summary>The statement on screen is the pinned one (a pinned plan is compared with a later run, not with itself).</summary>
+    public bool IsSelectedPinned => Pinned is { } p && Selected is { } s && p.Statement == s.Statement;
+
+    public bool CanPin => Host is not null && Selected is not null && !IsSelectedPinned;
+
+    public bool CanComparePinned => HasPinned && !IsSelectedPinned && Selected is not null;
+
+    public string PinTooltip => Host is null ? "Plans can only be pinned from a script tab."
+        : IsSelectedPinned ? "This plan is the pinned baseline."
+        : HasPinned ? "Replace the pinned plan with this one. A pinned plan survives the next runs of this script, so the new plan can be compared with it."
+        : "Keep this plan as the baseline. After the next run, compare the new plan with it.";
+
+    public string ComparePinnedText => Pinned is { } p ? $"Compare with pinned plan ({p.Detail})" : "No pinned plan";
+
+    /// <summary>The entries of the "Compare with" menu: the pinned plan, then the other statements of this tab, then the plans of the other plan tabs.</summary>
+    public IReadOnlyList<PlanCompareChoice> GetCompareChoices()
+    {
+        var choices = new List<PlanCompareChoice>();
+        if (Selected is not { } current) return choices;
+        if (Pinned is { } pinned && !IsSelectedPinned) choices.Add(new PlanCompareChoice("Pinned plan", pinned.Detail, pinned, true));
+        foreach (var other in Statements.Where(s => s != current))
+            choices.Add(new PlanCompareChoice(other.Title, new PlanCompareSource(other.Title, other.Plan, other.Statement).Detail,
+                new PlanCompareSource(other.Title, other.Plan, other.Statement), false));
+        foreach (var tab in (Host?.PlanTabs ?? []).Where(t => t != this))
+            foreach (var st in tab.Statements)
+            {
+                var label = tab.Statements.Count > 1 ? $"{tab.Header} · {st.Title}" : tab.Header;
+                var source = new PlanCompareSource(label, st.Plan, st.Statement);
+                choices.Add(new PlanCompareChoice(label, source.Detail, source, false));
+            }
+        return choices;
+    }
+
+    /// <summary>What the "Compare with" menu lists; refreshed when it opens.</summary>
+    [NotifyPropertyChangedFor(nameof(HasNoCompareChoices))]
+    [ObservableProperty] private IReadOnlyList<PlanCompareChoice> _compareChoices = [];
+
+    public bool HasNoCompareChoices => CompareChoices.Count == 0;
+
+    public void RefreshCompareChoices() => CompareChoices = GetCompareChoices();
+
+    /// <summary>Tells the bindings that the pinned plan or the selected statement changed.</summary>
+    public void RefreshPin()
+    {
+        foreach (var name in new[] { nameof(Pinned), nameof(HasPinned), nameof(IsSelectedPinned), nameof(CanPin), nameof(CanComparePinned), nameof(PinTooltip), nameof(ComparePinnedText) })
+            OnPropertyChanged(name);
+    }
+
+    [RelayCommand]
+    private void PinPlan()
+    {
+        if (Host is null || Selected is not { } s) return;
+        Host.PinPlan(new PlanCompareSource("Pinned plan", s.Plan, s.Statement));
+        RefreshPin();
+    }
+
+    [RelayCommand]
+    private void UnpinPlan()
+    {
+        Host?.PinPlan(null);
+        RefreshPin();
+    }
+
+    /// <summary>Opens the comparison of the statement on screen (the new plan, on the right) with <paramref name="baseline"/> (on the left).</summary>
+    [RelayCommand]
+    private void CompareWith(PlanCompareChoice? baseline)
+    {
+        if (baseline is null || Selected is not { } s) return;
+        Comparison = new PlanCompareViewModel(baseline.Source, new PlanCompareSource(Header, s.Plan, s.Statement), () => Comparison = null);
+    }
+
+    [RelayCommand]
+    private void ComparePinned()
+    {
+        if (Pinned is { } pinned && CanComparePinned) CompareWith(new PlanCompareChoice("Pinned plan", pinned.Detail, pinned, true));
+    }
+
+    [RelayCommand]
+    private void CloseComparison() => Comparison = null;
+
     // ---- IResultTab ----
 
     public string Header { get; }
@@ -536,5 +635,7 @@ public sealed partial class PlanResultTab : ObservableObject, IResultTab
         OnPropertyChanged(nameof(Raw));
         OnPropertyChanged(nameof(FileExtension));
         OnPropertyChanged(nameof(SuggestedFileName));
+        Comparison = null;
+        RefreshPin();
     }
 }

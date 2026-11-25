@@ -83,6 +83,8 @@ public static class PostgresPlanParser
             node.EstimatedExecutions = loops ?? 1;
             if (Number(e, "Actual Total Time") is { } t) node.ActualTimeMs = t * (loops ?? 1);
         }
+        if (Number(e, "Shared Hit Blocks") is not null || Number(e, "Shared Read Blocks") is not null)
+            node.LogicalReads = (Number(e, "Shared Hit Blocks") ?? 0) + (Number(e, "Shared Read Blocks") ?? 0);
         node.EstimatedRows = (Number(e, "Plan Rows") ?? 0) * (hasActual ? loops ?? 1 : 1);
 
         if (e.TryGetProperty("Plans", out var plans) && plans.ValueKind == JsonValueKind.Array)
