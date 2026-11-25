@@ -4,16 +4,16 @@
              x:Class="DbExplorer.App.Views.DatabaseUpgradePageView"
              x:DataType="vm:DatabaseUpgradeSettingsPage">
   <StackPanel Spacing="10" DataContext="{Binding Options}" x:DataType="vm:OptionsViewModel">
-    <TextBlock Classes="section" Text="N2F DATABASE UPDATES" Margin="0" />
+    <TextBlock Classes="section" Text="DATABASE UPDATES" Margin="0" />
 
     <StackPanel Spacing="4">
       <Label Content="_dbupdate folder" Target="{Binding #PathBox}" Padding="0" FontWeight="SemiBold" />
       <TextBlock Classes="dim small" TextWrapping="Wrap"
-                 Text="The dbupdate folder of the n2f repo (Web/Common/n2jWeb.Data/dbupdate). Leave it empty to switch the upgrade feature off. The folder is checked and kept when you leave the box or press Enter." />
+                 Text="The dbupdate folder of the repository (its dbupdate folder). Leave it empty to switch the upgrade feature off. The folder is checked and kept when you leave the box or press Enter." />
     </StackPanel>
 
     <Grid ColumnDefinitions="*,Auto">
-      <TextBox x:Name="PathBox" Text="{Binding DbUpdatePath}" Watermark="C:\repos\n2f\Web\Common\n2jWeb.Data\dbupdate"
+      <TextBox x:Name="PathBox" Text="{Binding DbUpdatePath}" Watermark="C:\repos\app\dbupdate"
                Classes.error="{Binding HasPathError}" />
       <Button x:Name="BrowseButton" Grid.Column="1" Content="Choose folder…" Margin="8,0,0,0" ToolTip.Tip="Pick the dbupdate folder" />
     </Grid>

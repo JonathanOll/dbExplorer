@@ -23,7 +23,7 @@ public record AppConfig(
     /// <summary>View menu: the navigator shows the Scripts section (the script library). Missing in old files: on.</summary>
     public bool ShowScripts { get; set; } = true;
 
-    /// <summary>Folder with the n2f dbupdate scripts; null switches the upgrade feature off. Missing in old files: null.</summary>
+    /// <summary>Folder with the dbupdate scripts; null switches the upgrade feature off. Missing in old files: null.</summary>
     public string? DbUpdatePath { get; set; }
 
     /// <summary>Whether the statements run from script tabs are recorded in the query history. Missing in old files: on.</summary>

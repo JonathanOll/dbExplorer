@@ -1,7 +1,7 @@
 {
 	"folders": {
 		"Admin": {},
-		"N2F": {},
+		"Company": {},
 		"Keeple": {},
 		"Translate": {}
 	},
@@ -13,8 +13,8 @@
 			"save-password": true,
 			"folder": "Admin",
 			"configuration": {
-				"database": "C:\\Temp\\_N2F\\adminDB.db",
-				"url": "jdbc:sqlite:C:\\Temp\\_N2F\\adminDB.db",
+				"database": "C:\\Temp\\_Company\\adminDB.db",
+				"url": "jdbc:sqlite:C:\\Temp\\_Company\\adminDB.db",
 				"configurationType": "MANUAL",
 				"type": "dev",
 				"closeIdleConnection": false
@@ -43,14 +43,14 @@
 		"microsoft-1a05bf273cf-1a6d26bd70a9b734": {
 			"provider": "sqlserver",
 			"driver": "microsoft",
-			"name": "N2F local",
+			"name": "Company local",
 			"save-password": true,
-			"folder": "N2F",
+			"folder": "Company",
 			"configuration": {
 				"host": "127.0.0.1",
 				"port": "1433",
-				"database": "n2f",
-				"url": "jdbc:sqlserver://;serverName\u003d127.0.0.1;databaseName\u003dn2f",
+				"database": "company",
+				"url": "jdbc:sqlserver://;serverName\u003d127.0.0.1;databaseName\u003dcompany",
 				"configurationType": "MANUAL",
 				"type": "dev",
 				"closeIdleConnection": false,
@@ -64,14 +64,14 @@
 		"microsoft-1a05bf3407a-f4902502410943f": {
 			"provider": "sqlserver",
 			"driver": "microsoft",
-			"name": "N2F resto ano",
+			"name": "Company resto ano",
 			"save-password": true,
-			"folder": "N2F",
+			"folder": "Company",
 			"configuration": {
 				"host": "devsql.example.test",
 				"port": "1433",
-				"database": "n2fResto",
-				"url": "jdbc:sqlserver://;serverName\u003ddevsql.example.test;databaseName\u003dn2fResto",
+				"database": "companyResto",
+				"url": "jdbc:sqlserver://;serverName\u003ddevsql.example.test;databaseName\u003dcompanyResto",
 				"configurationType": "MANUAL",
 				"type": "dev",
 				"closeIdleConnection": false,
@@ -85,14 +85,14 @@
 		"microsoft-1a05bf56182-30022e6b735a4d8": {
 			"provider": "sqlserver",
 			"driver": "microsoft",
-			"name": "N2F resto ano 2",
+			"name": "Company resto ano 2",
 			"save-password": true,
-			"folder": "N2F",
+			"folder": "Company",
 			"configuration": {
 				"host": "devsql.example.test",
 				"port": "1433",
-				"database": "n2fResto2",
-				"url": "jdbc:sqlserver://;serverName\u003ddevsql.example.test;databaseName\u003dn2fResto2",
+				"database": "companyResto2",
+				"url": "jdbc:sqlserver://;serverName\u003ddevsql.example.test;databaseName\u003dcompanyResto2",
 				"configurationType": "MANUAL",
 				"type": "dev",
 				"closeIdleConnection": false,
@@ -135,8 +135,8 @@
 			"configuration": {
 				"host": "localhost",
 				"port": "5454",
-				"database": "n2j",
-				"url": "jdbc:postgresql://localhost:5454/n2j",
+				"database": "app",
+				"url": "jdbc:postgresql://localhost:5454/app",
 				"configurationType": "MANUAL",
 				"home": "postgresql_client",
 				"type": "dev",
@@ -205,7 +205,7 @@
 			}
 		}
 	},
-	"virtual-models": {"microsoft-1a05bf273cf-1a6d26bd70a9b734":{"n2f":{"liquibase":{":DATABASECHANGELOG":{"constraints":{"VIRTUAL_PK":{"type":"vpk","useAllColumns":true}}}}}}},
+	"virtual-models": {"microsoft-1a05bf273cf-1a6d26bd70a9b734":{"company":{"liquibase":{":DATABASECHANGELOG":{"constraints":{"VIRTUAL_PK":{"type":"vpk","useAllColumns":true}}}}}}},
 	"connection-types": {
 		"dev": {
 			"name": "Development",

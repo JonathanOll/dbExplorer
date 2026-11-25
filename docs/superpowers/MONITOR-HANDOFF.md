@@ -3,9 +3,9 @@
 You are taking over as the **monitor (controller)** of the dbExplorer build from a previous monitor session whose context got too large. You coordinate subagents; you do NOT write product code yourself. The previous monitor stopped all agents and saved everything in git. Nothing is running.
 
 ## 0. User and style (important)
-- The user (Jonathan Ollivier, full-stack dev at N2F) wants replies in **French, "caveman" style** (short blunt sentences, small words; code/commands/error names normal). See his global `C:\Users\JonathanOllivier\.claude\CLAUDE.md`. Keep messages short.
+- The user (Jonathan Ollivier, full-stack dev) wants replies in **French, "caveman" style** (short blunt sentences, small words; code/commands/error names normal). See his global `C:\Users\JonathanOllivier\.claude\CLAUDE.md`. Keep messages short.
 - He is **quota-conscious**: when he says "met en pause", stop all agents (TaskStop), WIP-commit their worktrees, update the ledger + this file, push, and tell him. When he says "reprends", resume.
-- His priorities: **FAST LAUNCH** (RAM does not matter, 500 MB fine), safety of data (read-only guarantees), a nice usable UI (DBeaver-like). Ask before outward-facing actions; the private GitHub repo `jonathan-ollivier_n2jsoft/dbExplorer` already exists and pushing `feature/dbexplorer` + agent branches there is accepted.
+- His priorities: **FAST LAUNCH** (RAM does not matter, 500 MB fine), safety of data (read-only guarantees), a nice usable UI (DBeaver-like). Ask before outward-facing actions; the private GitHub repo `jonathan-ollivier_appsoft/dbExplorer` already exists and pushing `feature/dbexplorer` + agent branches there is accepted.
 - His rule: always remove git worktrees you created when done (`git worktree remove --force <path>` then `git worktree prune`).
 - Tell him at the end (and when relevant) the **open risks** (section 6) and the **rulings** you/previous monitor made (ledger lines containing `Ruling:`).
 
@@ -23,7 +23,7 @@ Skill: `superpowers:subagent-driven-development` (read it, plus its `references/
 5. Parallelism: the user asked for it — independent tasks run in parallel worktrees; merge sequentially.
 6. Final whole-branch review on **opus** at the end of a feature (see the skill's final-review.md), ONE fix wave, one scoped re-review.
 Tooling quirks learned the hard way: use **PowerShell** for dotnet/git (the Bash tool cannot create files in the project dir); `-p:UseSharedCompilation=false` (parallel agents fight over the Roslyn server); if a test project fails with "access denied" on obj, delete its stale `obj`; Windows Defender makes the FIRST launch of a new build slow; agent worktrees live in `.claude/worktrees/agent-*` (git-ignored); `TaskStop` kills an agent (WIP-commit its worktree afterwards).
-**Safety rules every agent must be given:** NEVER send coordinate-based mouse clicks or global keystrokes to the desktop (an agent once may have hit the user's Edge window: tell him to check his n2jSoft admin page if not already done); screenshots only in-process/headless or `PrintWindow` on the app's own window; temp `--data-dir`/`--dbeaver-dir` only; never read the user's real DBeaver `credentials-config.json` or `%APPDATA%\dbExplorer`.
+**Safety rules every agent must be given:** NEVER send coordinate-based mouse clicks or global keystrokes to the desktop (an agent once may have hit the user's Edge window: tell him to check his appSoft admin page if not already done); screenshots only in-process/headless or `PrintWindow` on the app's own window; temp `--data-dir`/`--dbeaver-dir` only; never read the user's real DBeaver `credentials-config.json` or `%APPDATA%\dbExplorer`.
 
 ## 3. Current state of git (at handoff)
 - `feature/dbexplorer` HEAD = the commit after `27f0871` (this handoff + the groups plan are committed on top). All 16 original tasks, the final-review fix wave (12 findings + PG transaction-abort report) and the "+ Row" fixes are MERGED. Pushed to GitHub.

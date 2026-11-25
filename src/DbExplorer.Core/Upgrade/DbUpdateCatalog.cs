@@ -15,7 +15,7 @@ public sealed record DbUpdateFolder(
     IReadOnlyList<DbUpdateScript> Scripts, IReadOnlyList<string> Ignored);
 
 /// <summary>
-/// The scanned dbupdate folder of the n2f repo: its version folders (top level only) and their scripts.
+/// The scanned dbupdate folder of the repository: its version folders (top level only) and their scripts.
 /// Pure disk listing: file contents are never read.
 /// </summary>
 public sealed class DbUpdateCatalog

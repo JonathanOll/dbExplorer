@@ -6,7 +6,7 @@ namespace DbExplorer.App.ViewModels;
 public sealed record OptionsResult(string? DbUpdatePath);
 
 /// <summary>
-/// The editor of the Database upgrade settings page: the dbupdate folder of the n2f repo. Validation and the optional info line are
+/// The editor of the Database upgrade settings page: the dbupdate folder of the repository. Validation and the optional info line are
 /// injected delegates (the folder may be a network share, so they run on OK, after Browse and on focus loss, never per keystroke).
 /// A blank path is valid and means "feature off".
 /// </summary>

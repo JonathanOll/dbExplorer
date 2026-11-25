@@ -21,7 +21,7 @@ internal sealed class TempDbUpdateTree : IDisposable
 
     public void AddDir(string name) => Directory.CreateDirectory(Path.Combine(Root, name));
 
-    /// <summary>A tree shaped like the real n2f dbupdate folder.</summary>
+    /// <summary>A tree shaped like the real dbupdate folder.</summary>
     public static TempDbUpdateTree Standard()
     {
         var t = new TempDbUpdateTree();

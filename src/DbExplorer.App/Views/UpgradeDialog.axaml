@@ -100,7 +100,7 @@
 
     <!-- Header -->
     <views:DialogHeader DockPanel.Dock="Top" Icon="{StaticResource IconDatabase}" Title="Upgrade database"
-                        Subtitle="Play the SQL scripts of one sprint of the n2f dbupdate folder." />
+                        Subtitle="Play the SQL scripts of one sprint of the dbupdate folder." />
 
     <!-- Stepper -->
     <Border DockPanel.Dock="Top" Background="{DynamicResource DbxContentBg}" BorderBrush="{DynamicResource DbxBorderSubtle}"

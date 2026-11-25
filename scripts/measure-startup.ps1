@@ -92,7 +92,7 @@ function New-SyntheticDataDir {
     New-Item -ItemType Directory -Force -Path $root, $dbeaver | Out-Null
     $fixture = Join-Path $repo 'tests\DbExplorer.Core.Tests\Fixtures\data-sources.json'
     if (Test-Path $fixture) { Copy-Item $fixture (Join-Path $dbeaver 'data-sources.json') }
-    $folders = 'Admin', 'N2F', 'Keeple', 'Translate'
+    $folders = 'Admin', 'Company', 'Keeple', 'Translate'
     $kinds = 'SqlServer', 'SqlServer', 'SqlServer', 'SqlServer', 'SqlServer', 'Postgres', 'Postgres', 'Sqlite'
     $conns = for ($i = 0; $i -lt 8; $i++) {
         [ordered]@{

@@ -5,7 +5,7 @@ using DbExplorer.Core.Upgrade;
 namespace DbExplorer.App.ViewModels;
 
 /// <summary>
-/// The gear-menu entries of the N2F upgrade feature. The command lives here because it needs the active connection and the
+/// The gear-menu entries of the database upgrade feature. The command lives here because it needs the active connection and the
 /// session resolver of the shell. Nothing is read from disk until the menu opens or the options are saved.
 /// </summary>
 public partial class MainViewModel

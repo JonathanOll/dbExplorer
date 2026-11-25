@@ -745,7 +745,7 @@ internal static class Scenes
             History = history,
             GetFormat = () => format,
             SetFormat = f => format = f,
-            Upgrade = new OptionsViewModel(@"C:\repos\n2f\Web\Common\n2jWeb.Data\dbupdate", _ => null, _ => "147 version folders found"),
+            Upgrade = new OptionsViewModel(@"C:\repos\app\dbupdate", _ => null, _ => "147 version folders found"),
             AutoUpdateCheck = new(() => true, _ => { }),
             ShowFolders = new(() => true, _ => { }),
             ShowGroups = new(() => true, _ => { }),

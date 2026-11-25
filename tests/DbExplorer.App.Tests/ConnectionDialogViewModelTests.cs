@@ -10,7 +10,7 @@ public class ConnectionDialogViewModelTests : IDisposable
     public void Dispose() => _fx.Dispose();
 
     private ConnectionDialogViewModel New(ConnectionConfig? existing = null, params string[] taken) =>
-        new(_fx.Protector, ["N2F", "Admin"], taken, existing);
+        new(_fx.Protector, ["Company", "Admin"], taken, existing);
 
     [Fact]
     public void KindChange_SetsDefaultPort_UnlessUserTypedOne()
@@ -70,7 +70,7 @@ public class ConnectionDialogViewModelTests : IDisposable
         vm.Database = "Sales";
         vm.User = "sa";
         vm.Password = "s3cret";
-        vm.Folder = "N2F";
+        vm.Folder = "Company";
         vm.Encrypt = true;
         vm.TrustServerCertificate = true;
         vm.ReadOnly = true;
@@ -80,7 +80,7 @@ public class ConnectionDialogViewModelTests : IDisposable
         var cfg = vm.Result!;
         Assert.Equal(DbKind.SqlServer, cfg.Kind);
         Assert.Equal(1433, cfg.Port);
-        Assert.Equal("N2F", cfg.Folder);
+        Assert.Equal("Company", cfg.Folder);
         Assert.Equal("p:s3cret", cfg.ProtectedPassword);
         Assert.True(cfg.Encrypt && cfg.TrustServerCertificate && cfg.ReadOnly);
 

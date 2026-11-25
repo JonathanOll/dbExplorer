@@ -4,7 +4,7 @@ Date: 2026-11-20
 
 ## Intent and why
 
-A lightweight Windows desktop app to explore and edit databases (PostgreSQL, SQL Server, SQLite, others later) faster than DBeaver. The user is a full-stack developer at N2F who today uses DBeaver with 8 connections (5 mssql, 2 postgres, 1 sqlite) organised in folders (Admin, N2F, Keeple, Translate). Pain: DBeaver is heavy and navigation is slow. Goal: switch between databases instantly, jump to any table or column by typing its name, follow foreign keys, filter and edit rows.
+A lightweight Windows desktop app to explore and edit databases (PostgreSQL, SQL Server, SQLite, others later) faster than DBeaver. The user is a full-stack developer at Company who today uses DBeaver with 8 connections (5 mssql, 2 postgres, 1 sqlite) organised in folders (Admin, Company, Keeple, Translate). Pain: DBeaver is heavy and navigation is slow. Goal: switch between databases instantly, jump to any table or column by typing its name, follow foreign keys, filter and edit rows.
 
 ## Goals
 
@@ -63,11 +63,11 @@ Electron rejected: too heavy.
 ## UI sketch
 
 ```
-┌ Connections ─────┬ [Admin SQLite ▾] [N2F local ▾]  ← tabs
+┌ Connections ─────┬ [Admin SQLite ▾] [Company local ▾]  ← tabs
 │ ▾ Admin          │ users ┃ Data ┃ Structure
 │   Admin Postgre  │ WHERE: ____________   ⟳
-│ ▾ N2F            │ id │ name │ company_id→ │ …
-│   ▸ N2F local    │ filter row: [  ] [ Bo ] [   ]
+│ ▾ Company            │ id │ name │ company_id→ │ …
+│   ▸ Company local    │ filter row: [  ] [ Bo ] [   ]
 │     ▸ dbo        │ 1  │ Bob  │ 42 ↗        │
 └──────────────────┴────────────────────────
 ```

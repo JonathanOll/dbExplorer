@@ -45,11 +45,11 @@ public class DbUpdatePathSettingTests : IDisposable
     {
         var store = Store();
         var config = AppConfig.Empty();
-        config.DbUpdatePath = @"C:\repos\n2f\Web\Common\n2jWeb.Data\dbupdate";
+        config.DbUpdatePath = @"C:\repos\app\dbupdate";
 
         store.Save(config);
 
-        Assert.Equal(@"C:\repos\n2f\Web\Common\n2jWeb.Data\dbupdate", store.Load().DbUpdatePath);
+        Assert.Equal(@"C:\repos\app\dbupdate", store.Load().DbUpdatePath);
     }
 
     [Fact]

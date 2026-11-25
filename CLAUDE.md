@@ -61,11 +61,11 @@ delegate the work itself to sub-agents (`Agent` tool) instead of doing it inline
 - Keep start-up lean: nothing heavy before first paint, no connection before first paint, lazy tree children.
 - Result tabs of a script implement `IResultTab` and get a `DataTemplate` in `ScriptTabView.axaml`.
 - Shortcuts are declared in three places that must agree: `MainShortcuts` / `ScriptTabKeys` (behaviour), `ShortcutCatalog`
-  and the script shortcuts flyout (help), README table.
+  and the script shortcuts flyout (help), the table in `docs/shortcuts.md`.
 
 ## Tests
 
 - Every behaviour change comes with a test in the matching project; bug fixes start with a test that fails.
 - Prefer real SQLite files (`TreeFixture.CreateSqliteFile`, `ScriptTabFixture`) over mocks. SQL Server / PostgreSQL integration
-  tests are opt-in through environment variables (`DBX_MSSQL`, ...), see the README: do not assume a server is available.
+  tests are opt-in through environment variables (`DBX_MSSQL`, ...), see `docs/development.md`: do not assume a server is available.
 - Plan parsers are tested on hand-written showplan XML / EXPLAIN JSON (`tests/DbExplorer.Core.Tests/PlanTests.cs`).

@@ -40,7 +40,7 @@ public sealed record UpgradeProgress(Guid ConnectionId, MemberState State, int S
 public sealed class UpgradeRefusedException(string message) : Exception(message);
 
 /// <summary>
-/// Plays SQL scripts on databases, in parallel. This is the write-capable runner of the n2f upgrade and it is deliberately
+/// Plays SQL scripts on databases, in parallel. This is the write-capable runner of the database upgrade and it is deliberately
 /// separate from <see cref="GroupRunner"/> (which stays read-only and is never reached from here, nor reaches this): it shares no
 /// code with it, uses plain <see cref="DbCommand.ExecuteNonQueryAsync(CancellationToken)"/> on a connection of its own, and the
 /// read-only guard of the group run is not involved. A connection flagged read-only is refused before anything is opened.

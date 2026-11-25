@@ -1,11 +1,11 @@
-# N2F database upgrade (play a sprint's dbupdate scripts) - design
+# Database upgrade (play a sprint's dbupdate scripts) - design
 
 Date: 2026-11-24. Status: approved by the user in conversation ("go"). Size: project.
 
 ## Intent and why
 
-The user upgrades N2F databases by playing the SQL scripts of a sprint from the n2f repo folder
-`Web/Common/n2jWeb.Data/dbupdate/` (on their PC `C:\repos\n2f\Web\Common\n2jWeb.Data\dbupdate\`). Today this is manual.
+The user upgrades Company databases by playing the SQL scripts of a sprint from the repository folder
+`Web/Common/appWeb.Data/dbupdate/` (on their PC `C:\repos\app\dbupdate\`). Today this is manual.
 They want dbExplorer to: take that folder path in its options, analyse its structure, play the scripts of one sprint
 given its number, warn about scripts that create an index or are long, and run it easily on a whole group of databases.
 
@@ -26,9 +26,9 @@ tracking of what was already played**.
 - No tracking table, no "already played" memory, no version-detection of a database.
 - No change to the read-only guarantee of "Run on group" (the existing group run stays read and compare only).
   A write must never become possible through the existing group run.
-- No edit of the n2f repo, no marker convention in scripts.
+- No edit of the repository, no marker convention in scripts.
 - No wrapping of scripts in a transaction (scripts do DDL, `GO` batches, replayable).
-- Not a Liquibase replacement (n2f's `databases/main/changelog` is out of scope).
+- Not a Liquibase replacement (company's `databases/main/changelog` is out of scope).
 - Row-count based "long" detection is optional, later (see Open for the builder).
 
 ## Facts about the folder (observed 2026-11-24)
@@ -49,8 +49,8 @@ tracking of what was already played**.
 
 1. **Text analysis of the script for warnings (chosen).** Lexer-based detection of `CREATE [UNIQUE] [CLUSTERED|NONCLUSTERED] INDEX`,
    `ALTER INDEX ... REBUILD`, `ALTER TABLE ... ALTER COLUMN`, `UPDATE`/`DELETE` without `WHERE`, `WHILE` loops, `WAITFOR`.
-   Cheap, no change to n2f. Heuristic, so warning only, never a block.
-2. Marker comment in scripts (`-- @long`). Reliable but needs the whole n2f repo to adopt it. Rejected.
+   Cheap, no change to company. Heuristic, so warning only, never a block.
+2. Marker comment in scripts (`-- @long`). Reliable but needs the whole repository to adopt it. Rejected.
 3. Measure real table row counts on the target. Better signal, extra queries and engine-specific code. Optional follow-up on top of 1.
 
 Execution: a **separate Upgrade runner** reusing connections and the parallel per-database machinery of the group

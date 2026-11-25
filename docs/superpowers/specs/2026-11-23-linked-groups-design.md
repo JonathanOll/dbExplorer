@@ -4,7 +4,7 @@ Date: 2026-11-23. Status: proposed, awaiting user approval. Extends `2026-11-20-
 
 ## Intent and why
 
-The user works with several databases that share the same schema (e.g. `n2fResto` / `n2fResto2`, "Translate dev" / "Translate local", dev / preprod / customer copies). They want to **link** such databases into a group, **switch** between members instantly without losing what they are looking at, and **run the same query on all members in parallel** to read and compare results.
+The user works with several databases that share the same schema (e.g. `companyResto` / `companyResto2`, "Translate dev" / "Translate local", dev / preprod / customer copies). They want to **link** such databases into a group, **switch** between members instantly without losing what they are looking at, and **run the same query on all members in parallel** to read and compare results.
 
 User decision (2026-11-23): **read and compare only**. No write fan-out, ever, in this feature.
 

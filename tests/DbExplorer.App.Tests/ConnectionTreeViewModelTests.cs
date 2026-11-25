@@ -23,16 +23,16 @@ public class ConnectionTreeViewModelTests : IDisposable
     [Fact]
     public void Tree_GroupsConnectionsByFolder_AndPutsUnfolderedAtRoot()
     {
-        var config = Config(["Admin", "N2F", "Empty"],
-            Conn("Admin PG", "Admin"), Conn("N2F local", "N2F"), Conn("N2F dev", "N2F"), Conn("Loose"));
+        var config = Config(["Admin", "Company", "Empty"],
+            Conn("Admin PG", "Admin"), Conn("Company local", "Company"), Conn("Company dev", "Company"), Conn("Loose"));
 
         var tree = _fx.CreateTree(config);
 
         // Folders first in config order, then unfoldered connections.
-        Assert.Equal(["Admin", "N2F", "Empty", "Loose"], tree.Nodes.Select(n => n.Title));
+        Assert.Equal(["Admin", "Company", "Empty", "Loose"], tree.Nodes.Select(n => n.Title));
         var folders = tree.Nodes.OfType<FolderNodeViewModel>().ToList();
         Assert.Equal(["Admin PG"], folders[0].Children.Select(n => n.Title));
-        Assert.Equal(["N2F dev", "N2F local"], folders[1].Children.Select(n => n.Title)); // sorted by name
+        Assert.Equal(["Company dev", "Company local"], folders[1].Children.Select(n => n.Title)); // sorted by name
         Assert.Empty(folders[2].Children);
         Assert.IsType<ConnectionNodeViewModel>(tree.Nodes[3]);
     }
@@ -51,11 +51,11 @@ public class ConnectionTreeViewModelTests : IDisposable
     public void MoveToFolder_Persists()
     {
         var c = Conn("Local");
-        var tree = _fx.CreateTree(Config(["N2F"], c));
+        var tree = _fx.CreateTree(Config(["Company"], c));
 
-        tree.MoveToFolder(c, "N2F");
+        tree.MoveToFolder(c, "Company");
 
-        Assert.Equal("N2F", Assert.Single(_fx.Store.Load().Connections).Folder);
+        Assert.Equal("Company", Assert.Single(_fx.Store.Load().Connections).Folder);
         var folder = Assert.IsType<FolderNodeViewModel>(Assert.Single(tree.Nodes));
         Assert.Equal("Local", Assert.Single(folder.Children).Title);
 
@@ -69,7 +69,7 @@ public class ConnectionTreeViewModelTests : IDisposable
     public void MoveToFolder_UnknownFolder_IsRejectedWithStatusError()
     {
         var c = Conn("Local");
-        var tree = _fx.CreateTree(Config(["N2F"], c));
+        var tree = _fx.CreateTree(Config(["Company"], c));
 
         tree.MoveToFolder(c, "Nope");
 
@@ -80,9 +80,9 @@ public class ConnectionTreeViewModelTests : IDisposable
     [Fact]
     public void DeleteFolder_MovesConnectionsToRoot()
     {
-        var tree = _fx.CreateTree(Config(["N2F", "Other"], Conn("A", "N2F"), Conn("B", "N2F"), Conn("C", "Other")));
+        var tree = _fx.CreateTree(Config(["Company", "Other"], Conn("A", "Company"), Conn("B", "Company"), Conn("C", "Other")));
 
-        tree.DeleteFolder("N2F");
+        tree.DeleteFolder("Company");
 
         var saved = _fx.Store.Load();
         Assert.Equal(["Other"], saved.Folders);
@@ -90,27 +90,27 @@ public class ConnectionTreeViewModelTests : IDisposable
         Assert.Equal("Other", saved.Connections.Single(c => c.Name == "C").Folder);
         Assert.Equal(3, tree.Config.Connections.Count);
         Assert.Contains(tree.Nodes, n => n.Title == "A" && n is ConnectionNodeViewModel);
-        Assert.DoesNotContain(tree.Nodes, n => n is FolderNodeViewModel { Name: "N2F" });
+        Assert.DoesNotContain(tree.Nodes, n => n is FolderNodeViewModel { Name: "Company" });
     }
 
     [Fact]
     public void AddFolder_RejectsEmptyAndDuplicateNames()
     {
-        var tree = _fx.CreateTree(Config(["N2F"]));
+        var tree = _fx.CreateTree(Config(["Company"]));
 
         Assert.False(tree.AddFolder("  "));
-        Assert.False(tree.AddFolder("n2f"));
+        Assert.False(tree.AddFolder("company"));
         Assert.True(tree.AddFolder(" Keeple "));
 
-        Assert.Equal(["N2F", "Keeple"], _fx.Store.Load().Folders);
+        Assert.Equal(["Company", "Keeple"], _fx.Store.Load().Folders);
     }
 
     [Fact]
     public void RenameFolder_UpdatesFolderAndItsConnections()
     {
-        var tree = _fx.CreateTree(Config(["N2F"], Conn("A", "N2F")));
+        var tree = _fx.CreateTree(Config(["Company"], Conn("A", "Company")));
 
-        Assert.True(tree.RenameFolder("N2F", "Work"));
+        Assert.True(tree.RenameFolder("Company", "Work"));
 
         var saved = _fx.Store.Load();
         Assert.Equal(["Work"], saved.Folders);
@@ -334,10 +334,10 @@ public class ConnectionTreeViewModelTests : IDisposable
     {
         var tree = new ConnectionTreeViewModel(_fx.Store, Config([]), _fx.Sessions, _fx.Status, _fx.Dialogs, _fx.DBeaverDir, persistenceEnabled: false);
 
-        Assert.True(tree.AddFolder("N2F"));
+        Assert.True(tree.AddFolder("Company"));
 
         Assert.False(File.Exists(_fx.ConfigPath));
-        Assert.Equal(["N2F"], tree.Config.Folders); // still usable in memory
+        Assert.Equal(["Company"], tree.Config.Folders); // still usable in memory
         Assert.True(_fx.Status.IsError);
         Assert.Contains("NOT saved", _fx.Status.Message);
     }
@@ -398,20 +398,20 @@ public class ConnectionTreeViewModelTests : IDisposable
     [Fact]
     public async Task AddConnectionCommand_UsesDialogResult_AndPersists()
     {
-        var tree = _fx.CreateTree(Config(["N2F"]));
+        var tree = _fx.CreateTree(Config(["Company"]));
         _fx.Dialogs.OnConnectionDialog = vm =>
         {
             vm.Name = "New one";
             vm.Kind = DbKind.Sqlite;
             vm.Database = "new.db";
-            vm.Folder = "N2F";
+            vm.Folder = "Company";
         };
 
         await tree.AddConnectionCommand.ExecuteAsync(null);
 
         var saved = Assert.Single(_fx.Store.Load().Connections);
         Assert.Equal("New one", saved.Name);
-        Assert.Equal("N2F", saved.Folder);
+        Assert.Equal("Company", saved.Folder);
         var folder = Assert.IsType<FolderNodeViewModel>(Assert.Single(tree.Nodes));
         Assert.Equal("New one", Assert.Single(folder.Children).Title);
     }
@@ -431,12 +431,12 @@ public class ConnectionTreeViewModelTests : IDisposable
     [Fact]
     public async Task DeleteFolderCommand_AsksConfirmation()
     {
-        var tree = _fx.CreateTree(Config(["N2F"], Conn("A", "N2F")));
+        var tree = _fx.CreateTree(Config(["Company"], Conn("A", "Company")));
         _fx.Dialogs.ConfirmResult = false;
 
         await tree.DeleteFolderCommand.ExecuteAsync(tree.Nodes.OfType<FolderNodeViewModel>().Single());
 
-        Assert.Equal(["N2F"], tree.Config.Folders);
+        Assert.Equal(["Company"], tree.Config.Folders);
     }
 
     [Fact]
