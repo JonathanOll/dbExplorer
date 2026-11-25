@@ -39,6 +39,20 @@ no real window and no input). See "Screenshots" below.
    `Focusable="False"` or your own focus visuals on a control a user can tab to.
 8. **Keep startup lean**: no heavy templates, effects, large fonts or images. Transitions are 120 ms on Background / BorderBrush
    only. The AvaloniaEdit theme stays inside `ScriptTabView` (lazy). A drop shadow only on the quick-open card.
+9. **Settings override tokens: views must not hard-code what a setting changes.** These values are replaced at run time by
+   `AppearanceApplier` (Settings dialog, `Appearance/`): the accent family (`DbxAccent`, `DbxAccentStrong`, `DbxAccentButtonBg`,
+   `DbxAccentButtonHover`, `DbxOnAccent`, `DbxAccentSoft`, `DbxAccentSoftHover`, `DbxFocusRing`, `DbxLink`, plus the tinted
+   `DbxRowHover` / `DbxRowSelected` / `DbxRowSelectedInactive` / `DbxEditorSelection` / `DbxEditorCurrentLine`), `DbxGridRowHeight`,
+   `DbxRowHeight`, `TreeViewItemMinHeight` (density 24 / 28 / 32), `DbxGridFontSize`, `DbxEditorFont`, `DbxEditorFontSize`,
+   `DbxGridZebra` (transparent when shading is off) and `DbxUiScale`. A view reads them with `{DynamicResource ...}` and never
+   writes `FontSize="13"` or a fixed row height for the SQL editor or the grids. Accent colours are changed in place on the
+   existing brushes, so never copy an accent brush into a field: bind it. Every accent preset keeps 4.5:1 between `DbxOnAccent`
+   and `DbxAccentButtonBg` (test `AccentContrastTests`).
+10. **UI scale is a layout transform around each window's content** (`UiScaleHost`, `LayoutTransformControl` bound to
+   `DbxUiScale`, inserted around the window's content presenter). Chosen over scaling the font tokens because hard-coded sizes,
+   icons and row heights would not follow a font change, and over a render transform because that does not re-measure
+   (clipping). Popups (menus, combo lists, tooltips) are separate top-levels and stay at 100 %. Check a new view at 125 %
+   (`main-table-settings`, `script-settings` scenes).
 
 ## Sizes and shapes
 
@@ -51,10 +65,11 @@ toolbar 40, document tab strip 38, sub tab strip 36, text box / combo 32, button
 | `DbxRadiusSm` | 4 | key caps, small chips |
 | `DbxCardRadius` (`OverlayCornerRadius`) | 10 | cards, dialogs, flyouts, menus, combo popups, quick-open card |
 | `DbxPillRadius` | 99 | badges |
-| `DbxRowHeight`, `DbxGridRowHeight` | 28 | tree pitch, data grid rows |
+| `DbxRowHeight`, `DbxGridRowHeight` | 28 (**configurable**: 24 / 28 / 32) | tree pitch, data grid rows |
 | `DbxToolbarHeight` / `DbxTabHeight` / `DbxSubTabHeight` / `DbxControlHeight` | 40 / 38 / 36 / 32 | |
 | `DbxFontSize` / `DbxSmallFontSize` / `DbxGridFontSize` / `DbxH1FontSize` / `DbxH2FontSize` | 13 / 11.5 / 12.5 / 20 / 15 | |
 | `DbxMonoFont`, `DbxCardShadow`, `DbxFocusGlow`, `DbxFocusGlowError`, `DbxFocusInset` | | font and box shadows (focus glow of inputs, inset ring of tabs) |
+| `DbxEditorFont`, `DbxEditorFontSize`, `DbxUiScale` | Consolas, 13, 1.0 | **configurable** (Settings > Editor / Appearance), see rule 9 and 10 |
 
 ## Tokens
 
@@ -178,6 +193,12 @@ current-cell frame: 2 px accent, inside the cell).
   chips (Scripts | Data), the data filters (connection, schema, table name) and an info banner about long searches, a thin progress
   bar, results grouped under file / table headers (unsaved badge, match count), the hit in bold, a status line with spinner and key
   hints, a warn band when results are capped. Scenes: `search`, `search-data`.
+- **Settings dialog** (`SettingsDialog`, Tools > Settings, `Ctrl+,`): a left list of category pages with a search box, the page on
+  the right (title, subtitle, "Reset to defaults"), one "Close" button, no OK / Cancel (changes apply and save at once). A page is
+  a `SettingsPageViewModel` listed in `SettingsPages.Create`; its rows are `SettingItemViewModel`s (toggle = check box, choice =
+  segmented chips or a combo box, number = spin box that clamps) built with `Make.Toggle` / `Make.Choice` / `Make.Number`, which
+  read and write through `SettingsService`. A generic page needs no XAML; a page with its own layout adds a `DataTemplate` before the
+  generic one in `SettingsDialog.axaml`. The persisted values are sections of `AppSettings` (Core). Do not add an empty page.
 - **Dialogs**: shared `DialogHeader` / `DialogFooter` (`DialogParts.cs`): icon tile, title, subtitle; footer with verb buttons
   ("Add connection", "Create group", "Save"). Inline field errors (`TextBox.error` + `TextBlock.fielderror`). Destructive
   confirmations use `ConfirmRequest` with `DialogTone.Danger`: a red verb button, a red icon, Cancel is the default and focused.
@@ -194,8 +215,10 @@ dotnet run --project tools/UiShots -- --scroll 3        # scroll benchmark of a 
 ```
 
 Scenes: `empty`, `main-table`, `table-edit`, `table-structure`, `script`, `script-error`, `quick-open`, `connection-dialog`,
-`sql-preview`, `virtual-key`, `history` (the Query history window), `confirm-dialog`, `live-theme-switch` (flips the theme while the window shows),
-`main-table-125` (1024x640 DIP, the 1280x800 window at 125 percent scaling), and for linked groups `groups-tree` (the Groups
+`sql-preview`, `virtual-key`, `history` (the Query history window), `search`, `search-data`, `format-sql`, `confirm-dialog`, `live-theme-switch` (flips the theme while the window shows),
+`main-table-125` (1024x640 DIP, the 1280x800 window at 125 percent scaling), the Settings dialog (`settings-appearance`,
+`settings-editor`, `settings-results`, `settings-history`, `settings-format`, `settings-shortcuts`, `settings-upgrade`, `settings-search`, `settings-appearance-125`),
+`main-table-settings` and `script-settings` (UI scale 125 %, purple accent, Compact density), and for linked groups `groups-tree` (the Groups
 section of the navigator), `group-editor`, `group-editor-warning` (one member + a name clash: warning and error bands) and
 `group-schema-diff` (schema-difference report with an unreachable member), `group-switch-table` and `group-switch-script`
 (the database selector in a table and a script tab), `group-run` and `group-run-differences` (a read-only run of one statement on

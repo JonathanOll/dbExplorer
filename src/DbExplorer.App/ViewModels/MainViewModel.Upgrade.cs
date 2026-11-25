@@ -33,24 +33,43 @@ public partial class MainViewModel
         OpenUpgradeCommand.NotifyCanExecuteChanged();
     }
 
+    private void ApplyDbUpdatePath(string? path)
+    {
+        if (path == Tree.Config.DbUpdatePath) return;
+        Tree.SetDbUpdatePath(path);
+        RefreshUpgradeAvailability();
+    }
+
+    /// <summary>What the settings pages read and write: the live settings service plus the config flags of the menus.</summary>
+    private SettingsContext SettingsContextFor(OptionsViewModel upgrade) => new(Settings.SettingsService.Instance)
+    {
+        Upgrade = upgrade,
+        ApplyDbUpdatePath = ApplyDbUpdatePath,
+        RecordHistory = new(() => Tree.Config.RecordHistory, v => Tree.SetRecordHistory(v)),
+        History = _history,
+        GetFormat = () => Tree.Config.Format,
+        SetFormat = f => Tree.SetFormatOptions(f),
+        AutoUpdateCheck = new(() => Update.AutoCheckEnabled, v => Update.AutoCheckEnabled = v),
+        ShowFolders = new(() => Tree.ShowFolders, v => { if (v != Tree.ShowFolders) Tree.ToggleFoldersCommand.Execute(null); }),
+        ShowGroups = new(() => Tree.ShowGroups, v => { if (v != Tree.ShowGroups) Tree.ToggleGroupsCommand.Execute(null); }),
+        ShowScripts = new(() => Tree.ShowScripts, v => { if (v != Tree.ShowScripts) Tree.ToggleScriptsCommand.Execute(null); }),
+        CopyText = text => CopyToClipboard?.Invoke(text) ?? Task.CompletedTask,
+    };
+
+    /// <summary>Opens the Settings dialog (Tools > Settings, Ctrl+,). <paramref name="page"/> picks the page to start on.</summary>
     [RelayCommand]
-    private async Task OpenOptionsAsync()
+    private async Task OpenOptionsAsync(string? page = null)
     {
         try
         {
             if (_upgradeDialogs is not { } dialogs) return;
-            var vm = new OptionsViewModel(
+            var upgrade = new OptionsViewModel(
                 Tree.Config.DbUpdatePath,
                 DbUpdateCatalog.Validate,
-                path => $"{DbUpdateCatalog.Scan(path).Folders.Count} version folders found",
-                Tree.Config.RecordHistory,
-                _history is { } history ? history.Clear : null,
-                Tree.Config.Format);
-            if (!await dialogs.ShowOptionsAsync(vm) || vm.Result is not { } result) return;
-            Tree.SetDbUpdatePath(result.DbUpdatePath);
-            if (result.RecordHistory != Tree.Config.RecordHistory) Tree.SetRecordHistory(result.RecordHistory);
-            if (result.Format is { } format && format != Tree.Config.Format) Tree.SetFormatOptions(format);
-            RefreshUpgradeAvailability();
+                path => $"{DbUpdateCatalog.Scan(path).Folders.Count} version folders found");
+            using var vm = new SettingsViewModel(SettingsContextFor(upgrade), page);
+            if (!await dialogs.ShowOptionsAsync(vm) || upgrade.Result is not { } result) return;
+            ApplyDbUpdatePath(result.DbUpdatePath);
         }
         catch (Exception ex)
         {

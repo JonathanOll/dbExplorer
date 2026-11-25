@@ -14,7 +14,9 @@ using Avalonia.VisualTree;
 using AvaloniaEdit.Highlighting;
 using AvaloniaEdit.Rendering;
 using AvaloniaEdit.Search;
+using DbExplorer.App.Settings;
 using DbExplorer.App.ViewModels;
+using DbExplorer.Core.Model;
 
 namespace DbExplorer.App.Views;
 
@@ -49,15 +51,32 @@ public partial class ScriptTabView : UserControl
         DataContextChanged += (_, _) => Attach(DataContext as ScriptTabViewModel);
         DetachedFromVisualTree += (_, _) =>
         {
+            SettingsService.Instance.Changed -= OnSettingsChanged;
             Attach(null);
             StopElapsedTimer();
         };
         AttachedToVisualTree += (_, _) =>
         {
+            SettingsService.Instance.Changed += OnSettingsChanged;
+            ApplyEditorSettings(SettingsService.Instance.Current.Editor);
             Attach(DataContext as ScriptTabViewModel);
             ApplyEditorTheme();
             Editor.Focus();
         };
+    }
+
+    private void OnSettingsChanged(AppSettings settings) => ApplyEditorSettings(settings.Editor);
+
+    /// <summary>Editor options of the Settings dialog (font family and size come through the DbxEditorFont* resources).</summary>
+    private void ApplyEditorSettings(EditorSettings editor)
+    {
+        Editor.ShowLineNumbers = editor.LineNumbers;
+        Editor.WordWrap = editor.WordWrap;
+        Editor.Options.ShowSpaces = editor.ShowWhitespace;
+        Editor.Options.ShowTabs = editor.ShowWhitespace;
+        Editor.Options.HighlightCurrentLine = editor.HighlightCurrentLine;
+        Editor.Options.IndentationSize = editor.TabSize;
+        Editor.TextArea.TextView.Redraw();
     }
 
     // The highlighting definition is a process-wide singleton: its colours are switched once per theme, not once per tab.
@@ -86,7 +105,7 @@ public partial class ScriptTabView : UserControl
         Editor.LineNumbersForeground = Token("DbxEditorGutterText");
         Editor.TextArea.SelectionBrush = Token("DbxEditorSelection");
         Editor.TextArea.TextView.CurrentLineBackground = Token("DbxEditorCurrentLine");
-        Editor.Options.HighlightCurrentLine = true;
+        Editor.Options.HighlightCurrentLine = SettingsService.Instance.Current.Editor.HighlightCurrentLine;
 
         // The gutter: a solid hairline with some air on both sides instead of the dotted line AvaloniaEdit draws.
         foreach (var rule in Editor.TextArea.LeftMargins.OfType<Line>())

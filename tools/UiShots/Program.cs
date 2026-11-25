@@ -5,6 +5,8 @@ using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using DbExplorer.App.Appearance;
+using DbExplorer.App.Settings;
 using DbExplorer.App.ViewModels;
 using DbExplorer.App.Views;
 using DbExplorer.Core.Config;
@@ -348,7 +350,17 @@ internal static class Scenes
         ("search", SearchScripts),
         ("search-data", SearchData),
         ("format-sql", FormatSql),
-        ("options-format", OptionsFormat),
+        ("settings-appearance", d => SettingsDialogScene(d, "appearance")),
+        ("settings-editor", d => SettingsDialogScene(d, "editor")),
+        ("settings-results", d => SettingsDialogScene(d, "results")),
+        ("settings-history", d => SettingsDialogScene(d, "history")),
+        ("settings-format", d => SettingsDialogScene(d, "format")),
+        ("settings-shortcuts", d => SettingsDialogScene(d, "shortcuts")),
+        ("settings-upgrade", d => SettingsDialogScene(d, "upgrade")),
+        ("settings-search", d => SettingsDialogScene(d, "appearance", search: "size")),
+        ("main-table-settings", d => Customised(d, MainTable)),
+        ("script-settings", d => Customised(d, s => Script(s, false))),
+        ("settings-appearance-125", d => Customised(d, s => SettingsDialogScene(s, "appearance"))),
     ];
 
     private static string Theme = "light";
@@ -374,6 +386,12 @@ internal static class Scenes
             catch (Exception e)
             {
                 Console.WriteLine($"FAILED {name}-{theme}: {e}");
+            }
+            finally
+            {
+                // a scene may run under custom settings: the next one starts from the defaults
+                SettingsService.Instance = new SettingsService(new AppSettings());
+                AppearanceApplier.Apply(new AppSettings());
             }
         }
     }
@@ -698,15 +716,6 @@ internal static class Scenes
         return null;
     }
 
-    private static async Task<Window?> OptionsFormat(Demo d)
-    {
-        await Open(d);
-        var dialog = new OptionsDialog { DataContext = new OptionsViewModel(null, _ => null, null, true, () => { }, null) };
-        dialog.Show(d.Window);
-        await Settle();
-        return dialog;
-    }
-
     private static async Task<Window?> SaveScriptDialogScene(Demo d)
     {
         await Open(d);
@@ -717,6 +726,50 @@ internal static class Scenes
         dialog.Show(d.Window);
         await Settle();
         return dialog;
+    }
+
+    // The Settings dialog on one page (optionally with a search typed in), over the main window.
+    private static async Task<Window?> SettingsDialogScene(Demo d, string page, string? search = null)
+    {
+        await Open(d);
+        var history = new DbExplorer.Core.Scripting.QueryHistory(Path.Combine(d.Dir, "history-settings.jsonl"));
+        var now = DateTime.UtcNow;
+        for (var i = 0; i < 12; i++)
+            history.Append(new DbExplorer.Core.Scripting.HistoryEntry(Guid.NewGuid(), now.AddMinutes(-30 * i), d.Shop.Id, d.Shop.Name, d.Shop.Kind,
+                d.Shop.Database, $"SELECT id, status, total FROM orders WHERE customer_id = {i + 1};", 12 + i, 3, null));
+        var recording = true;
+        var format = new DbExplorer.Core.Scripting.SqlFormatOptions();
+        var ctx = new SettingsContext(SettingsService.Instance)
+        {
+            RecordHistory = new(() => recording, v => recording = v),
+            History = history,
+            GetFormat = () => format,
+            SetFormat = f => format = f,
+            Upgrade = new OptionsViewModel(@"C:\repos\n2f\Web\Common\n2jWeb.Data\dbupdate", _ => null, _ => "147 version folders found"),
+            AutoUpdateCheck = new(() => true, _ => { }),
+            ShowFolders = new(() => true, _ => { }),
+            ShowGroups = new(() => true, _ => { }),
+            ShowScripts = new(() => true, _ => { }),
+        };
+        var vm = new SettingsViewModel(ctx, page);
+        if (search is not null) vm.SearchText = search;
+        var dialog = new SettingsDialog { DataContext = vm };
+        dialog.Show(d.Window);
+        await Settle();
+        return dialog;
+    }
+
+    // A scene under non-default settings: 125 % scale, purple accent, compact rows, a bigger grid font.
+    private static async Task<Window?> Customised(Demo d, Func<Demo, Task<Window?>> inner)
+    {
+        var custom = new AppSettings
+        {
+            Appearance = new() { UiScalePercent = 125, Accent = AccentPreset.Purple, Density = GridDensity.Compact },
+            Results = new() { ThousandsSeparator = true },
+        };
+        SettingsService.Instance = new SettingsService(custom);
+        AppearanceApplier.Apply(custom);
+        return await inner(d);
     }
 
     private static async Task<Window?> GroupsTree(Demo d)

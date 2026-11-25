@@ -33,6 +33,9 @@ public static class MainShortcuts
             case (Key.Escape, KeyModifiers.None) when main.IsShortcutsVisible:
                 main.HideShortcutsCommand.Execute(null);
                 return true;
+            case (Key.OemComma, KeyModifiers.Control):
+                main.OpenOptionsCommand.Execute(null);
+                return true;
             case (Key.T, KeyModifiers.Control):
                 main.ShowTablePickerCommand.Execute(null);
                 return true;

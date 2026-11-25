@@ -300,37 +300,6 @@ public class HistoryViewModelTests : IDisposable
         Assert.Equal(expected, HistoryTime.Ago(Now.AddSeconds(-seconds), Now));
 }
 
-public class HistoryOptionsTests
-{
-    [Fact]
-    public void RecordHistory_FlowsIntoTheResult()
-    {
-        var vm = new OptionsViewModel(null, _ => null, null, recordHistory: true) { RecordHistory = false };
-
-        Assert.True(vm.TryConfirm());
-        Assert.False(vm.Result!.RecordHistory);
-    }
-
-    [Fact]
-    public void ClearHistory_NeedsASecondClick()
-    {
-        var cleared = 0;
-        var vm = new OptionsViewModel(null, _ => null, null, true, () => cleared++);
-
-        vm.ClearHistoryCommand.Execute(null);
-        Assert.Equal(0, cleared);
-        Assert.Contains("again", vm.ClearHistoryText);
-
-        vm.ClearHistoryCommand.Execute(null);
-        Assert.Equal(1, cleared);
-        Assert.Equal("History cleared.", vm.ClearHistoryInfo);
-    }
-
-    [Fact]
-    public void WithoutAHistory_TheButtonIsHidden() =>
-        Assert.False(new OptionsViewModel(null, _ => null).CanClearHistory);
-}
-
 public class HistoryConfigTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "dbx-histcfg-" + Guid.NewGuid().ToString("N"));

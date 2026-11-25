@@ -13,7 +13,11 @@ namespace DbExplorer.App;
 [SupportedOSPlatform("windows")] // DPAPI secret protector
 public class App : Application
 {
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+        Appearance.UiScaleHost.Install();   // every window wraps its content in the UI scale host
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {
@@ -28,12 +32,20 @@ public class App : Application
             var startup = prefetched.Startup;
             if (startup.Notice is not null) status.Error(startup.Notice);
 
+            // User settings come from the config that is already loaded: no extra IO. Applied before the window exists, so the first
+            // paint already has the chosen theme, accent and scale; the default settings change nothing and cost nothing.
+            var settings = Settings.SettingsService.Instance = new Settings.SettingsService(startup.Config.Settings);
+            Appearance.AppearanceApplier.ResetTracking();
+            if (settings.Current != new Core.Model.AppSettings()) Appearance.AppearanceApplier.Apply(settings.Current, this);
+            settings.Changed += changed => Appearance.AppearanceApplier.Apply(changed, this);
+
             var window = new MainWindow();
             var dialogs = new DialogService(window);
             var cache = new MetadataCache(paths.CacheDir);
             var sessions = new SessionManager(store, cache, protector);
             var tree = new ConnectionTreeViewModel(
                 store, startup.Config, sessions, status, dialogs, paths.DBeaverDir, startup.PersistenceEnabled);
+            settings.Persist = tree.SetSettings;
             var main = new MainViewModel(tree, status, cache) { Banner = startup.Banner };
             var editDialogs = new EditDialogService(window);
             main.UseTableTabs(sessions, editDialogs);

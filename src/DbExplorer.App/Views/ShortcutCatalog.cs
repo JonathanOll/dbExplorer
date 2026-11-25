@@ -66,6 +66,7 @@ public static class ShortcutCatalog
             new("Tab", "Switch between this connection and all connections"),
         ]),
         new("Help", [
+            new("Ctrl+,", "Open the settings"),
             new("F1", "This list"),
             new("Esc", "Close this list or the search"),
         ]),

@@ -83,7 +83,7 @@ public sealed class GridCell : TextBlock
     {
         var values = GridCellColumn.ValuesOf(Row);
         var value = values is not null && Index < values.Length ? values[Index] : null;
-        var formatted = CellFormatter.Format(value);
+        var formatted = CellFormatter.FormatForDisplay(value);
         var row = Row as RowViewModel;
 
         IsLink = CanLink && !formatted.IsNull;

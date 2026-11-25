@@ -143,7 +143,7 @@
           </MenuItem>
 
           <MenuItem Header="_Tools">
-            <MenuItem Header="_Options…" Command="{Binding OpenOptionsCommand}">
+            <MenuItem Header="_Settings…" Command="{Binding OpenOptionsCommand}" InputGesture="Ctrl+OemComma">
               <MenuItem.Icon><PathIcon Data="{StaticResource IconSettings}" /></MenuItem.Icon>
             </MenuItem>
             <MenuItem Header="_Upgrade database…" Command="{Binding OpenUpgradeCommand}" />
@@ -287,7 +287,7 @@
               <Button.Flyout>
                 <MenuFlyout Placement="TopEdgeAlignedRight" Opening="OnSettingsFlyoutOpening">
                   <MenuItem Header="Upgrade database…" Command="{Binding OpenUpgradeCommand}" />
-                  <MenuItem Header="Options…" Command="{Binding OpenOptionsCommand}" />
+                  <MenuItem Header="Settings…" Command="{Binding OpenOptionsCommand}" InputGesture="Ctrl+OemComma" />
                   <MenuItem Header="Keyboard shortcuts" Command="{Binding ShowShortcutsCommand}" InputGesture="F1" />
                   <Separator />
                   <MenuItem Header="Check for updates automatically" ToggleType="CheckBox"

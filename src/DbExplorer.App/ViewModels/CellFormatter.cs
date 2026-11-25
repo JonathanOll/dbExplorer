@@ -1,4 +1,6 @@
 using System.Globalization;
+using DbExplorer.App.Settings;
+using DbExplorer.Core.Model;
 using DbExplorer.Core.Querying;
 
 namespace DbExplorer.App.ViewModels;
@@ -40,6 +42,55 @@ public static class CellFormatter
     }
 
     /// <summary>
+    /// <see cref="Format"/> as the Results settings want it shown in a grid cell: NULL label, thousands separators, locale dates
+    /// and the cell length. Only for display: filters, sorting, editing and copying keep using the plain invariant text.
+    /// </summary>
+    public static FormattedCell FormatForDisplay(object? value) => FormatForDisplay(value, SettingsService.Instance.Current.Results);
+
+    public static FormattedCell FormatForDisplay(object? value, ResultsSettings results)
+    {
+        switch (value)
+        {
+            case null:
+                return new FormattedCell(results.NullLabel, null, IsNull: true, IsBinary: false, IsNumber: false);
+            case string s:
+                return FormatText(s, results.MaxCellLength);
+            case DateTime or DateTimeOffset when results.DateFormat == DateDisplay.Locale:
+                return new FormattedCell(value is DateTime dt ? dt.ToString("G", CultureInfo.CurrentCulture) : ((DateTimeOffset)value).ToString("G", CultureInfo.CurrentCulture),
+                    null, false, false, false);
+            case DateOnly d when results.DateFormat == DateDisplay.Locale:
+                return new FormattedCell(d.ToString("d", CultureInfo.CurrentCulture), null, false, false, false);
+            case byte[] or bool:
+                return Format(value);
+            default:
+                var plain = Format(value);
+                return plain.IsNumber && results.ThousandsSeparator
+                    ? plain with { Text = GroupThousands(plain.Text) }
+                    : plain;
+        }
+    }
+
+    /// <summary>"1234567.891" becomes "1,234,567.891". Exponent forms (1E+20) are left alone.</summary>
+    public static string GroupThousands(string invariantNumber)
+    {
+        if (invariantNumber.Contains('E') || invariantNumber.Contains('e')) return invariantNumber;
+        var start = invariantNumber.StartsWith('-') ? 1 : 0;
+        var end = invariantNumber.IndexOf('.');
+        if (end < 0) end = invariantNumber.Length;
+        var digits = invariantNumber.AsSpan(start, end - start);
+        if (digits.Length <= 3 || digits.IndexOfAnyExceptInRange('0', '9') >= 0) return invariantNumber;
+        var sb = new System.Text.StringBuilder(invariantNumber.Length + digits.Length / 3);
+        sb.Append(invariantNumber, 0, start);
+        for (var i = 0; i < digits.Length; i++)
+        {
+            if (i > 0 && (digits.Length - i) % 3 == 0) sb.Append(',');
+            sb.Append(digits[i]);
+        }
+        sb.Append(invariantNumber, end, invariantNumber.Length - end);
+        return sb.ToString();
+    }
+
+    /// <summary>
     /// Filter-box text that selects rows equal to <paramref name="value"/>: "null" for NULL, otherwise "=" followed by
     /// the invariant text (the "=" also keeps the string "null" from being read as the NULL filter).
     /// Binary values cannot be filtered on.
@@ -65,14 +116,14 @@ public static class CellFormatter
         };
     }
 
-    private static FormattedCell FormatText(string s)
+    private static FormattedCell FormatText(string s, int maxChars = MaxCellChars)
     {
         var newline = s.AsSpan().IndexOfAny('\r', '\n');
-        if (newline < 0 && s.Length <= MaxCellChars) return new FormattedCell(s, null, false, false, false);
+        if (newline < 0 && s.Length <= maxChars) return new FormattedCell(s, null, false, false, false);
 
         var firstLine = newline < 0 ? s : s[..newline];
         string text;
-        if (firstLine.Length > MaxCellChars) text = firstLine[..MaxCellChars] + "…";
+        if (firstLine.Length > maxChars) text = firstLine[..maxChars] + "…";
         else text = newline < 0 ? firstLine : firstLine + " …";
 
         var tooltip = s.Length > MaxTooltipChars ? s[..MaxTooltipChars] + "…" : s;

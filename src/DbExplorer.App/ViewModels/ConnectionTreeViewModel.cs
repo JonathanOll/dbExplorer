@@ -614,6 +614,16 @@ public partial class ConnectionTreeViewModel : ObservableObject
         return SaveSetting();
     }
 
+    /// <summary>
+    /// Stores the Settings dialog values (appearance, editor, results...), same contract as <see cref="SetAutoUpdateCheck"/>: they
+    /// apply in memory at once, are saved unless persistence is off, and the status bar says so when they are not kept.
+    /// </summary>
+    public bool SetSettings(AppSettings settings)
+    {
+        Config.Settings = settings;
+        return SaveSetting();
+    }
+
     private bool SaveSetting()
     {
         if (!_persistenceEnabled)

@@ -107,6 +107,17 @@ public sealed class QueryHistory(string file, int maxEntries = QueryHistory.MaxE
         }
     }
 
+    /// <summary>Size of the history file in bytes (0 when it does not exist); reads no content.</summary>
+    public long FileSize
+    {
+        get
+        {
+            try { return File.Exists(file) ? new FileInfo(file).Length : 0; }
+            catch (IOException) { return 0; }
+        }
+    }
+
+
     /// <summary>Number of stored entries (reads the file when needed).</summary>
     public int Count
     {

@@ -32,5 +32,8 @@ public record AppConfig(
     /// <summary>SQL formatter style (Options dialog). Missing in old files: the defaults.</summary>
     public SqlFormatOptions Format { get; set; } = new();
 
+    /// <summary>Settings dialog values (appearance, editor, results...). Missing in old files: the defaults.</summary>
+    public AppSettings Settings { get; set; } = new();
+
     public static AppConfig Empty() => new(new(), new(), new());
 }

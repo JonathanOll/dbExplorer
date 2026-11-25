@@ -64,7 +64,7 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
   a tab between them with one key press, run the same read-only query on all of them at once and see where the results
   differ, or compare their schemas. Details, shortcuts and limits: [Linked database groups](#linked-database-groups).
 - **N2F database upgrade**: play the dbupdate scripts of one sprint of the n2f repo on the current database or on a whole
-  group, with a preview, warnings (index creation, long-running statements) and a confirmation. Gear menu: **Options...**
+  group, with a preview, warnings (index creation, long-running statements) and a confirmation. Gear menu: **Settings...**
   and **Upgrade database...**. Details: [N2F database upgrade](#n2f-database-upgrade).
 - **Safety**: nothing is written without an explicit save; passwords are stored encrypted with Windows DPAPI (current
   user); SQL Server connections expose `encrypt` and `trustServerCertificate`.
@@ -188,7 +188,8 @@ error, an estimated plan is marked as such). `Ctrl+Shift+H` or View > Query hist
 
 The history is a plain JSON-lines file (`history.jsonl` in the data folder), read only when the window opens, capped at the latest
 5,000 statements; a statement longer than 20,000 characters is cut with a marker. A damaged line is skipped, an unwritable file only
-means nothing is remembered. Tools > Options switches the recording off and has a "Clear history" button (setting `RecordHistory`).
+means nothing is remembered. Tools > Settings > **Query history** switches the recording off (`RecordHistory` in `config.json`) and has a "Clear history" button
+(asks for a second click; shows the number of entries and the file size).
 Group runs (one statement on every database) are not recorded.
 
 ## SQL formatting
@@ -213,8 +214,8 @@ a line, subqueries and CTEs as indented blocks, `CASE WHEN ... THEN ... END` on 
 kept on one line and long ones wrapped at 100 columns. The rules follow the tab's engine (`TOP` on SQL Server, `RETURNING`
 and `::` on PostgreSQL, `GO` lines on SQL Server).
 
-**Tools > Options > SQL formatting** sets the keyword case (upper, lower, as typed), the indent (2, 4, 8 spaces or a tab) and
-the comma position (end or start of the line), with a live preview. They are saved in `config.json` (`Format`).
+**Tools > Settings > SQL formatting** sets the keyword case (upper, lower, as typed), the indent (2, 4, 8 spaces or a tab) and
+the comma position (end or start of the line) and the maximum line width, with a live preview. They are saved in `config.json` (`Format`).
 
 ## Execution statistics
 
@@ -325,6 +326,29 @@ select a result, Enter opens it, Esc closes (the last results are shown again th
   (key and leading columns, the matching cell in bold); it opens the table filtered on that column and value. Searching a large
   database can take a while: the overlay says so.
 
+## Settings
+
+Tools > **Settings...** (`Ctrl+,`, also the gear button). A left list of pages, a search box that filters the settings by
+label, and no OK / Cancel: every change applies at once and is saved in `config.json` (section `Settings`; an older file
+without it means the defaults). **Reset to defaults** works per page. When the config could not be read at start-up the
+status bar says the setting is not saved (it still applies for the run).
+
+| Page | What it sets |
+| --- | --- |
+| General | Navigator: folders, Groups section, Scripts section (same flags as the View menu) |
+| Appearance | Theme (System / Light / Dark, live), UI scale 90 to 150 %, accent colour (blue, teal, green, orange, pink, purple, both themes, button text keeps 4.5:1), row density (Comfortable 28 / Compact 24 / Spacious 32 px) |
+| Editor | Font family (installed code fonts) and size 10 to 24, line numbers, word wrap, show whitespace, current line highlight, tab size 2 / 4 / 8. Open editors follow at once |
+| Results | Grid font size, alternate row shading, default row limit of new scripts, NULL text (`NULL`, `(null)`, empty), thousands separator, date format (ISO or locale), longest cell text. Display only: filters, sorting, copy and edits keep the plain values |
+| Query history | Record the query history on or off, **Clear history** (confirmed), entry count and file size |
+| SQL formatting | Keyword case, indent (2, 4, 8 spaces or tab), comma position, maximum line width, live preview of a sample statement |
+| Shortcuts | Every shortcut (from the same list as F1) with a filter box and **Copy as markdown**. Read only |
+| Updates | Automatic update check |
+| Database upgrade | The dbupdate folder (see [N2F database upgrade](#n2f-database-upgrade)) |
+
+The saved theme, accent and scale are applied before the first paint from the config that is already loaded (no extra file
+read); default settings change nothing at start-up. The UI scale is a layout transform around each window's content, so
+menus, drop-down lists and tooltips (separate windows) keep their size.
+
 ## Keyboard shortcuts
 
 | Shortcut | Where | Action |
@@ -332,6 +356,7 @@ select a result, Enter opens it, Esc closes (the last results are shown again th
 | `Ctrl+Alt+F` | anywhere | Search in scripts (open tabs and library) and in the data of a connection |
 | `Ctrl+T` | anywhere | Quick open a table/view of the active connection |
 | `Ctrl+Shift+P` | anywhere | Quick open a table/view across all connections (metadata cache) |
+| `Ctrl+,` | anywhere | Open the Settings dialog (Tools > Settings...) |
 | `Ctrl+Shift+T` | anywhere | Reopen the last closed tab (like a browser; press again to go further back; up to 50 are remembered; a table keeps its filters, a script its text) |
 | `Ctrl+Shift+H` | anywhere | Query history: search, filter, re-open or re-run the statements you ran (View > Query history) |
 | `Ctrl+L` | table tab | Fuzzy-search a column and scroll to it |
@@ -450,10 +475,10 @@ Plays the SQL scripts of one sprint of the n2f `dbupdate` folder (`Web/Common/n2
 or on every database of one of its groups, after a preview with warnings and an explicit confirmation. It is a **separate,
 explicit write path**: [Run on group](#linked-database-groups) is unchanged and stays read-only. SQL Server only.
 
-**Setting.** Gear menu of the navigator toolbar, **Options...**: the path of the dbupdate folder (Browse or type it; a valid
+**Setting.** Tools > **Settings...** (`Ctrl+,`), page **Database upgrade** (also in the gear menu): the path of the dbupdate folder (Browse or type it; a valid
 folder shows how many version folders it holds). Stored in `config.json` as `DbUpdatePath`; empty (the default, and what an
-older file means) switches the feature off. The folder is validated when OK is pressed, after Browse and when the box loses
-focus, and the gear menu's **Upgrade database...** is only enabled when the saved path still validates (checked each time the
+older file means) switches the feature off. The folder is validated after Browse, on Enter, when the box loses focus and on Close (it is kept at once when valid; Esc leaves without keeping a half-typed one);
+the gear menu's **Upgrade database...** is only enabled when the saved path still validates (checked each time the
 menu opens). The path must exist and contain at least one `v...` folder. Nothing is read at launch and nothing is scanned
 until you open **Upgrade database...** (that scan is a directory listing; scripts are read when you press Load).
 
@@ -540,7 +565,7 @@ Everything lives in `%APPDATA%\dbExplorer`:
 
 | Path | Content |
 | --- | --- |
-| `config.json` | folders, connections (passwords DPAPI-encrypted for the current Windows user), virtual keys, linked groups, the automatic-update setting, the N2F dbupdate folder (`DbUpdatePath`, empty = upgrade off), the SQL formatting style (`Format`) |
+| `config.json` | folders, connections (passwords DPAPI-encrypted for the current Windows user), virtual keys, linked groups, the automatic-update setting, the N2F dbupdate folder (`DbUpdatePath`, empty = upgrade off), the SQL formatting style (`Format`), the query-history switch (`RecordHistory`), the Settings dialog values (`Settings`) |
 | `cache\` | per-connection metadata cache (schema/table/column names) used by `Ctrl+Shift+P` |
 | `scripts\` | unsaved script tabs, restored at the next start |
 | `library\` | the script library: your saved `.sql` scripts and their folders ([Script library](#script-library)) |
@@ -609,7 +634,7 @@ install folder (the folder must be writable; [`install.ps1`](#installation) crea
 before this feature and local builds never self-update), or when `DbExplorer.exe` is not what is running.
 `%APPDATA%\dbExplorer` (config, sessions, scripts, cache) is outside the install folder and is never touched.
 
-To turn it off: untick **Check for updates automatically** in the navigator's settings (gear) button (saved in `config.json`
+To turn it off: untick **Check for updates automatically** in Settings > Updates (or the gear button / Help menu) (saved in `config.json`
 as `AutoUpdateCheck`; a config without it means on), or start with `--no-update-check` / `DBEXPLORER_NO_UPDATE_CHECK=1`
 for one run. The check is also skipped when the config could not be read at startup.
 

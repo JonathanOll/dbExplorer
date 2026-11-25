@@ -1,0 +1,203 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbExplorer.App.ViewModels"
+        xmlns:views="using:DbExplorer.App.Views"
+        x:Class="DbExplorer.App.Views.SettingsDialog"
+        x:DataType="vm:SettingsViewModel"
+        Title="Settings"
+        Width="920" Height="640" MinWidth="720" MinHeight="460"
+        WindowStartupLocation="CenterOwner">
+
+  <Window.Resources>
+    <DataTemplate x:Key="ChipTemplate" DataType="vm:ChoiceChip">
+      <ToggleButton Classes="segment" Margin="0,0,6,0" IsChecked="{Binding IsChecked, Mode=TwoWay}" AutomationProperties.Name="{Binding Label}">
+        <StackPanel Orientation="Horizontal" Spacing="7">
+          <Ellipse Width="12" Height="12" IsVisible="{Binding HasSwatch}" VerticalAlignment="Center"
+                   Fill="{Binding Swatch, Converter={x:Static views:SettingsConverters.HexToBrush}}" />
+          <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+        </StackPanel>
+      </ToggleButton>
+    </DataTemplate>
+  </Window.Resources>
+
+  <Window.DataTemplates>
+    <!-- Page with its own layout first: the first matching template wins, the generic page is the fallback for every other page. -->
+    <DataTemplate DataType="vm:DatabaseUpgradeSettingsPage">
+      <views:DatabaseUpgradePageView />
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:ShortcutsSettingsPage">
+      <views:ShortcutsPageView />
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:FormatPreviewViewModel">
+      <StackPanel Spacing="6" Margin="0,0,0,20">
+        <TextBlock Classes="section" Text="Preview" Margin="0,0,0,2" />
+        <Border Background="{DynamicResource DbxInputBg}" BorderBrush="{DynamicResource DbxBorder}" BorderThickness="1"
+                CornerRadius="{DynamicResource DbxRadius}" Padding="10,8">
+          <TextBlock x:Name="PreviewText" Text="{Binding Text}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12"
+                     Foreground="{DynamicResource DbxText}" TextWrapping="NoWrap" MinHeight="170"
+                     AutomationProperties.Name="Preview of the formatted sample statement" />
+        </Border>
+        <TextBlock Classes="dim small" Text="A sample statement formatted with the choices above." />
+      </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:ActionSettingItem">
+      <Border Padding="0,8" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource DbxBorderSubtle}">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Spacing="2" Margin="0,0,16,0" VerticalAlignment="Center">
+            <TextBlock Text="{Binding Label}" />
+            <TextBlock Classes="dim small" Text="{Binding Description}" TextWrapping="Wrap" IsVisible="{Binding HasDescription}" />
+            <TextBlock Classes="dim small" Text="{Binding Info}" TextWrapping="Wrap" IsVisible="{Binding HasInfo}" />
+          </StackPanel>
+          <Button Grid.Column="1" Content="{Binding ButtonText}" Command="{Binding RunCommand}" VerticalAlignment="Center"
+                  AutomationProperties.Name="{Binding Label}" />
+        </Grid>
+      </Border>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:SettingsPageViewModel">
+      <StackPanel Spacing="22">
+        <ItemsControl ItemsSource="{Binding VisibleGroups}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:SettingGroupViewModel">
+              <StackPanel Spacing="4" Margin="0,0,0,20">
+                <TextBlock Classes="section" Text="{Binding Title}" Margin="0,0,0,6" />
+                <ItemsControl ItemsSource="{Binding Items}" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <ContentControl Content="{Binding Footer}" />
+        <StackPanel Classes="empty" IsVisible="{Binding HasNoMatch}">
+          <PathIcon Data="{StaticResource IconSearch}" />
+          <TextBlock Classes="h2" Text="No settings match" />
+          <TextBlock Classes="dim" Text="Try another word." />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- one row per setting: label and explanation on the left, the control on the right -->
+    <DataTemplate DataType="vm:ToggleSettingItem">
+      <Border Padding="0,8" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource DbxBorderSubtle}">
+        <CheckBox IsChecked="{Binding Value}" AutomationProperties.Name="{Binding Label}">
+          <StackPanel Spacing="2">
+            <TextBlock Text="{Binding Label}" />
+            <TextBlock Classes="dim small" Text="{Binding Description}" TextWrapping="Wrap" IsVisible="{Binding HasDescription}" />
+          </StackPanel>
+        </CheckBox>
+      </Border>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:ChoiceSettingItem">
+      <Border Padding="0,8" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource DbxBorderSubtle}">
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+          <StackPanel Spacing="2" Margin="0,0,16,0" VerticalAlignment="Center">
+            <TextBlock Text="{Binding Label}" />
+            <TextBlock Classes="dim small" Text="{Binding Description}" TextWrapping="Wrap" IsVisible="{Binding HasDescription}" />
+          </StackPanel>
+          <ItemsControl Grid.Column="1" ItemsSource="{Binding Chips}" IsVisible="{Binding SideChips}" VerticalAlignment="Center"
+                        ItemTemplate="{StaticResource ChipTemplate}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
+          <ItemsControl Grid.Row="1" Grid.ColumnSpan="2" Margin="0,10,0,0" ItemsSource="{Binding Chips}" IsVisible="{Binding StackChips}"
+                        ItemTemplate="{StaticResource ChipTemplate}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+          </ItemsControl>
+          <ComboBox Grid.Column="1" ItemsSource="{Binding Options}" SelectedItem="{Binding Selected}" IsVisible="{Binding UseCombo}"
+                    MinWidth="240" MaxWidth="320" VerticalAlignment="Center" AutomationProperties.Name="{Binding Label}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate DataType="vm:ChoiceOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </Grid>
+      </Border>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:NumberSettingItem">
+      <Border Padding="0,8" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource DbxBorderSubtle}">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Spacing="2" Margin="0,0,16,0" VerticalAlignment="Center">
+            <TextBlock Text="{Binding Label}" />
+            <TextBlock Classes="dim small" Text="{Binding Description}" TextWrapping="Wrap" IsVisible="{Binding HasDescription}" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <NumericUpDown Value="{Binding Value}" Minimum="{Binding DecimalMinimum}" Maximum="{Binding DecimalMaximum}"
+                           Increment="{Binding DecimalStep}" FormatString="0.##" Width="130" ParsingNumberStyle="Float"
+                           AutomationProperties.Name="{Binding Label}" />
+            <TextBlock Classes="dim small" Text="{Binding Suffix}" VerticalAlignment="Center" MinWidth="72" />
+          </StackPanel>
+        </Grid>
+      </Border>
+    </DataTemplate>
+  </Window.DataTemplates>
+
+  <DockPanel>
+    <views:DialogFooter DockPanel.Dock="Bottom">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="dim small" VerticalAlignment="Center"
+                   Text="Changes apply and are saved as you make them." />
+        <Button Grid.Column="1" Content="Close" Classes="accent" IsDefault="True" Click="OnCloseClick" MinWidth="88" HorizontalContentAlignment="Center" />
+      </Grid>
+    </views:DialogFooter>
+
+    <Grid ColumnDefinitions="248,*">
+      <!-- left: search and the category list -->
+      <Border Background="{DynamicResource DbxNavBg}" BorderThickness="0,0,1,0" BorderBrush="{DynamicResource DbxBorderSubtle}">
+        <DockPanel Margin="12,14,12,12">
+          <TextBox x:Name="SearchBox" DockPanel.Dock="Top" Text="{Binding SearchText}" Watermark="Search settings" Margin="0,0,0,10"
+                   AutomationProperties.Name="Search settings">
+            <TextBox.InnerRightContent>
+              <Button Classes="ghost" Padding="4" MinHeight="0" MinWidth="0" Command="{Binding ClearSearchCommand}" IsVisible="{Binding HasSearch}"
+                      ToolTip.Tip="Clear the search (Esc)" AutomationProperties.Name="Clear the search">
+                <PathIcon Data="{StaticResource IconClose}" Width="10" Height="10" />
+              </Button>
+            </TextBox.InnerRightContent>
+          </TextBox>
+          <ListBox x:Name="PageList" ItemsSource="{Binding VisiblePages}" SelectedItem="{Binding SelectedPage}" Background="Transparent"
+                   BorderThickness="0" AutomationProperties.Name="Settings categories">
+            <ListBox.ItemTemplate>
+              <DataTemplate DataType="vm:SettingsPageViewModel">
+                <StackPanel Orientation="Horizontal" Spacing="10" Margin="2,2">
+                  <PathIcon Data="{Binding IconKey, Converter={x:Static views:Icons.ByKey}}" Width="16" Height="16" Foreground="{DynamicResource DbxIcon}" />
+                  <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </Border>
+
+      <!-- right: the selected page -->
+      <Border Grid.Column="1" Background="{DynamicResource DbxContentBg}">
+        <Grid RowDefinitions="Auto,*">
+          <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource DbxBorderSubtle}" Padding="28,18,28,14">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="2" VerticalAlignment="Center">
+                <TextBlock Classes="h1" Text="{Binding SelectedPage.Title}" />
+                <TextBlock Classes="dim" Text="{Binding SelectedPage.Subtitle}" TextWrapping="Wrap" />
+              </StackPanel>
+              <Button Grid.Column="1" Content="Reset to defaults" Command="{Binding ResetPageCommand}" IsVisible="{Binding CanResetPage}"
+                      VerticalAlignment="Center" ToolTip.Tip="Put every setting of this page back to its default" />
+            </Grid>
+          </Border>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Panel Margin="28,18,28,24">
+              <ContentControl Content="{Binding SelectedPage}" />
+              <StackPanel Classes="empty" IsVisible="{Binding NoPageMatches}">
+                <PathIcon Data="{StaticResource IconSearch}" />
+                <TextBlock Classes="h2" Text="No settings match" />
+                <TextBlock Classes="dim" Text="Try another word." />
+              </StackPanel>
+            </Panel>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+    </Grid>
+  </DockPanel>
+</Window>

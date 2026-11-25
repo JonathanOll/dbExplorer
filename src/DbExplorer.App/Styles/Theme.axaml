@@ -44,6 +44,10 @@
   <Thickness x:Key="TreeViewItemExpandCollapseChevronMargin">8,0,4,0</Thickness>
   <!-- one family on purpose: a FontFamily element takes a comma list as a single family name -->
   <FontFamily x:Key="DbxMonoFont">Consolas</FontFamily>
+  <!-- Configurable (Settings > Editor / Appearance): AppearanceApplier replaces these at run time; do not hard-code the values in a view -->
+  <FontFamily x:Key="DbxEditorFont">Consolas</FontFamily>
+  <x:Double x:Key="DbxEditorFontSize">13</x:Double>
+  <ScaleTransform x:Key="DbxUiScale" ScaleX="1" ScaleY="1" />
   <BoxShadows x:Key="DbxCardShadow">0 12 32 0 #40000000</BoxShadows>
 
   <ResourceDictionary.ThemeDictionaries>
