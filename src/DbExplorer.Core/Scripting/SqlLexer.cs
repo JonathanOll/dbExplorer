@@ -94,11 +94,11 @@ internal static class SqlLexer
         return tokens;
     }
 
-    private static char Peek(string s, int i) => i < s.Length ? s[i] : '\0';
+    internal static char Peek(string s, int i) => i < s.Length ? s[i] : '\0';
 
-    private static bool IsWordStart(char c) => char.IsLetter(c) || c == '_';
+    internal static bool IsWordStart(char c) => char.IsLetter(c) || c == '_';
 
-    private static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c is '_' or '$' or '#' or '@';
+    internal static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c is '_' or '$' or '#' or '@';
 
     internal static int SkipLineComment(string s, int i)
     {
@@ -128,7 +128,7 @@ internal static class SqlLexer
     }
 
     /// <summary>Skips a quoted run starting at the opening quote; a doubled quote is an escaped quote.</summary>
-    private static int SkipQuoted(string s, int i, char quote, bool backslashEscapes)
+    internal static int SkipQuoted(string s, int i, char quote, bool backslashEscapes)
     {
         i++;
         while (i < s.Length)
@@ -145,7 +145,7 @@ internal static class SqlLexer
     }
 
     /// <summary>Skips [identifier]; "]]" is an escaped bracket. The caller guarantees a closing bracket exists.</summary>
-    private static int SkipBracketIdentifier(string s, int i)
+    internal static int SkipBracketIdentifier(string s, int i)
     {
         i++;
         while (i < s.Length)
@@ -164,7 +164,7 @@ internal static class SqlLexer
     /// Recognises a PostgreSQL dollar-quoted string ($$...$$ or $tag$...$tag$) starting at <paramref name="i"/>.
     /// Requires a closing delimiter; $1-style parameters and $ inside identifiers are not dollar quotes.
     /// </summary>
-    private static bool TryDollarQuote(string s, int i, out int end)
+    internal static bool TryDollarQuote(string s, int i, out int end)
     {
         end = i;
         if (i > 0 && IsWordChar(s[i - 1])) return false;

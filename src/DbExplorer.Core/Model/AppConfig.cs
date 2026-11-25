@@ -1,3 +1,5 @@
+using DbExplorer.Core.Scripting;
+
 namespace DbExplorer.Core.Model;
 
 /// <summary>Application configuration. VirtualKeys: connection id -> "schema.table" -> key columns.</summary>
@@ -23,6 +25,9 @@ public record AppConfig(
 
     /// <summary>Folder with the n2f dbupdate scripts; null switches the upgrade feature off. Missing in old files: null.</summary>
     public string? DbUpdatePath { get; set; }
+
+    /// <summary>SQL formatter style (Options dialog). Missing in old files: the defaults.</summary>
+    public SqlFormatOptions Format { get; set; } = new();
 
     public static AppConfig Empty() => new(new(), new(), new());
 }

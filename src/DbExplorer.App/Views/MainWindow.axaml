@@ -125,6 +125,10 @@
             <MenuItem Header="Run _all" Command="{Binding ActiveScript.RunScriptCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="F5" />
             <MenuItem Header="S_top" Command="{Binding ActiveScript.CancelCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Escape" />
             <Separator />
+            <MenuItem Header="_Format SQL" Command="{Binding ActiveScript.FormatSqlCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Ctrl+Shift+F">
+              <MenuItem.Icon><PathIcon Data="{StaticResource IconFormat}" /></MenuItem.Icon>
+            </MenuItem>
+            <Separator />
             <MenuItem Header="_Estimated execution plan" Command="{Binding ActiveScript.ShowEstimatedPlanCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Ctrl+L" />
             <MenuItem Header="Include actual _plan" ToggleType="CheckBox" IsChecked="{Binding ActiveScript.ActualPlanEnabled, Mode=TwoWay, FallbackValue=False}"
                       IsEnabled="{Binding ActiveScript.CanUseActualPlan, FallbackValue=False}" InputGesture="Ctrl+M" />

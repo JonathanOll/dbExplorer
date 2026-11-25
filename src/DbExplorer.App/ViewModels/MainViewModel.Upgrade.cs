@@ -42,9 +42,11 @@ public partial class MainViewModel
             var vm = new OptionsViewModel(
                 Tree.Config.DbUpdatePath,
                 DbUpdateCatalog.Validate,
-                path => $"{DbUpdateCatalog.Scan(path).Folders.Count} version folders found");
+                path => $"{DbUpdateCatalog.Scan(path).Folders.Count} version folders found",
+                Tree.Config.Format);
             if (!await dialogs.ShowOptionsAsync(vm) || vm.Result is not { } result) return;
             Tree.SetDbUpdatePath(result.DbUpdatePath);
+            if (result.Format is { } format && format != Tree.Config.Format) Tree.SetFormatOptions(format);
             RefreshUpgradeAvailability();
         }
         catch (Exception ex)

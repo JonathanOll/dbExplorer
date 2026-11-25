@@ -44,7 +44,8 @@ public sealed record ScriptTabHooks(
     GroupSwitchHooks? Switch = null,
     Func<Guid, Session?>? FindSession = null,
     ScriptLibrary? Library = null,
-    Action<string>? FileUsed = null);
+    Action<string>? FileUsed = null,
+    Func<SqlFormatOptions>? FormatOptions = null);
 
 /// <summary>
 /// A SQL script editor on one connection. Runs the statement under the caret / the selection (Ctrl+Enter) or the

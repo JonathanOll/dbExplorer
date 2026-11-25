@@ -242,6 +242,15 @@
                         VerticalAlignment="Center" Margin="4,0,0,0" ToolTip.Tip="{Binding ActualPlanTip}" AutomationProperties.Name="Include the actual execution plan" />
 
           <Border Classes="vsep" />
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconFormat}"
+                  Command="{Binding FormatSqlCommand}" AutomationProperties.Name="Format SQL">
+            <ToolTip.Tip>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Format the selection, or the whole script" />
+                <Border Classes="kbd"><TextBlock Text="Ctrl+Shift+F" /></Border>
+              </StackPanel>
+            </ToolTip.Tip>
+          </Button>
           <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconFileOpen}"
                   Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).OpenScriptFileCommand}"
                   AutomationProperties.Name="Open a script file">

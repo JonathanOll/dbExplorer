@@ -48,6 +48,32 @@
           </StackPanel>
           <TextBlock Classes="dim small" Text="{Binding FeatureHint}" TextWrapping="Wrap" IsVisible="{Binding ShowHint}" />
         </Panel>
+
+        <Border Height="1" Margin="0,6" Background="{DynamicResource DbxBorderSubtle}" />
+
+        <TextBlock Classes="section" Text="SQL FORMATTING" Margin="0" />
+        <TextBlock Classes="dim small" TextWrapping="Wrap"
+                   Text="How Ctrl+Shift+F lays out a script. Only whitespace and the case of keywords change." />
+
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="8" ColumnSpacing="12">
+          <Label Grid.Row="0" Content="_Keywords" Target="{Binding #KeywordCaseBox}" VerticalAlignment="Center" Padding="0" />
+          <ComboBox x:Name="KeywordCaseBox" Grid.Row="0" Grid.Column="1" HorizontalAlignment="Stretch"
+                    ItemsSource="{x:Static vm:OptionsViewModel.KeywordCaseChoices}" SelectedIndex="{Binding KeywordCaseIndex}" />
+          <Label Grid.Row="1" Content="_Indent" Target="{Binding #IndentBox}" VerticalAlignment="Center" Padding="0" />
+          <ComboBox x:Name="IndentBox" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch"
+                    ItemsSource="{x:Static vm:OptionsViewModel.IndentChoices}" SelectedIndex="{Binding IndentIndex}" />
+          <Label Grid.Row="2" Content="C_ommas" Target="{Binding #CommaBox}" VerticalAlignment="Center" Padding="0" />
+          <ComboBox x:Name="CommaBox" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch"
+                    ItemsSource="{x:Static vm:OptionsViewModel.CommaChoices}" SelectedIndex="{Binding CommaIndex}" />
+        </Grid>
+
+        <TextBlock Classes="dim small" Text="Preview" Margin="0,4,0,0" />
+        <Border Background="{DynamicResource DbxInputBg}" BorderBrush="{DynamicResource DbxBorder}" BorderThickness="1"
+                CornerRadius="{DynamicResource DbxRadius}" Padding="10,8">
+          <TextBlock x:Name="PreviewText" Text="{Binding Preview}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12"
+                     Foreground="{DynamicResource DbxText}" TextWrapping="NoWrap" MinHeight="170"
+                     AutomationProperties.Name="Preview of the formatted sample statement" />
+        </Border>
       </StackPanel>
     </Border>
   </DockPanel>

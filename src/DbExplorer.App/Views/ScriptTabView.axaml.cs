@@ -111,6 +111,7 @@ public partial class ScriptTabView : UserControl
             _vm.PropertyChanged -= OnViewModelChanged;
             _vm.Results.CollectionChanged -= OnResultsChanged;
             _vm.RevealRequested -= OnRevealRequested;
+            _vm.FormatRequested -= OnFormatRequested;
         }
         _vm = next;
         _marks.Clear();
@@ -119,6 +120,7 @@ public partial class ScriptTabView : UserControl
         _vm.PropertyChanged += OnViewModelChanged;
         _vm.Results.CollectionChanged += OnResultsChanged;
         _vm.RevealRequested += OnRevealRequested;
+        _vm.FormatRequested += OnFormatRequested;
         _vm.EditorAttached();
         _syncing = true;
         try
@@ -392,6 +394,24 @@ public partial class ScriptTabView : UserControl
         return true;
     }
 
+    // Ctrl+Shift+F: the view-model computed the change; here it becomes ONE edit of the document, so Ctrl+Z restores it all.
+    private void OnFormatRequested(ScriptTextEdit edit)
+    {
+        var document = Editor.Document;
+        document.UndoStack.StartUndoGroup();
+        try
+        {
+            using (document.RunUpdate()) document.Replace(edit.Start, edit.Length, edit.Text);
+        }
+        finally
+        {
+            document.UndoStack.EndUndoGroup();
+        }
+        if (edit.SelectionLength > 0) Editor.Select(edit.SelectionStart, edit.SelectionLength);
+        else Editor.CaretOffset = Math.Min(edit.Caret, document.TextLength);
+        Editor.TextArea.Caret.BringCaretToView();
+    }
+
     // Ctrl+/: puts "-- " in front of the selected lines, or takes it off when they all have it.
     private void ToggleComment()
     {
@@ -450,6 +470,10 @@ public partial class ScriptTabView : UserControl
             case ScriptKeyAction.ToggleComment:
                 if (!Editor.IsKeyboardFocusWithin) return;
                 ToggleComment();
+                e.Handled = true;
+                return;
+            case ScriptKeyAction.FormatSql:
+                vm.FormatSqlCommand.Execute(null);
                 e.Handled = true;
                 return;
             case ScriptKeyAction.SwitchPane:
