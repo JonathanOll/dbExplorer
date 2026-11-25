@@ -33,7 +33,7 @@ public sealed record TableTabHooks(
 public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
 {
     public const int PageSize = 200;
-    public const string ConnectionClosedMessage = "Connection closed — reopen the table";
+    public const string ConnectionClosedMessage = "Connection closed. Reload to reconnect.";
 
     /// <summary>The query behind the rows on screen: what paging, refresh and count reuse.</summary>
     private sealed record AppliedQuery(IReadOnlyList<ColumnFilter> Filters, string? RawWhere, SortSpec? Sort);
@@ -263,6 +263,17 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
     {
         if (string.IsNullOrEmpty(text)) ColumnFilters.Remove(column);
         else ColumnFilters[column] = text;
+        OnPropertyChanged(nameof(IsFilterDirty));
+        OnPropertyChanged(nameof(NotAppliedText));
+    }
+
+    /// <summary>Sort on the column in the given direction (<c>null</c> = no sort), from the first page.</summary>
+    public async Task SortAsync(string column, bool? descending)
+    {
+        if (FindColumn(column) is not { } index || !await ConfirmLeaveAsync()) return;
+        var name = Columns[index].Name;
+        var basis = _applied ?? CurrentInputs(null);
+        await RunAsync(basis with { Sort = descending is { } d ? new SortSpec(name, d) : null }, 0);
     }
 
     /// <summary>Repaints the filter row after <see cref="ColumnFilters"/> was changed in code.</summary>
@@ -280,6 +291,27 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
         try
         {
             text = CellFormatter.FilterText(Rows[rowIndex].Values[index], Columns[index].Name);
+        }
+        catch (FilterException e)
+        {
+            SetError(e.Message);
+            return;
+        }
+
+        ColumnFilters[Columns[index].Name] = text;
+        NotifyFiltersChanged();
+        await ApplyFiltersAsync();
+    }
+
+    /// <summary>Drops the rows that have the value of the cell (<c>!=value</c>, or <c>!null</c>) and applies, keeping the other filters.</summary>
+    public async Task ExcludeByCellAsync(int rowIndex, string column)
+    {
+        if (rowIndex < 0 || rowIndex >= Rows.Count || FindColumn(column) is not { } index) return;
+        if (!await ConfirmLeaveAsync()) return;
+        string text;
+        try
+        {
+            text = CellFormatter.ExcludeText(Rows[rowIndex].Values[index], Columns[index].Name);
         }
         catch (FilterException e)
         {
@@ -518,10 +550,14 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
             PageIndex = page;
             HasNextPage = result.HasMore;
             if (queryChanged) TotalCount = null;
+            // A last page is its own count: no query needed to know the total.
+            if (!result.HasMore && (rows.Count > 0 || page == 0)) TotalCount = (long)page * PageSize + rows.Count;
             ErrorMessage = null;
             NeedsReload = false;
+            _loadFailed = false;
             ElapsedText = $"{result.Duration.TotalMilliseconds:N0} ms";
             OnPropertyChanged(nameof(RangeText));
+            RefreshFilterState();
             return true;
         }
         catch (OperationCanceledException) when (version != _loadVersion || cts.IsCancellationRequested)
@@ -530,15 +566,27 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
         }
         catch (ObjectDisposedException)
         {
-            if (version == _loadVersion) SetClosed();
+            if (version == _loadVersion)
+            {
+                _loadFailed = true;
+                SetClosed();
+            }
         }
         catch (Exception e)
         {
-            if (version == _loadVersion) SetError(ErrorText.Describe(e));
+            if (version == _loadVersion)
+            {
+                _loadFailed = true;
+                SetError(ErrorText.Describe(e));
+            }
         }
         finally
         {
-            if (version == _loadVersion) IsLoading = false;
+            if (version == _loadVersion)
+            {
+                IsLoading = false;
+                NotifyViewState();
+            }
         }
         return false;
     }
@@ -571,7 +619,7 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
         Info = info;
         Columns = info is null ? [] : info.Columns.OrderBy(c => c.Ordinal).ToList();
         GridColumns = BuildGridColumns();
-        Structure = info is null ? StructureViewModel.Empty : new StructureViewModel(info, t => OpenTableAsync(t, null));
+        Structure = info is null ? StructureViewModel.Empty : new StructureViewModel(info, t => OpenTableAsync(t, null), name => FocusColumn(name));
         RefreshEditState();
     }
 

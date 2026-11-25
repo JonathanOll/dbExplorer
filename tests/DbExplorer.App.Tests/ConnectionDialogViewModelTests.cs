@@ -173,8 +173,116 @@ public class ConnectionDialogViewModelTests : IDisposable
         await vm.TestConnectionAsync();
 
         Assert.False(vm.TestSucceeded);
-        Assert.Equal("Host is required.", vm.TestMessage);
+        Assert.Null(vm.TestMessage);                       // a missing field is not a failed test: the field says what to fix
+        Assert.Equal("Host is required.", vm.HostError);
+        Assert.Equal("Database is required.", vm.DatabaseError);
+        Assert.Null(vm.NameError);
         Assert.False(vm.IsTesting);
+    }
+
+    [Fact]
+    public async Task TestConnection_DoesNotNeedAName_OrComplainAboutOne()
+    {
+        var vm = New(null, "lite");   // "lite" is taken: a save would refuse it, a test does not care
+        vm.Kind = DbKind.Sqlite;
+        vm.Name = "lite";
+        vm.Database = _fx.CreateSqliteFile();
+
+        await vm.TestConnectionAsync();
+
+        Assert.True(vm.TestSucceeded);
+        Assert.Contains("succe", vm.TestMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(" ms", vm.TestMessage);
+    }
+
+    [Fact]
+    public async Task EditingASetting_ClearsTheOldTestResult()
+    {
+        var vm = New();
+        vm.Kind = DbKind.Sqlite;
+        vm.Database = _fx.CreateSqliteFile();
+        await vm.TestConnectionAsync();
+        Assert.True(vm.HasTestMessage);
+
+        vm.Database += "x";
+
+        Assert.False(vm.HasTestMessage);
+        Assert.False(vm.TestSucceeded);
+    }
+
+    [Fact]
+    public void InlineErrors_ShowAfterTheFirstOk_ThenFollowTheInput()
+    {
+        var vm = New();
+        Assert.Null(vm.NameError);
+        Assert.Null(vm.HostError);
+
+        Assert.False(vm.TryConfirm());
+        Assert.Equal("Name is required.", vm.NameError);
+        Assert.Equal("Host is required.", vm.HostError);
+        Assert.Equal("Database is required.", vm.DatabaseError);
+        Assert.False(vm.HasGeneralError);   // the field lines explain it: no banner
+
+        vm.Host = "srv";
+        Assert.Null(vm.HostError);
+        vm.PortText = "99999";
+        Assert.NotNull(vm.PortError);
+        vm.PortText = "5432";
+        Assert.Null(vm.PortError);
+    }
+
+    [Fact]
+    public void ANameClash_ShowsAsItIsTyped_AnEmptyNameOnlyAfterOk()
+    {
+        var vm = New(null, "Billing");
+
+        vm.Name = "";
+        Assert.Null(vm.NameError);
+        vm.Name = "billing";
+        Assert.Equal("A connection named 'billing' already exists.", vm.NameError);
+        vm.Name = "billing 2";
+        Assert.Null(vm.NameError);
+    }
+
+    [Fact]
+    public void ErrorOutsideAnyField_IsAGeneralError()
+    {
+        var vm = New();
+        vm.Error = "Cannot open the file picker: boom";
+
+        Assert.True(vm.HasGeneralError);
+    }
+
+    [Fact]
+    public void TurningEncryptOff_AlsoTurnsTrustOff()
+    {
+        var vm = New();
+        vm.Kind = DbKind.SqlServer;
+        vm.Encrypt = true;
+        vm.TrustServerCertificate = true;
+
+        vm.Encrypt = false;
+
+        Assert.False(vm.TrustServerCertificate);
+    }
+
+    [Fact]
+    public void SavedPassword_IsKept_HintedAndRemovableOnRequest()
+    {
+        var existing = TreeFixture.Conn("PG", "Admin", "db", DbKind.Postgres) with { Port = 5432, User = "u", ProtectedPassword = "p:old" };
+        var vm = New(existing);
+        Assert.True(vm.HasSavedPassword);
+        Assert.Contains("Saved", vm.PasswordHint);
+        Assert.Equal("Save", vm.OkText);
+
+        vm.ClearSavedPassword = true;
+        Assert.True(vm.TryConfirm());
+        Assert.Null(vm.Result!.ProtectedPassword);
+
+        var fresh = New();
+        Assert.False(fresh.HasSavedPassword);
+        Assert.Equal("Optional", fresh.PasswordHint);
+        Assert.Equal("Add connection", fresh.OkText);
     }
 }
 

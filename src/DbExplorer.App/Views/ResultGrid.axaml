@@ -2,12 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="DbExplorer.App.Views.ResultGrid">
   <UserControl.Styles>
-    <!-- Compact rows: more data on screen, fewer pixels to paint -->
-    <Style Selector="DataGridCell">
-      <Setter Property="MinHeight" Value="24" />
-      <Setter Property="FontSize" Value="{DynamicResource DbxGridFontSize}" />
-    </Style>
-    <Style Selector="DataGridRow"><Setter Property="MinHeight" Value="24" /></Style>
+    <!-- Row and cell height come from the theme (DbxGridRowHeight, 28). -->
     <!-- zebra stripes: the grid marks every second realised row with the class "odd" -->
     <Style Selector="DataGridRow.odd"><Setter Property="Background" Value="{DynamicResource DbxGridZebra}" /></Style>
     <!-- Header cell: no padding of its own, the header content (name band + filter band) fills it -->
@@ -16,39 +11,43 @@
       <Setter Property="MinHeight" Value="0" />
       <Setter Property="HorizontalContentAlignment" Value="Stretch" />
       <Setter Property="VerticalContentAlignment" Value="Stretch" />
-      <Setter Property="BorderBrush" Value="{DynamicResource DbxBorder}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxBorderSubtle}" />
       <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
     <Style Selector="Border.nameBand">
-      <Setter Property="Padding" Value="8,5,6,5" />
+      <Setter Property="Padding" Value="10,6,8,6" />
     </Style>
     <Style Selector="Border.filterBand">
       <Setter Property="Background" Value="{DynamicResource DbxGridFilterBg}" />
       <Setter Property="BorderBrush" Value="{DynamicResource DbxBorderSubtle}" />
       <Setter Property="BorderThickness" Value="0,1,0,0" />
-      <Setter Property="Padding" Value="4,3" />
+      <Setter Property="Padding" Value="6,3" />
     </Style>
     <Style Selector="Border.filterBand TextBox">
       <Setter Property="MinHeight" Value="0" />
-      <Setter Property="Height" Value="22" />
-      <Setter Property="Padding" Value="5,1" />
+      <Setter Property="Height" Value="24" />
+      <Setter Property="Padding" Value="6,0" />
       <Setter Property="FontSize" Value="12" />
       <Setter Property="FontFamily" Value="{DynamicResource DbxMonoFont}" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <!-- A filter that is on: lit like a selected choice. Typed but not applied yet: amber border. -->
+    <Style Selector="Border.filterBand TextBox.active">
+      <Setter Property="Background" Value="{DynamicResource DbxAccentSoft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" />
+    </Style>
+    <Style Selector="Border.filterBand TextBox.dirty">
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxWarn}" />
     </Style>
     <Style Selector="PathIcon.pk"><Setter Property="Foreground" Value="{DynamicResource DbxIconKey}" /></Style>
     <Style Selector="PathIcon.fk"><Setter Property="Foreground" Value="{DynamicResource DbxLink}" /></Style>
     <Style Selector="PathIcon.sortGlyph"><Setter Property="Foreground" Value="{DynamicResource DbxAccent}" /></Style>
+    <Style Selector="PathIcon.filterMark"><Setter Property="Foreground" Value="{DynamicResource DbxAccent}" /></Style>
+    <!-- the column the rows are sorted by -->
+    <Style Selector="TextBlock.colTitle.sorted"><Setter Property="Foreground" Value="{DynamicResource DbxAccent}" /></Style>
     <!-- Ctrl+L: the column jumped to is lit for a moment (class set by ResultGrid.FlashColumn) -->
     <Style Selector="DataGridCell.flash"><Setter Property="Background" Value="{DynamicResource DbxColumnFlash}" /></Style>
     <Style Selector="StackPanel.flashHeader"><Setter Property="Background" Value="{DynamicResource DbxColumnFlashHeader}" /></Style>
-    <Style Selector="DataGridRowHeader">
-      <Setter Property="Width" Value="38" />
-    </Style>
-    <Style Selector="TextBlock.rowNumber">
-      <Setter Property="Foreground" Value="{DynamicResource DbxTextFaint}" />
-      <Setter Property="FontSize" Value="11" />
-      <Setter Property="FontFamily" Value="{DynamicResource DbxMonoFont}" />
-    </Style>
   </UserControl.Styles>
   <!-- Columns, headers and cells are generated in code (ResultGrid.axaml.cs): 20+ columns x 200 rows must stay cheap. -->
   <DataGrid x:Name="Grid"

@@ -91,7 +91,7 @@ public class ShortcutTests : ShellTestBase
         await Pump(20);
 
         Assert.Equal(0, sub.SelectedIndex);
-        var filters = view.GetVisualDescendants().OfType<TextBox>().Where(t => t.Watermark == "filter…").ToList();
+        var filters = view.GetVisualDescendants().OfType<TextBox>().Where(t => Avalonia.Automation.AutomationProperties.GetName(t)?.StartsWith("Filter ") == true).ToList();
         Assert.Equal(tab.Columns.Count, filters.Count);
         Assert.True(filters[note].IsFocused, "the filter box of the requested column should have the focus");
         window.Close();

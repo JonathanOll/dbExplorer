@@ -127,6 +127,7 @@ public sealed partial class TableTabViewModel : ITableEditActions
         OnPropertyChanged(nameof(IsReadOnlyConnection));
         OnPropertyChanged(nameof(CanDefineKey));
         OnPropertyChanged(nameof(EditBadge));
+        OnPropertyChanged(nameof(EditBadgeTip));
         OnPropertyChanged(nameof(Badge));
     }
 
@@ -292,6 +293,7 @@ public sealed partial class TableTabViewModel : ITableEditActions
         OnPropertyChanged(nameof(HasPendingEdits));
         OnPropertyChanged(nameof(HasUnsavedWork));
         OnPropertyChanged(nameof(PendingText));
+        NotifyPendingBreakdown();
     }
 
     /// <summary>

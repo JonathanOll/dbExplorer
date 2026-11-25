@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
+using DbExplorer.App.ViewModels;
 using DbExplorer.App.Views;
 
 namespace DbExplorer.App;
@@ -13,7 +14,8 @@ namespace DbExplorer.App;
 /// </summary>
 internal static class DialogShell
 {
-    public static Window Create(string title, string iconKey, Control body, IReadOnlyList<Button> buttons, double minWidth = 380, double maxWidth = 520)
+    public static Window Create(string title, string iconKey, Control body, IReadOnlyList<Button> buttons, double minWidth = 380, double maxWidth = 520,
+        DialogTone tone = DialogTone.Info)
     {
         var footerButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right };
         foreach (var button in buttons) footerButtons.Children.Add(button);
@@ -27,7 +29,12 @@ internal static class DialogShell
         footer.Bind(Border.BorderBrushProperty, footer.GetResourceObservable("DbxBorder"));
 
         var icon = new PathIcon { Width = 26, Height = 26, Data = Icons.Find(iconKey), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 2, 14, 0) };
-        icon.Bind(TemplatedControl.ForegroundProperty, icon.GetResourceObservable("DbxAccent"));
+        icon.Bind(TemplatedControl.ForegroundProperty, icon.GetResourceObservable(tone switch
+        {
+            DialogTone.Danger => "DbxError",
+            DialogTone.Warning => "DbxWarn",
+            _ => "DbxAccent",
+        }));
         var content = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
         content.Children.Add(icon);
         Grid.SetColumn(body, 1);
@@ -51,18 +58,28 @@ internal static class DialogShell
         };
     }
 
-    public static Button Button(string text, bool isDefault = false, bool isCancel = false, bool primary = false)
+    public static Button Button(string text, bool isDefault = false, bool isCancel = false, bool primary = false, bool danger = false)
     {
         var button = new Button
         {
             Content = text, IsDefault = isDefault, IsCancel = isCancel, MinWidth = 88, HorizontalContentAlignment = HorizontalAlignment.Center,
         };
-        if (primary) button.Classes.Add("accent");
+        if (danger) button.Classes.Add("danger");
+        else if (primary) button.Classes.Add("accent");
         return button;
     }
 
-    public static TextBlock Message(string text) => new()
+    /// <summary>The message of a dialog: selectable (an error text can be copied), with an optional dim detail line under it.</summary>
+    public static Control Message(string text, string? detail = null)
     {
-        Text = text, TextWrapping = TextWrapping.Wrap, MaxWidth = 380, VerticalAlignment = VerticalAlignment.Center,
-    };
+        var message = new SelectableTextBlock
+        {
+            Text = text, TextWrapping = TextWrapping.Wrap, MaxWidth = 380, VerticalAlignment = VerticalAlignment.Center,
+            FontWeight = detail is null ? FontWeight.Normal : FontWeight.SemiBold,
+        };
+        if (detail is null) return message;
+        var info = new SelectableTextBlock { Text = detail, TextWrapping = TextWrapping.Wrap, MaxWidth = 380, Margin = new Thickness(0, 6, 0, 0) };
+        info.Classes.Add("dim");
+        return new StackPanel { VerticalAlignment = VerticalAlignment.Center, Children = { message, info } };
+    }
 }

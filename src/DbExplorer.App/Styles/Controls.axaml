@@ -1,8 +1,14 @@
 <!--
   Control themes and style classes of dbExplorer (see docs/ui/README.md for the vocabulary).
-  Themes (apply with Theme="{StaticResource ...}"):   DbxToolButton, DbxDocTabControl + DbxDocTabItem, DbxSubTabControl + DbxSubTabItem
-  Classes:  Border.banner (+ error / warn / info), Border.panelHeader, Border.badge (+ error / warn / ok or info), Border.vsep, Border.kbd,
-            TextBlock.dim / faint / small / title / section
+  Themes (Theme="{StaticResource ...}"):  DbxToolButton, DbxDocTabControl + DbxDocTabItem, DbxSubTabControl + DbxSubTabItem
+  Button:     (default = secondary) .accent / .primary, .danger, .subtle, .ghost, .card, .link
+  Toggle:     ToggleButton.segment, ListBoxItem.choice
+  Inputs:     TextBox / ComboBox .error, TextBox.bare, TextBlock.fielderror
+  Bands:      Border.banner (+ error / warn / info / success), Border.panelHeader, Border.toolbar, Border.vsep
+  Surfaces:   Border.surface, Border.card, StackPanel.empty (empty state)
+  Chips:      Border.badge (+ warn / error / ok / info / success), Border.kbd
+  Text:       TextBlock.h1 / h2 / title / section / dim / faint / small / fielderror
+  Misc:       PathIcon.spin, ProgressBar.thin, MenuItem.danger
 -->
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -10,15 +16,21 @@
 
   <Styles.Resources>
 
-    <!-- Flat button for toolbars: optional icon (Tag = geometry) followed by optional text (Content). Disabled = dimmed. -->
+    <!-- Keyboard focus ring (shown by Avalonia only for keyboard navigation = focus-visible): 2 px accent, drawn over the control edge (the adorner layer clips to the control) -->
+    <FocusAdornerTemplate x:Key="DbxFocusAdorner">
+      <Border BorderThickness="2" BorderBrush="{DynamicResource DbxFocusRing}" CornerRadius="6" IsHitTestVisible="False" />
+    </FocusAdornerTemplate>
+
+    <!-- Ghost button for toolbars: optional icon (Tag = geometry) followed by optional text (Content). Rounded hover / pressed,
+         disabled = dimmed. Classes: accent / primary (filled), danger, run, stop, link, tint, close. -->
     <ControlTheme x:Key="DbxToolButton" TargetType="Button">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{DynamicResource DbxText}" />
       <Setter Property="BorderBrush" Value="Transparent" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Padding" Value="6,0" />
-      <Setter Property="MinHeight" Value="26" />
-      <Setter Property="MinWidth" Value="28" />
+      <Setter Property="Padding" Value="8,0" />
+      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="MinWidth" Value="30" />
       <Setter Property="CornerRadius" Value="{DynamicResource DbxRadius}" />
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="HorizontalAlignment" Value="Left" />
@@ -29,8 +41,14 @@
           <Border Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                   BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
                   Padding="{TemplateBinding Padding}">
-            <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center" VerticalAlignment="Center">
-              <PathIcon Name="Ico" Width="14" Height="14" Data="{TemplateBinding Tag}"
+            <Border.Transitions>
+              <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.12" />
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.12" />
+              </Transitions>
+            </Border.Transitions>
+            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+              <PathIcon Name="Ico" Width="16" Height="16" Data="{TemplateBinding Tag}" Foreground="{DynamicResource DbxIcon}"
                         IsVisible="{TemplateBinding Tag, Converter={x:Static ObjectConverters.IsNotNull}}" />
               <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}"
                                 ContentTemplate="{TemplateBinding ContentTemplate}" RecognizesAccessKey="True"
@@ -41,24 +59,39 @@
         </ControlTemplate>
       </Setter>
       <Style Selector="^:pointerover /template/ Border#Bd"><Setter Property="Background" Value="{DynamicResource DbxHover}" /></Style>
+      <Style Selector="^:pointerover /template/ PathIcon#Ico"><Setter Property="Foreground" Value="{DynamicResource DbxText}" /></Style>
       <Style Selector="^:pressed /template/ Border#Bd"><Setter Property="Background" Value="{DynamicResource DbxPressed}" /></Style>
-      <Style Selector="^:focus-visible /template/ Border#Bd"><Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" /></Style>
       <Style Selector="^:disabled /template/ Border#Bd"><Setter Property="Opacity" Value="0.4" /></Style>
-      <Style Selector="^.accent /template/ Border#Bd">
+      <Style Selector="^.accent /template/ Border#Bd, ^.primary /template/ Border#Bd">
         <Setter Property="Background" Value="{DynamicResource DbxAccentButtonBg}" />
         <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxOnAccent}" />
       </Style>
-      <Style Selector="^.accent /template/ PathIcon#Ico"><Setter Property="Foreground" Value="{DynamicResource DbxOnAccent}" /></Style>
-      <Style Selector="^.accent:pointerover /template/ Border#Bd"><Setter Property="Background" Value="{DynamicResource DbxAccentButtonHover}" /></Style>
-      <!-- coloured icons: add one of these classes -->
+      <Style Selector="^.accent /template/ PathIcon#Ico, ^.primary /template/ PathIcon#Ico, ^.danger /template/ PathIcon#Ico">
+        <Setter Property="Foreground" Value="{DynamicResource DbxOnAccent}" />
+      </Style>
+      <Style Selector="^.accent:pointerover /template/ Border#Bd, ^.primary:pointerover /template/ Border#Bd">
+        <Setter Property="Background" Value="{DynamicResource DbxAccentButtonHover}" />
+      </Style>
+      <Style Selector="^.accent:pressed /template/ Border#Bd, ^.primary:pressed /template/ Border#Bd">
+        <Setter Property="Background" Value="{DynamicResource DbxAccentStrong}" />
+      </Style>
+      <Style Selector="^.danger /template/ Border#Bd">
+        <Setter Property="Background" Value="{DynamicResource DbxDanger}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxOnAccent}" />
+      </Style>
+      <Style Selector="^.danger:pointerover /template/ Border#Bd, ^.danger:pressed /template/ Border#Bd">
+        <Setter Property="Background" Value="{DynamicResource DbxDangerHover}" />
+      </Style>
+      <!-- semantic icon colours: add one of these classes -->
       <Style Selector="^.run /template/ PathIcon#Ico"><Setter Property="Foreground" Value="{DynamicResource DbxRun}" /></Style>
       <Style Selector="^.stop /template/ PathIcon#Ico"><Setter Property="Foreground" Value="{DynamicResource DbxStop}" /></Style>
       <Style Selector="^.link /template/ PathIcon#Ico"><Setter Property="Foreground" Value="{DynamicResource DbxLink}" /></Style>
-      <Style Selector="^.close /template/ PathIcon#Ico"><Setter Property="Width" Value="10" /><Setter Property="Height" Value="10" /></Style>
       <Style Selector="^.tint /template/ PathIcon#Ico"><Setter Property="Foreground" Value="{DynamicResource DbxAccent}" /></Style>
+      <Style Selector="^.close /template/ PathIcon#Ico"><Setter Property="Width" Value="10" /><Setter Property="Height" Value="10" /></Style>
     </ControlTheme>
 
-    <!-- Document tab strip (main editor area): tabs shrink to fit, the active one has an accent strip and the content colour. -->
+    <!-- Document tab strip (main editor area). Chrome-coloured strip, rounded tabs; the active tab takes the content colour (so it
+         melts into the toolbar below) and has a short accent bar at its top. Tabs shrink to fit (TabStripPanel). -->
     <ControlTheme x:Key="DbxDocTabItem" TargetType="TabItem">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" />
@@ -69,10 +102,13 @@
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="Template">
         <ControlTemplate>
-          <Border Name="Root" Background="{TemplateBinding Background}" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,1,0">
-            <Grid RowDefinitions="3,*">
-              <Border Name="Strip" Height="3" />
-              <ContentPresenter Name="PART_ContentPresenter" Grid.Row="1" Content="{TemplateBinding Header}"
+          <Border Name="Root" Background="{TemplateBinding Background}" Margin="1,6,1,0" CornerRadius="8,8,0,0">
+            <Border.Transitions>
+              <Transitions><BrushTransition Property="Background" Duration="0:0:0.12" /></Transitions>
+            </Border.Transitions>
+            <Grid>
+              <Border Name="Strip" Height="2" VerticalAlignment="Top" Margin="10,0" CornerRadius="0,0,2,2" />
+              <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Header}"
                                 ContentTemplate="{TemplateBinding HeaderTemplate}" Padding="{TemplateBinding Padding}"
                                 VerticalAlignment="Center" />
             </Grid>
@@ -80,15 +116,10 @@
         </ControlTemplate>
       </Setter>
       <Style Selector="^:pointerover /template/ Border#Root"><Setter Property="Background" Value="{DynamicResource DbxHover}" /></Style>
-      <Style Selector="^:selected">
-        <Setter Property="Foreground" Value="{DynamicResource DbxText}" />
-      </Style>
+      <Style Selector="^:selected"><Setter Property="Foreground" Value="{DynamicResource DbxText}" /></Style>
       <Style Selector="^:selected /template/ Border#Root"><Setter Property="Background" Value="{DynamicResource DbxContentBg}" /></Style>
       <Style Selector="^:selected /template/ Border#Strip"><Setter Property="Background" Value="{DynamicResource DbxAccent}" /></Style>
-      <Style Selector="^:focus-visible /template/ Border#Root">
-        <Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" />
-        <Setter Property="BorderThickness" Value="1" />
-      </Style>
+      <Style Selector="^:focus-visible /template/ Border#Root"><Setter Property="BoxShadow" Value="{DynamicResource DbxFocusInset}" /></Style>
     </ControlTheme>
 
     <ControlTheme x:Key="DbxDocTabControl" TargetType="TabControl">
@@ -99,9 +130,12 @@
       <Setter Property="Template">
         <ControlTemplate>
           <DockPanel Background="{TemplateBinding Background}">
-            <Border DockPanel.Dock="Top" Background="{DynamicResource DbxTabStripBg}" BorderBrush="{DynamicResource DbxBorder}"
-                    BorderThickness="0,0,0,1">
-              <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />
+            <Border DockPanel.Dock="Top" Background="{DynamicResource DbxTabStripBg}">
+              <Grid>
+                <!-- hairline under the strip; the active tab (content colour) is drawn over it -->
+                <Border Height="1" VerticalAlignment="Bottom" Background="{DynamicResource DbxBorderSubtle}" />
+                <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" Margin="6,0,6,0" />
+              </Grid>
             </Border>
             <ContentPresenter Name="PART_SelectedContentHost" Content="{TemplateBinding SelectedContent}"
                               ContentTemplate="{TemplateBinding SelectedContentTemplate}" />
@@ -110,28 +144,35 @@
       </Setter>
     </ControlTheme>
 
-    <!-- Secondary tabs (Data / Structure of a table, statement results of a script): underline style on a light strip. -->
+    <!-- Secondary tabs (Data / Structure of a table, statement results of a script): clean underline, a rounded accent bar under the
+         active tab, soft rounded hover. -->
     <ControlTheme x:Key="DbxSubTabItem" TargetType="TabItem">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" />
       <Setter Property="FontSize" Value="12.5" />
-      <Setter Property="MinHeight" Value="30" />
+      <Setter Property="MinHeight" Value="{DynamicResource DbxSubTabHeight}" />
       <Setter Property="MaxWidth" Value="320" />
       <Setter Property="Padding" Value="12,0" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="Template">
         <ControlTemplate>
-          <Border Name="Root" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="0,0,0,2"
-                  Padding="{TemplateBinding Padding}">
+          <Grid>
+            <Border Name="Root" Background="{TemplateBinding Background}" CornerRadius="6" Margin="1,4,1,6">
+              <Border.Transitions>
+                <Transitions><BrushTransition Property="Background" Duration="0:0:0.12" /></Transitions>
+              </Border.Transitions>
+            </Border>
             <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Header}"
-                              ContentTemplate="{TemplateBinding HeaderTemplate}" VerticalAlignment="Center" />
-          </Border>
+                              ContentTemplate="{TemplateBinding HeaderTemplate}" Padding="{TemplateBinding Padding}"
+                              VerticalAlignment="Center" Margin="0,0,0,1" />
+            <Border Name="Line" Height="2" VerticalAlignment="Bottom" Margin="12,0" CornerRadius="1,1,0,0" />
+          </Grid>
         </ControlTemplate>
       </Setter>
       <Style Selector="^:pointerover /template/ Border#Root"><Setter Property="Background" Value="{DynamicResource DbxHover}" /></Style>
       <Style Selector="^:selected"><Setter Property="Foreground" Value="{DynamicResource DbxText}" /></Style>
-      <Style Selector="^:selected /template/ Border#Root"><Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" /></Style>
-      <Style Selector="^:focus-visible /template/ Border#Root"><Setter Property="Background" Value="{DynamicResource DbxHover}" /></Style>
+      <Style Selector="^:selected /template/ Border#Line"><Setter Property="Background" Value="{DynamicResource DbxAccent}" /></Style>
+      <Style Selector="^:focus-visible /template/ Border#Root"><Setter Property="BoxShadow" Value="{DynamicResource DbxFocusInset}" /></Style>
     </ControlTheme>
 
     <ControlTheme x:Key="DbxSubTabControl" TargetType="TabControl">
@@ -143,7 +184,7 @@
         <ControlTemplate>
           <DockPanel Background="{TemplateBinding Background}">
             <Border DockPanel.Dock="Top" Background="{DynamicResource DbxToolbarBg}" BorderBrush="{DynamicResource DbxBorderSubtle}"
-                    BorderThickness="0,0,0,1">
+                    BorderThickness="0,0,0,1" Padding="6,0">
               <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" HorizontalAlignment="Left" />
             </Border>
             <ContentPresenter Name="PART_SelectedContentHost" Content="{TemplateBinding SelectedContent}"
@@ -155,55 +196,376 @@
 
   </Styles.Resources>
 
-  <!-- ===== generic ===== -->
-  <Style Selector="PathIcon"><Setter Property="Width" Value="14" /><Setter Property="Height" Value="14" /></Style>
+  <!-- ================= generic ================= -->
+  <Style Selector="PathIcon"><Setter Property="Width" Value="16" /><Setter Property="Height" Value="16" /></Style>
   <Style Selector="PathIcon.dim"><Setter Property="Foreground" Value="{DynamicResource DbxIcon}" /></Style>
 
+  <!-- keyboard focus ring on every focusable button-like control (tabs and text inputs draw their own, see below) -->
+  <Style Selector="Button, ToggleButton, CheckBox, RadioButton, ListBoxItem, TreeViewItem">
+    <Setter Property="FocusAdorner" Value="{StaticResource DbxFocusAdorner}" />
+  </Style>
+
+  <!-- spinner: a PathIcon rotates while its OWN IsVisible is true (the animation does not run while hidden) -->
+  <Style Selector="PathIcon.spin[IsVisible=true]">
+    <Setter Property="RenderTransform"><RotateTransform /></Setter>
+    <Style.Animations>
+      <Animation Duration="0:0:0.9" IterationCount="INFINITE">
+        <KeyFrame Cue="0%"><Setter Property="RotateTransform.Angle" Value="0" /></KeyFrame>
+        <KeyFrame Cue="100%"><Setter Property="RotateTransform.Angle" Value="360" /></KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+
+  <!-- ================= text ================= -->
   <Style Selector="TextBlock.dim"><Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" /></Style>
   <Style Selector="TextBlock.faint"><Setter Property="Foreground" Value="{DynamicResource DbxTextFaint}" /></Style>
   <Style Selector="TextBlock.small"><Setter Property="FontSize" Value="{DynamicResource DbxSmallFontSize}" /></Style>
   <Style Selector="TextBlock.title"><Setter Property="FontWeight" Value="SemiBold" /></Style>
+  <Style Selector="TextBlock.h1">
+    <Setter Property="FontSize" Value="{DynamicResource DbxH1FontSize}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.h2">
+    <Setter Property="FontSize" Value="{DynamicResource DbxH2FontSize}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
   <Style Selector="TextBlock.section">
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="LetterSpacing" Value="0.4" />
     <Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" />
-    <Setter Property="Margin" Value="0,6,0,2" />
+    <Setter Property="Margin" Value="0,10,0,4" />
+  </Style>
+  <Style Selector="TextBlock.fielderror">
+    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="Foreground" Value="{DynamicResource DbxError}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Margin" Value="0,3,0,0" />
   </Style>
 
+  <!-- ================= splitters ================= -->
   <Style Selector="GridSplitter">
     <Setter Property="Background" Value="{DynamicResource DbxSplitter}" />
+    <Setter Property="Transitions">
+      <Transitions><BrushTransition Property="Background" Duration="0:0:0.12" /></Transitions>
+    </Setter>
   </Style>
   <Style Selector="GridSplitter:pointerover"><Setter Property="Background" Value="{DynamicResource DbxAccent}" /></Style>
   <Style Selector="GridSplitter:focus-visible"><Setter Property="Background" Value="{DynamicResource DbxAccent}" /></Style>
 
-  <Style Selector="TextBox"><Setter Property="MinHeight" Value="28" /><Setter Property="Padding" Value="8,4" /></Style>
-  <Style Selector="ComboBox"><Setter Property="MinHeight" Value="28" /></Style>
-  <Style Selector="ProgressBar"><Setter Property="Foreground" Value="{DynamicResource DbxAccent}" /></Style>
+  <!-- ================= buttons ================= -->
+  <!-- default = secondary: soft fill, thin border. Hover / press / disabled colours come from the re-pointed Fluent brushes. -->
+  <Style Selector="Button">
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="CornerRadius" Value="{DynamicResource DbxRadius}" />
+  </Style>
+  <Style Selector="Button /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.12" />
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.12" />
+      </Transitions>
+    </Setter>
+  </Style>
 
-  <!-- ===== bands ===== -->
+  <!-- primary = Classes="accent" (alias "primary"): filled accent. accent itself is styled by the Fluent theme through AccentButton* brushes. -->
+  <Style Selector="Button.primary /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxAccentButtonBg}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxAccentButtonBg}" />
+    <Setter Property="Foreground" Value="{DynamicResource DbxOnAccent}" />
+  </Style>
+  <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxAccentButtonHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxAccentButtonHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource DbxOnAccent}" />
+  </Style>
+  <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxAccentStrong}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxAccentStrong}" />
+    <Setter Property="Foreground" Value="{DynamicResource DbxOnAccent}" />
+  </Style>
+  <Style Selector="Button.primary:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource DbxTextFaint}" />
+  </Style>
+
+  <!-- danger: destructive confirmation (filled red, white text) -->
+  <Style Selector="Button.danger /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxDanger}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxDanger}" />
+    <Setter Property="Foreground" Value="{DynamicResource DbxOnAccent}" />
+  </Style>
+  <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.danger:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxDangerHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxDangerHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource DbxOnAccent}" />
+  </Style>
+  <Style Selector="Button.danger:disabled /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxHover}" />
+    <Setter Property="Foreground" Value="{DynamicResource DbxTextFaint}" />
+  </Style>
+
+  <!-- subtle: quiet filled, no border -->
+  <Style Selector="Button.subtle /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxHover}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.subtle:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxPressed}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.subtle:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxPressed}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+
+  <!-- ghost: transparent, no border, rounded hover (same look as DbxToolButton, for plain text buttons) -->
+  <Style Selector="Button.ghost /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.ghost:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxHover}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.ghost:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxPressed}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.link"><Setter Property="Foreground" Value="{DynamicResource DbxLink}" /></Style>
+
+  <!-- card button (welcome actions): a whole clickable card -->
+  <Style Selector="Button.card">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Padding" Value="14,12" />
+    <Setter Property="Background" Value="{DynamicResource DbxSurface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxBorder}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource DbxCardRadius}" />
+  </Style>
+  <Style Selector="Button.card:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxAccentSoft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" />
+  </Style>
+
+  <!-- segmented / option chips: ToggleButton.segment (a few exclusive or independent options in a row), checked = accent soft + accent border -->
+  <Style Selector="ToggleButton.segment">
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="Padding" Value="12,3" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="CornerRadius" Value="{DynamicResource DbxRadius}" />
+  </Style>
+  <Style Selector="ToggleButton /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.12" />
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.12" />
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <!-- ================= text inputs ================= -->
+  <Style Selector="TextBox">
+    <Setter Property="MinHeight" Value="{DynamicResource DbxControlHeight}" />
+    <Setter Property="Padding" Value="10,5" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBox /template/ Border#PART_BorderElement">
+    <Setter Property="Transitions">
+      <Transitions><BrushTransition Property="BorderBrush" Duration="0:0:0.12" /></Transitions>
+    </Setter>
+  </Style>
+  <!-- focus: accent border + soft 3 px glow (TextBox.bare = no frame at all, e.g. the quick-open search box) -->
+  <Style Selector="TextBox:focus:not(.bare):not(.search) /template/ Border#PART_BorderElement">
+    <Setter Property="BoxShadow" Value="{DynamicResource DbxFocusGlow}" />
+  </Style>
+  <Style Selector="TextBox.error /template/ Border#PART_BorderElement">
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxError}" />
+  </Style>
+  <Style Selector="TextBox.error:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxError}" />
+  </Style>
+  <Style Selector="TextBox.error:focus /template/ Border#PART_BorderElement">
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxError}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource DbxFocusGlowError}" />
+  </Style>
+  <Style Selector="TextBox.bare">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="TextBox.bare:focus /template/ Border#PART_BorderElement">
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="ComboBox">
+    <Setter Property="MinHeight" Value="{DynamicResource DbxControlHeight}" />
+    <Setter Property="Padding" Value="10,4,0,4" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="ComboBox:focus-visible /template/ Border#HighlightBackground">
+    <Setter Property="BoxShadow" Value="{DynamicResource DbxFocusGlow}" />
+  </Style>
+  <Style Selector="ComboBox.error /template/ Border#Background">
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxError}" />
+  </Style>
+  <Style Selector="ComboBox.error:focus-visible /template/ Border#HighlightBackground">
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxError}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource DbxFocusGlowError}" />
+  </Style>
+  <Style Selector="ComboBoxItem">
+    <Setter Property="CornerRadius" Value="{DynamicResource DbxRadius}" />
+    <Setter Property="Margin" Value="0,1" />
+  </Style>
+
+  <Style Selector="CheckBox"><Setter Property="CornerRadius" Value="5" /></Style>
+  <Style Selector="ListBoxItem"><Setter Property="CornerRadius" Value="{DynamicResource DbxRadius}" /></Style>
+
+  <!-- selectable choice card: ListBoxItem.choice (engine picker...). selected = accent soft fill + accent border -->
+  <Style Selector="ListBoxItem.choice">
+    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="Margin" Value="0,0,8,0" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxBorder}" />
+    <Setter Property="Background" Value="{DynamicResource DbxSurface}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource DbxCardRadius}" />
+  </Style>
+  <Style Selector="ListBoxItem.choice:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxBorderStrong}" />
+  </Style>
+  <Style Selector="ListBoxItem.choice:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxAccentSoft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" />
+  </Style>
+  <Style Selector="ListBoxItem.choice:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxAccentSoftHover}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" />
+  </Style>
+
+  <Style Selector="ProgressBar">
+    <Setter Property="Foreground" Value="{DynamicResource DbxAccent}" />
+    <Setter Property="Background" Value="{DynamicResource DbxHover}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource DbxPillRadius}" />
+  </Style>
+  <Style Selector="ProgressBar.thin">
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Height" Value="3" />
+  </Style>
+
+  <!-- ================= scroll bars: slim, no arrows, thumb grows on hover ================= -->
+  <Style Selector="ScrollBar /template/ RepeatButton#PART_LineUpButton, ScrollBar /template/ RepeatButton#PART_LineDownButton">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="ScrollBar /template/ Thumb"><Setter Property="CornerRadius" Value="6" /></Style>
+
+  <!-- ================= trees and lists: rounded rows with a little air ================= -->
+  <Style Selector="TreeViewItem"><Setter Property="CornerRadius" Value="{DynamicResource DbxRadius}" /></Style>
+  <Style Selector="TreeViewItem /template/ Border#PART_LayoutRoot"><Setter Property="Margin" Value="2,1" /></Style>
+
+  <!-- ================= menus, flyouts, tooltips ================= -->
+  <Style Selector="MenuItem /template/ Border#PART_LayoutRoot">
+    <Setter Property="CornerRadius" Value="{DynamicResource DbxRadius}" />
+    <Setter Property="Margin" Value="0,1" />
+  </Style>
+  <Style Selector="MenuItem /template/ TextBlock#PART_InputGestureText">
+    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+    <Setter Property="Margin" Value="32,0,0,0" />
+  </Style>
+  <Style Selector="MenuItem.danger /template/ ContentPresenter#PART_HeaderPresenter"><Setter Property="Foreground" Value="{DynamicResource DbxError}" /></Style>
+  <Style Selector="MenuItem.danger /template/ ContentControl#PART_IconPresenter"><Setter Property="Foreground" Value="{DynamicResource DbxError}" /></Style>
+  <Style Selector="Separator"><Setter Property="Background" Value="{DynamicResource DbxBorderSubtle}" /></Style>
+  <Style Selector="ToolTip"><Setter Property="CornerRadius" Value="{DynamicResource DbxRadius}" /></Style>
+  <!-- key caps inside a tooltip: ToolTip.Tip content = StackPanel (Horizontal, Spacing 8) with a TextBlock and a Border.kbd -->
+  <Style Selector="ToolTip Border.kbd"><Setter Property="Background" Value="{DynamicResource DbxHover}" /></Style>
+
+  <!-- ================= data grid ================= -->
+  <Style Selector="DataGrid">
+    <Setter Property="Background" Value="{DynamicResource DbxContentBg}" />
+    <Setter Property="RowBackground" Value="Transparent" />
+    <Setter Property="GridLinesVisibility" Value="Horizontal" />
+    <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource DbxGridLine}" />
+    <Setter Property="VerticalGridLinesBrush" Value="{DynamicResource DbxGridLine}" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="DataGridRow"><Setter Property="MinHeight" Value="{DynamicResource DbxGridRowHeight}" /></Style>
+  <Style Selector="DataGridCell">
+    <Setter Property="MinHeight" Value="{DynamicResource DbxGridRowHeight}" />
+    <Setter Property="FontSize" Value="{DynamicResource DbxGridFontSize}" />
+  </Style>
+  <!-- current cell: 2 px accent frame, fully inside the cell -->
+  <Style Selector="DataGridCell /template/ Grid#FocusVisual"><Setter Property="Margin" Value="1" /></Style>
+  <Style Selector="DataGridColumnHeader">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="Padding" Value="10,0,6,0" />
+  </Style>
+
+  <!-- ================= bands ================= -->
   <Style Selector="Border.panelHeader">
     <Setter Property="Background" Value="{DynamicResource DbxPanelHeaderBg}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource DbxBorder}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxBorderSubtle}" />
     <Setter Property="BorderThickness" Value="0,0,0,1" />
-    <Setter Property="Padding" Value="8,0,4,0" />
+    <Setter Property="Padding" Value="12,0,6,0" />
     <Setter Property="MinHeight" Value="{DynamicResource DbxToolbarHeight}" />
   </Style>
   <Style Selector="Border.toolbar">
     <Setter Property="Background" Value="{DynamicResource DbxToolbarBg}" />
     <Setter Property="BorderBrush" Value="{DynamicResource DbxBorderSubtle}" />
     <Setter Property="BorderThickness" Value="0,0,0,1" />
-    <Setter Property="Padding" Value="6,3" />
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="MinHeight" Value="{DynamicResource DbxToolbarHeight}" />
   </Style>
   <Style Selector="Border.vsep">
     <Setter Property="Width" Value="1" />
-    <Setter Property="Margin" Value="5,5" />
+    <Setter Property="Margin" Value="6,8" />
     <Setter Property="Background" Value="{DynamicResource DbxBorder}" />
     <Setter Property="VerticalAlignment" Value="Stretch" />
   </Style>
 
-  <!-- ===== banners: coloured band with an icon (class bi), text and optional buttons ===== -->
+  <!-- ================= surfaces ================= -->
+  <!-- surface: a raised panel (no padding). card: surface + padding + larger radius, the standard container for a group of content. -->
+  <Style Selector="Border.surface">
+    <Setter Property="Background" Value="{DynamicResource DbxSurface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxBorderSubtle}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource DbxSurface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource DbxCardRadius}" />
+    <Setter Property="Padding" Value="16" />
+  </Style>
+  <!-- empty state: StackPanel.empty > PathIcon, TextBlock.h2 (title), TextBlock.dim (hint), optional Button.primary -->
+  <Style Selector="StackPanel.empty">
+    <Setter Property="Spacing" Value="8" />
+    <Setter Property="MaxWidth" Value="380" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="StackPanel.empty > PathIcon">
+    <Setter Property="Width" Value="36" />
+    <Setter Property="Height" Value="36" />
+    <Setter Property="Foreground" Value="{DynamicResource DbxTextFaint}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="0,0,0,4" />
+  </Style>
+  <Style Selector="StackPanel.empty > TextBlock">
+    <Setter Property="TextAlignment" Value="Center" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="StackPanel.empty > Button"><Setter Property="HorizontalAlignment" Value="Center" /><Setter Property="Margin" Value="0,8,0,0" /></Style>
+
+  <!-- ================= banners: band with an icon (class bi), text and optional buttons ================= -->
   <Style Selector="Border.banner">
-    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="Padding" Value="12,8" />
     <Setter Property="BorderThickness" Value="0,0,0,1" />
   </Style>
   <Style Selector="Border.banner.error">
@@ -224,13 +586,19 @@
     <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxInfoText}" />
   </Style>
   <Style Selector="Border.banner.info PathIcon.bi"><Setter Property="Foreground" Value="{DynamicResource DbxInfo}" /></Style>
+  <Style Selector="Border.banner.success">
+    <Setter Property="Background" Value="{DynamicResource DbxSuccessBg}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxSuccessBorder}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxSuccessText}" />
+  </Style>
+  <Style Selector="Border.banner.success PathIcon.bi"><Setter Property="Foreground" Value="{DynamicResource DbxSuccess}" /></Style>
 
-  <!-- ===== badges and key caps ===== -->
+  <!-- ================= badges and key caps ================= -->
   <Style Selector="Border.badge">
-    <Setter Property="CornerRadius" Value="9" />
-    <Setter Property="Padding" Value="7,1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource DbxPillRadius}" />
+    <Setter Property="Padding" Value="8,2" />
     <Setter Property="Background" Value="{DynamicResource DbxHover}" />
-    <Setter Property="BorderBrush" Value="{DynamicResource DbxBorder}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxBorderSubtle}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
@@ -249,8 +617,13 @@
     <Setter Property="BorderBrush" Value="{DynamicResource DbxInfoBorder}" />
     <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxInfoText}" />
   </Style>
+  <Style Selector="Border.badge.success">
+    <Setter Property="Background" Value="{DynamicResource DbxSuccessBg}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource DbxSuccessBorder}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxSuccessText}" />
+  </Style>
   <Style Selector="Border.kbd">
-    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="CornerRadius" Value="{DynamicResource DbxRadiusSm}" />
     <Setter Property="Padding" Value="5,1" />
     <Setter Property="Background" Value="{DynamicResource DbxToolbarBg}" />
     <Setter Property="BorderBrush" Value="{DynamicResource DbxBorder}" />

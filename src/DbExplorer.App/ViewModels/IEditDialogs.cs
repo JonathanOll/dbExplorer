@@ -23,7 +23,7 @@ public interface IEditDialogs
 }
 
 /// <summary>One selectable column of the virtual key dialog.</summary>
-public sealed class VirtualKeyColumn(string name, string dataType, bool isKeyable, bool isSelected)
+public sealed class VirtualKeyColumn(string name, string dataType, bool isKeyable, bool isSelected, bool inUniqueIndex = false)
 {
     public string Name { get; } = name;
     public string DataType { get; } = dataType;
@@ -32,6 +32,9 @@ public sealed class VirtualKeyColumn(string name, string dataType, bool isKeyabl
     public bool IsKeyable { get; } = isKeyable;
 
     public bool IsSelected { get; set; } = isSelected;
+
+    /// <summary>The column is part of a unique index: a hint that it identifies rows safely.</summary>
+    public bool InUniqueIndex { get; } = inUniqueIndex;
 
     public string Label => IsKeyable ? $"{Name}  ({DataType})" : $"{Name}  ({DataType}) - cannot be used in a key";
 }
@@ -50,12 +53,13 @@ public sealed class VirtualKeyDialogViewModel
     {
         Table = table.Ref;
         var selected = current is null ? [] : current.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var unique = table.Indexes.Where(i => i.Unique).SelectMany(i => i.Columns).ToHashSet(StringComparer.OrdinalIgnoreCase);
         UseAllColumns = current is not null && selected.Contains("*");
         Columns = table.Columns.OrderBy(c => c.Ordinal)
             .Select(c =>
             {
                 var keyable = IsKeyable(c, kind);
-                return new VirtualKeyColumn(c.Name, c.DataType, keyable, keyable && !UseAllColumns && selected.Contains(c.Name));
+                return new VirtualKeyColumn(c.Name, c.DataType, keyable, keyable && !UseAllColumns && selected.Contains(c.Name), unique.Contains(c.Name));
             })
             .ToList();
     }
@@ -66,6 +70,9 @@ public sealed class VirtualKeyDialogViewModel
 
     /// <summary>"All columns": every column that can be compared; unusable ones are left out.</summary>
     public bool UseAllColumns { get; set; }
+
+    /// <summary>Some column is part of a unique index (those columns are marked in the dialog).</summary>
+    public bool HasUniqueIndexColumns => Columns.Any(c => c.InUniqueIndex);
 
     public bool HasExcludedColumns => Columns.Any(c => !c.IsKeyable);
 

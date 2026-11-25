@@ -46,6 +46,10 @@ public class UpgradeDialogTests : IDisposable
     private static Button? ButtonNamed(Window window, string text) =>
         window.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Content as string == text && b.IsEffectivelyVisible);
 
+    /// <summary>The primary button of the confirmation: "Run N scripts on M databases".</summary>
+    private static Button? RunButton(Window window) =>
+        window.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Content is string t && t.StartsWith("Run ") && b.IsEffectivelyVisible);
+
     private static bool ShowsText(Window window, string text) =>
         window.GetVisualDescendants().OfType<TextBlock>().Any(t => t.Text == text && t.IsEffectivelyVisible);
 
@@ -81,7 +85,7 @@ public class UpgradeDialogTests : IDisposable
         Assert.True(ShowsText(window, "Production2"));                       // the badge
         Assert.True(ShowsText(window, "1 warning: 1 index"));                // the summary banner
         Assert.Contains(window.GetVisualDescendants().OfType<CheckBox>(), c => c.IsChecked == false && c.IsEffectivelyVisible);
-        Assert.NotNull(ButtonNamed(window, "Run..."));
+        Assert.NotNull(ButtonNamed(window, "Review and run…"));
         window.Close();
     }
 
@@ -98,7 +102,7 @@ public class UpgradeDialogTests : IDisposable
         await PumpUntil(() => vm.Message is not null);
 
         Assert.True(ShowsText(window, "Enter a sprint number, for example 143."));
-        Assert.Null(ButtonNamed(window, "Run..."));   // still in Setup
+        Assert.Null(ButtonNamed(window, "Review and run…"));   // still in Setup
         window.Close();
     }
 
@@ -110,7 +114,7 @@ public class UpgradeDialogTests : IDisposable
         await LoadSprint143(window, vm);
         vm.SelectedTarget = vm.Targets[1];
 
-        Click(ButtonNamed(window, "Run...")!);
+        Click(ButtonNamed(window, "Review and run…")!);
 
         Assert.Equal(UpgradePhase.Confirm, vm.Phase);
         Assert.True(ShowsText(window, "Upgrade 9 scripts on:"));
@@ -118,7 +122,7 @@ public class UpgradeDialogTests : IDisposable
         Assert.True(ShowsText(window, "C"));
         var box = window.FindControl<TextBox>("ConfirmBox")!;
         Assert.True(box.IsEffectivelyVisible);
-        var run = ButtonNamed(window, "Run")!;
+        var run = RunButton(window)!;
         Assert.False(run.IsEffectivelyEnabled);
 
         box.Text = "143";
@@ -137,10 +141,10 @@ public class UpgradeDialogTests : IDisposable
         var window = Show(vm, out _);
         await LoadSprint143(window, vm);
 
-        Click(ButtonNamed(window, "Run...")!);
+        Click(ButtonNamed(window, "Review and run…")!);
 
         Assert.False(window.FindControl<TextBox>("ConfirmBox")!.IsEffectivelyVisible);
-        Assert.True(ButtonNamed(window, "Run")!.IsEffectivelyEnabled);
+        Assert.True(RunButton(window)!.IsEffectivelyEnabled);
         window.Close();
     }
 
@@ -151,17 +155,17 @@ public class UpgradeDialogTests : IDisposable
         var vm = _f.Vm([UpgradeFixture.Group("G", _f.Db("Alpha"), _f.Db("Beta"))], copy: t => { copied.Add(t); return Task.CompletedTask; });
         var window = Show(vm, out var closed);
         await LoadSprint143(window, vm);
-        Click(ButtonNamed(window, "Run...")!);
+        Click(ButtonNamed(window, "Review and run…")!);
         window.FindControl<TextBox>("ConfirmBox")!.Text = "143";
         Dispatcher.UIThread.RunJobs();
 
-        Click(ButtonNamed(window, "Run")!);
+        Click(RunButton(window)!);
         await PumpUntil(() => vm.Phase == UpgradePhase.Finished);
 
         Assert.True(ShowsText(window, "Alpha"));
         Assert.True(ShowsText(window, "Beta"));
         Assert.True(ShowsText(window, "2 of 2 databases done."));
-        Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.IsEffectivelyVisible && t.Text!.StartsWith("done - 9 scripts"));
+        Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.IsEffectivelyVisible && t.Text!.StartsWith("9 scripts · "));
 
         Click(ButtonNamed(window, "Copy log")!);
         await PumpUntil(() => copied.Count > 0);
@@ -172,27 +176,33 @@ public class UpgradeDialogTests : IDisposable
     }
 
     [AvaloniaFact]
-    public async Task ClosingWhileRunning_DoesNotClose_ItCancelsAll()
+    public async Task ClosingWhileRunning_DoesNotClose_ItAsksBeforeStopping()
     {
         UpgradeViewModel.CancelGrace = TimeSpan.FromMilliseconds(100);
         _f.Override = (_, _) => new TaskCompletionSource<Session?>().Task;   // never connects
         var vm = _f.Vm([UpgradeFixture.Group("G", _f.Db("A"), _f.Db("B"))]);
         var window = Show(vm, out var closed);
         await LoadSprint143(window, vm);
-        Click(ButtonNamed(window, "Run...")!);
+        Click(ButtonNamed(window, "Review and run…")!);
         window.FindControl<TextBox>("ConfirmBox")!.Text = "143";
         Dispatcher.UIThread.RunJobs();
         var run = vm.ConfirmRunCommand.ExecuteAsync(null);
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(UpgradePhase.Running, vm.Phase);
-        Assert.NotNull(ButtonNamed(window, "Cancel all"));
+        Assert.NotNull(ButtonNamed(window, "Stop all…"));
         Assert.False(ButtonNamed(window, "Close")?.IsEffectivelyEnabled ?? false);
 
         window.Close();   // the X button
         Dispatcher.UIThread.RunJobs();
 
         Assert.False(closed());                  // refused while running...
-        await PumpUntil(() => run.IsCompleted);  // ...and it cancelled everything
+        Assert.True(vm.ConfirmingStop);          // ...the dialog asks first: nothing is interrupted yet
+        Assert.False(run.IsCompleted);
+        Assert.NotNull(ButtonNamed(window, "Stop upgrade"));
+        Assert.NotNull(ButtonNamed(window, "Keep running"));
+
+        Click(ButtonNamed(window, "Stop upgrade")!);   // ...and the confirmed stop cancels everything
+        await PumpUntil(() => run.IsCompleted);
         Assert.Equal(UpgradePhase.Finished, vm.Phase);
         Assert.All(vm.Members, m => Assert.Equal(MemberState.Cancelled, m.State));
 

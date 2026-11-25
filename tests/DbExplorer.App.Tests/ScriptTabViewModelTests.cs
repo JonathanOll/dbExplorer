@@ -171,7 +171,7 @@ public class ScriptTabViewModelTests : IDisposable
 
         Assert.Equal(3, tab.Results.Count);
         Assert.Matches(@"^3 rows · \d+ ms$", tab.Results[0].StatusText);
-        Assert.Equal("1 row affected", tab.Results[1].StatusText);
+        Assert.Matches(@"^1 row affected · \d+ ms$", tab.Results[1].StatusText);
         Assert.Equal("x", Cell(tab.Results[2]));
         Assert.All(tab.Results, r => Assert.Null(r.Error));
         Assert.False(tab.IsRunning);
@@ -312,7 +312,7 @@ public class ScriptTabViewModelTests : IDisposable
         var result = Assert.Single(tab.Results);
         Assert.Equal(10, result.Sets[0].Rows.Count);
         Assert.True(result.IsTruncated);
-        Assert.Equal("showing first 10 rows — raise the limit and re-run", result.TruncatedNotice);
+        Assert.Equal("Showing first 10 rows", result.TruncatedNotice);
     }
 
     [Fact]

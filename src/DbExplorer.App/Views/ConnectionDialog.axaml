@@ -6,114 +6,202 @@
         x:Class="DbExplorer.App.Views.ConnectionDialog"
         x:DataType="vm:ConnectionDialogViewModel"
         Title="{Binding Title}"
-        Width="540" SizeToContent="Height" CanResize="False"
+        Width="560" SizeToContent="Height" CanResize="False"
         WindowStartupLocation="CenterOwner">
 
+  <Window.Styles>
+    <!-- Field captions: dim, top aligned with the text of a 32 px box so an error line under the box never moves them -->
+    <Style Selector="Label.cap">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0,7,12,0" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+      <Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" />
+    </Style>
+    <!-- "Show" / "Hide" inside the password box -->
+    <Style Selector="ToggleButton.reveal">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="8,2" />
+      <Setter Property="Margin" Value="0,0,4,0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" />
+    </Style>
+    <Style Selector="ToggleButton.reveal:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxAccent}" />
+    </Style>
+    <Style Selector="TextBlock.optdesc">
+      <Setter Property="FontSize" Value="11.5" />
+      <Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+  </Window.Styles>
+
   <DockPanel>
-    <!-- Footer: the dialog's verdict -->
-    <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxWindowBg}" BorderBrush="{DynamicResource DbxBorder}"
-            BorderThickness="0,1,0,0" Padding="20,12">
+    <views:DialogFooter DockPanel.Dock="Bottom">
       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-        <Button Content="OK" Classes="accent" IsDefault="True" Click="OnOkClick" MinWidth="88" HorizontalContentAlignment="Center" />
+        <Button Content="{Binding OkText}" Classes="accent" IsDefault="True" Click="OnOkClick" MinWidth="104" HorizontalContentAlignment="Center" />
         <Button Content="Cancel" IsCancel="True" Click="OnCancelClick" MinWidth="88" HorizontalContentAlignment="Center" />
       </StackPanel>
-    </Border>
+    </views:DialogFooter>
 
-    <!-- Header -->
-    <Border DockPanel.Dock="Top" Background="{DynamicResource DbxPanelHeaderBg}" BorderBrush="{DynamicResource DbxBorder}"
-            BorderThickness="0,0,0,1" Padding="20,14">
-      <StackPanel Orientation="Horizontal" Spacing="12">
-        <PathIcon Data="{StaticResource IconDatabase}" Width="30" Height="30" Foreground="{DynamicResource DbxAccent}" />
-        <StackPanel VerticalAlignment="Center">
-          <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" />
-          <TextBlock Classes="dim small" Text="Passwords are stored encrypted for your Windows user." />
-        </StackPanel>
-      </StackPanel>
-    </Border>
+    <views:DialogHeader DockPanel.Dock="Top" Icon="{StaticResource IconDatabase}" Title="{Binding Title}"
+                        Subtitle="Passwords are stored encrypted for your Windows user." />
 
-    <StackPanel Background="{DynamicResource DbxContentBg}" Margin="0" Spacing="0">
-      <StackPanel Margin="20,16,20,4" Spacing="4">
-        <TextBlock Classes="section" Text="GENERAL" Margin="0,0,0,2" />
-        <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
-          <TextBlock Grid.Row="0" Classes="dim" Text="Name" VerticalAlignment="Center" />
-          <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Name}" />
+    <!-- Scrolls when the screen is shorter than the form (the window caps its own height, see the code-behind) -->
+    <ScrollViewer Background="{DynamicResource DbxContentBg}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <Border Padding="24,20,24,22">
+      <StackPanel Spacing="18">
 
-          <TextBlock Grid.Row="1" Classes="dim" Text="Engine" VerticalAlignment="Center" />
-          <ComboBox Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch"
-                    ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}">
-            <ComboBox.ItemTemplate>
-              <DataTemplate x:DataType="model:DbKind">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <views:EngineIcon Kind="{Binding .}" Width="14" Height="14" />
-                  <TextBlock Text="{Binding ., Converter={x:Static views:Icons.EngineName}}" />
-                </StackPanel>
-              </DataTemplate>
-            </ComboBox.ItemTemplate>
-          </ComboBox>
+        <!-- Engine: three cards, the form below follows the choice -->
+        <ListBox x:Name="EngineList" ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" Background="Transparent"
+                 BorderThickness="0" Padding="0" Margin="0,0,-8,0" AutomationProperties.Name="Database engine"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="model:DbKind">
+              <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+                <views:EngineIcon Kind="{Binding .}" Width="18" Height="18" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding ., Converter={x:Static views:Icons.EngineName}}" FontWeight="SemiBold" VerticalAlignment="Center" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
 
-          <TextBlock Grid.Row="2" Classes="dim" Text="Folder" VerticalAlignment="Center" />
-          <ComboBox Grid.Row="2" Grid.Column="1" HorizontalAlignment="Stretch"
-                    ItemsSource="{Binding FolderChoices}" SelectedItem="{Binding SelectedFolderChoice}" />
-        </Grid>
-      </StackPanel>
+        <StackPanel Spacing="12">
+          <TextBlock Classes="section" Text="GENERAL" Margin="0" />
 
-      <StackPanel Margin="20,10,20,4" Spacing="4">
-        <TextBlock Classes="section" Text="CONNECTION" Margin="0,0,0,2" />
-        <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
-          <TextBlock Grid.Row="0" Classes="dim" Text="Host" VerticalAlignment="Center" IsVisible="{Binding IsNetwork}" />
-          <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto,90" IsVisible="{Binding IsNetwork}">
-            <TextBox Text="{Binding Host}" />
-            <TextBlock Grid.Column="1" Classes="dim" Text="Port" Margin="12,0" VerticalAlignment="Center" />
-            <TextBox Grid.Column="2" Text="{Binding PortText}" />
+          <Grid ColumnDefinitions="92,*">
+            <Label Classes="cap" Content="_Name" Target="{Binding #NameBox}" />
+            <StackPanel Grid.Column="1" Spacing="4">
+              <TextBox x:Name="NameBox" Text="{Binding Name}" Watermark="e.g. Billing replica"
+                       Classes.error="{Binding NameError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBlock Classes="fielderror" Text="{Binding NameError}"
+                         IsVisible="{Binding NameError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            </StackPanel>
           </Grid>
 
-          <TextBlock Grid.Row="1" Classes="dim" Text="{Binding DatabaseLabel}" VerticalAlignment="Center" />
-          <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto">
-            <TextBox Text="{Binding Database}" />
-            <Button Grid.Column="1" Content="Browse…" Margin="6,0,0,0" IsVisible="{Binding IsSqlite}" Click="OnBrowseClick" />
+          <Grid ColumnDefinitions="92,*">
+            <Label Classes="cap" Content="_Folder" Target="{Binding #FolderBox}" />
+            <ComboBox x:Name="FolderBox" Grid.Column="1" HorizontalAlignment="Stretch"
+                      ItemsSource="{Binding FolderChoices}" SelectedItem="{Binding SelectedFolderChoice}" />
+          </Grid>
+        </StackPanel>
+
+        <StackPanel Spacing="12">
+          <TextBlock Classes="section" Text="CONNECTION" Margin="0" />
+
+          <Grid ColumnDefinitions="92,*" IsVisible="{Binding IsNetwork}">
+            <Label Classes="cap" Content="_Host" Target="{Binding #HostBox}" />
+            <StackPanel Grid.Column="1" Spacing="4">
+              <Grid ColumnDefinitions="*,Auto,96">
+                <TextBox x:Name="HostBox" Text="{Binding Host}" Watermark="server.example.com"
+                         Classes.error="{Binding HostError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <TextBlock Grid.Column="1" Classes="dim" Text="Port" Margin="14,0,8,0" VerticalAlignment="Center" />
+                <TextBox Grid.Column="2" Text="{Binding PortText}" AutomationProperties.Name="Port"
+                         Classes.error="{Binding PortError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              </Grid>
+              <TextBlock Classes="fielderror" Text="{Binding HostError}"
+                         IsVisible="{Binding HostError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBlock Classes="fielderror" Text="{Binding PortError}"
+                         IsVisible="{Binding PortError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            </StackPanel>
           </Grid>
 
-          <TextBlock Grid.Row="2" Classes="dim" Text="User" VerticalAlignment="Center" IsVisible="{Binding IsNetwork}" />
-          <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding User}" IsVisible="{Binding IsNetwork}" />
+          <Grid ColumnDefinitions="92,*">
+            <Label Classes="cap" Content="{Binding DatabaseLabel}" Target="{Binding #DatabaseBox}" />
+            <StackPanel Grid.Column="1" Spacing="4">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBox x:Name="DatabaseBox" Text="{Binding Database}" Watermark="{Binding DatabasePlaceholder}"
+                         Classes.error="{Binding DatabaseError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <Button Grid.Column="1" Content="Browse…" Margin="8,0,0,0" IsVisible="{Binding IsSqlite}" Click="OnBrowseClick"
+                        ToolTip.Tip="Choose a SQLite database file" />
+              </Grid>
+              <TextBlock Classes="fielderror" Text="{Binding DatabaseError}"
+                         IsVisible="{Binding DatabaseError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            </StackPanel>
+          </Grid>
 
-          <TextBlock Grid.Row="3" Classes="dim" Text="Password" VerticalAlignment="Center" IsVisible="{Binding IsNetwork}" />
-          <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Password}" PasswordChar="*" IsVisible="{Binding IsNetwork}"
-                   Watermark="{Binding PasswordHint}" />
-        </Grid>
-      </StackPanel>
+          <Grid ColumnDefinitions="92,*" IsVisible="{Binding IsNetwork}">
+            <Label Classes="cap" Content="_User" Target="{Binding #UserBox}" />
+            <TextBox x:Name="UserBox" Grid.Column="1" Text="{Binding User}" />
+          </Grid>
 
-      <StackPanel Margin="20,10,20,4" Spacing="4">
-        <TextBlock Classes="section" Text="OPTIONS" Margin="0,0,0,2" />
-        <CheckBox Content="Encrypt connection" IsChecked="{Binding Encrypt}" IsVisible="{Binding IsSqlServer}" />
-        <CheckBox Content="Trust server certificate" IsChecked="{Binding TrustServerCertificate}" IsVisible="{Binding IsSqlServer}" />
-        <CheckBox Content="Read-only (no editing, scripts refuse writes)" IsChecked="{Binding ReadOnly}" />
-      </StackPanel>
-
-      <!-- Test connection -->
-      <StackPanel Margin="20,10,20,0" Spacing="8">
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconPlay}" Classes="run" Content="Test connection"
-                  Command="{Binding TestConnectionCommand}" BorderBrush="{DynamicResource DbxBorder}" Padding="10,0" />
-          <Button Content="Cancel test" Command="{Binding CancelTestCommand}" IsVisible="{Binding IsTesting}" />
-          <ProgressBar IsIndeterminate="{Binding IsTesting}" Width="70" Height="4" VerticalAlignment="Center" IsVisible="{Binding IsTesting}" />
+          <Grid ColumnDefinitions="92,*" IsVisible="{Binding IsNetwork}">
+            <Label Classes="cap" Content="_Password" Target="{Binding #PasswordBox}" />
+            <StackPanel Grid.Column="1" Spacing="8">
+              <TextBox x:Name="PasswordBox" Text="{Binding Password}" PasswordChar="•" Watermark="{Binding PasswordHint}">
+                <TextBox.InnerRightContent>
+                  <ToggleButton x:Name="RevealButton" Classes="reveal" Content="Show" Click="OnRevealClick"
+                                AutomationProperties.Name="Show password" ToolTip.Tip="Show or hide the password" />
+                </TextBox.InnerRightContent>
+              </TextBox>
+              <CheckBox Content="Remove the saved password" IsChecked="{Binding ClearSavedPassword}"
+                        IsVisible="{Binding HasSavedPassword}" />
+            </StackPanel>
+          </Grid>
         </StackPanel>
-        <Border Classes="banner" CornerRadius="4" BorderThickness="1" Classes.info="{Binding TestSucceeded}" Classes.error="{Binding !TestSucceeded}"
-                IsVisible="{Binding TestMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <PathIcon Classes="bi" Data="{StaticResource IconCheck}" IsVisible="{Binding TestSucceeded}" VerticalAlignment="Top" />
-            <PathIcon Classes="bi" Data="{StaticResource IconError}" IsVisible="{Binding !TestSucceeded}" VerticalAlignment="Top" />
-            <TextBlock Text="{Binding TestMessage}" TextWrapping="Wrap" MaxWidth="440" />
+
+        <StackPanel Spacing="10">
+          <TextBlock Classes="section" Text="OPTIONS" Margin="0" />
+          <CheckBox IsChecked="{Binding Encrypt}" IsVisible="{Binding IsSqlServer}">
+            <StackPanel>
+              <TextBlock Text="Encrypt connection" />
+              <TextBlock Classes="optdesc" Text="Uses TLS between this app and the server." />
+            </StackPanel>
+          </CheckBox>
+          <CheckBox IsChecked="{Binding TrustServerCertificate}" IsVisible="{Binding IsSqlServer}" IsEnabled="{Binding Encrypt}"
+                    ToolTip.Tip="Turn on Encrypt connection first" ToolTip.ShowOnDisabled="True">
+            <StackPanel>
+              <TextBlock Text="Trust server certificate" />
+              <TextBlock Classes="optdesc" Text="Skips certificate validation. Use it for self-signed servers only." />
+            </StackPanel>
+          </CheckBox>
+          <CheckBox IsChecked="{Binding ReadOnly}">
+            <StackPanel>
+              <TextBlock Text="Read-only" />
+              <TextBlock Classes="optdesc" Text="Blocks row edits and write statements in scripts." />
+            </StackPanel>
+          </CheckBox>
+        </StackPanel>
+
+        <!-- Test connection -->
+        <StackPanel Spacing="10">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button x:Name="TestButton" Command="{Binding TestConnectionCommand}" AutomationProperties.Name="Test connection">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <PathIcon Data="{StaticResource IconPlay}" Width="12" Height="12" Foreground="{DynamicResource DbxRun}" />
+                <TextBlock Text="Test connection" />
+              </StackPanel>
+            </Button>
+            <PathIcon Classes="spin" Data="{StaticResource IconRefresh}" Width="14" Height="14" VerticalAlignment="Center"
+                      Foreground="{DynamicResource DbxAccent}" IsVisible="{Binding IsTesting}" />
+            <TextBlock Classes="dim" Text="Testing…" VerticalAlignment="Center" IsVisible="{Binding IsTesting}" />
+            <Button Content="Cancel test" Classes="subtle" Command="{Binding CancelTestCommand}" IsVisible="{Binding IsTesting}" />
           </StackPanel>
-        </Border>
-        <Border Classes="banner error" CornerRadius="4" BorderThickness="1"
-                IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <PathIcon Classes="bi" Data="{StaticResource IconError}" VerticalAlignment="Top" />
-            <TextBlock Text="{Binding Error}" TextWrapping="Wrap" MaxWidth="440" />
+          <StackPanel IsVisible="{Binding !IsTesting}">
+            <Border Classes="banner" CornerRadius="6" BorderThickness="1" Classes.success="{Binding TestSucceeded}"
+                    Classes.error="{Binding !TestSucceeded}" IsVisible="{Binding HasTestMessage}">
+              <Grid ColumnDefinitions="Auto,*">
+                <PathIcon Classes="bi" Data="{StaticResource IconCheck}" IsVisible="{Binding TestSucceeded}" VerticalAlignment="Top" Margin="0,2,8,0" />
+                <PathIcon Classes="bi" Data="{StaticResource IconError}" IsVisible="{Binding !TestSucceeded}" VerticalAlignment="Top" Margin="0,2,8,0" />
+                <SelectableTextBlock Grid.Column="1" Text="{Binding TestMessage}" TextWrapping="Wrap" />
+              </Grid>
+            </Border>
           </StackPanel>
-        </Border>
+          <Border Classes="banner error" CornerRadius="6" BorderThickness="1" IsVisible="{Binding HasGeneralError}">
+            <Grid ColumnDefinitions="Auto,*">
+              <PathIcon Classes="bi" Data="{StaticResource IconError}" VerticalAlignment="Top" Margin="0,2,8,0" />
+              <SelectableTextBlock Grid.Column="1" Text="{Binding Error}" TextWrapping="Wrap" />
+            </Grid>
+          </Border>
+        </StackPanel>
       </StackPanel>
-      <Border Height="16" />
-    </StackPanel>
+      </Border>
+    </ScrollViewer>
   </DockPanel>
 </Window>

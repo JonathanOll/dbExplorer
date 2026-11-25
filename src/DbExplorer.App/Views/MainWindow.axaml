@@ -5,8 +5,31 @@
         xmlns:model="using:DbExplorer.Core.Model"
         x:Class="DbExplorer.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="dbExplorer"
+        Title="{Binding WindowTitle}"
         Width="1280" Height="800" MinWidth="720" MinHeight="420">
+
+  <Window.Resources>
+    <!-- The document tab strip of the foundation, plus a "new script" button at its right end -->
+    <ControlTheme x:Key="MainDocTabControl" TargetType="TabControl" BasedOn="{StaticResource DbxDocTabControl}">
+      <Setter Property="Template">
+        <ControlTemplate>
+          <DockPanel Background="{TemplateBinding Background}">
+            <Border DockPanel.Dock="Top" Background="{DynamicResource DbxTabStripBg}">
+              <Grid ColumnDefinitions="*,Auto">
+                <Border Grid.ColumnSpan="2" Height="1" VerticalAlignment="Bottom" Background="{DynamicResource DbxBorderSubtle}" />
+                <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" Margin="6,0,0,0" />
+                <Button Grid.Column="1" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconAdd}" Margin="2,0,6,2" MinWidth="28" MinHeight="28"
+                        Padding="4" Command="{Binding NewScriptTabCommand, DataType=vm:MainViewModel}"
+                        AutomationProperties.Name="New SQL script" ToolTip.Tip="New SQL script (Ctrl+N)" />
+              </Grid>
+            </Border>
+            <ContentPresenter Name="PART_SelectedContentHost" Content="{TemplateBinding SelectedContent}"
+                              ContentTemplate="{TemplateBinding SelectedContentTemplate}" />
+          </DockPanel>
+        </ControlTemplate>
+      </Setter>
+    </ControlTheme>
+  </Window.Resources>
 
   <Window.Styles>
     <!-- tab close button: only drawn (and clickable) on the hovered or the selected tab -->
@@ -18,23 +41,19 @@
       <Setter Property="Opacity" Value="1" />
       <Setter Property="IsHitTestVisible" Value="True" />
     </Style>
-    <Style Selector="TextBlock.connected"><Setter Property="FontWeight" Value="SemiBold" /></Style>
-    <Style Selector="PathIcon.view"><Setter Property="Foreground" Value="{DynamicResource DbxIconView}" /></Style>
+    <!-- the unsaved dot steps aside while the pointer is on the tab (the close button takes its place) -->
+    <Style Selector="TabItem:pointerover Ellipse.dirty"><Setter Property="Opacity" Value="0" /></Style>
+    <!-- status bar severities -->
     <Style Selector="PathIcon.status"><Setter Property="Foreground" Value="{DynamicResource DbxInfo}" /></Style>
+    <Style Selector="PathIcon.status.success"><Setter Property="Foreground" Value="{DynamicResource DbxSuccess}" /></Style>
+    <Style Selector="PathIcon.status.warn"><Setter Property="Foreground" Value="{DynamicResource DbxWarn}" /></Style>
     <Style Selector="PathIcon.status.error"><Setter Property="Foreground" Value="{DynamicResource DbxError}" /></Style>
     <Style Selector="TextBlock.statusText.error"><Setter Property="Foreground" Value="{DynamicResource DbxError}" /></Style>
-    <!-- welcome panel actions -->
-    <Style Selector="Button.card">
-      <Setter Property="HorizontalAlignment" Value="Stretch" />
-      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-      <Setter Property="Padding" Value="12,10" />
-      <Setter Property="Background" Value="{DynamicResource DbxToolbarBg}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource DbxBorderSubtle}" />
-      <Setter Property="CornerRadius" Value="6" />
-    </Style>
-    <Style Selector="Button.card:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <!-- navigator drop target while a connection is dragged -->
+    <Style Selector="TreeViewItem.drop /template/ Border#PART_LayoutRoot">
       <Setter Property="Background" Value="{DynamicResource DbxAccentSoft}" />
       <Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" />
+      <Setter Property="BorderThickness" Value="1" />
     </Style>
   </Window.Styles>
 
@@ -55,270 +74,364 @@
         <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
           <PathIcon Classes="bi" Data="{StaticResource IconInfo}" Margin="0,0,8,0" VerticalAlignment="Center" />
           <TextBlock Grid.Column="1" Text="{Binding Update.Text}" TextWrapping="Wrap" VerticalAlignment="Center" />
-          <ProgressBar Grid.Column="2" Minimum="0" Maximum="1" Value="{Binding Update.Progress}" Width="120" Height="4" Margin="8,0,0,0"
+          <ProgressBar Grid.Column="2" Classes="thin" Minimum="0" Maximum="1" Value="{Binding Update.Progress}" Width="120" Margin="8,0,0,0"
                        VerticalAlignment="Center" IsVisible="{Binding Update.IsDownloading}" />
-          <Button Grid.Column="3" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconImport}" Margin="8,0,0,0"
+          <Button Grid.Column="3" Theme="{StaticResource DbxToolButton}" Classes="accent" Tag="{StaticResource IconImport}" Margin="12,0,0,0"
                   Content="{Binding Update.ActionText}" Command="{Binding Update.UpdateCommand}" IsVisible="{Binding Update.CanAct}" />
           <Button Grid.Column="4" Theme="{StaticResource DbxToolButton}" Margin="4,0,0,0"
                   Content="{Binding Update.DismissText}" Command="{Binding Update.DismissCommand}" IsVisible="{Binding Update.CanAct}" />
         </Grid>
       </Border>
 
-      <!-- Status bar: message (left), busy + cancel (middle), active connection and shortcuts (right) -->
-      <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxPanelHeaderBg}" BorderBrush="{DynamicResource DbxBorder}"
-              BorderThickness="0,1,0,0" MinHeight="26" Padding="10,0,8,0">
+      <!-- Status bar: message with its history (left), the running operation, the active connection, shortcuts and settings (right) -->
+      <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxWindowBg}" BorderBrush="{DynamicResource DbxBorderSubtle}"
+              BorderThickness="0,1,0,0" MinHeight="30" Padding="6,0,6,0">
         <Grid ColumnDefinitions="*,Auto,Auto">
-          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="7" VerticalAlignment="Center"
-                      IsVisible="{Binding Status.Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-            <PathIcon Classes="status" Classes.error="{Binding Status.IsError}" Width="13" Height="13"
-                      Data="{Binding Status.IsError, Converter={x:Static views:Icons.StatusIcon}}" />
-            <TextBlock Classes="statusText" Classes.error="{Binding Status.IsError}" Text="{Binding Status.Message}"
-                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="12"
-                       ToolTip.Tip="{Binding Status.Message}" />
-          </StackPanel>
+          <!-- last message: click for the history of the session; warnings and errors stay until dismissed -->
+          <Grid Grid.Column="0" ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+            <Button Classes="ghost" Padding="6,2" MinHeight="24" HorizontalAlignment="Left" HorizontalContentAlignment="Left" VerticalAlignment="Center"
+                    IsVisible="{Binding Status.ShowMessage}" ToolTip.Tip="{Binding Status.Message}"
+                    AutomationProperties.Name="Last message, click for the history" MaxWidth="900">
+              <Grid ColumnDefinitions="Auto,*">
+                <PathIcon Classes="status" Classes.success="{Binding Status.IsSuccess}" Classes.warn="{Binding Status.IsWarn}"
+                          Classes.error="{Binding Status.IsError}" Width="13" Height="13" Margin="0,0,7,0" VerticalAlignment="Center"
+                          Data="{Binding Status.Severity, Converter={x:Static views:StatusIcons.Severity}}" />
+                <TextBlock Grid.Column="1" Classes="statusText" Classes.error="{Binding Status.IsError}" Text="{Binding Status.Message}"
+                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
+              <Button.Flyout>
+                <Flyout Placement="Top">
+                  <StackPanel Width="420" Spacing="6">
+                    <TextBlock Classes="title" Text="Recent messages" />
+                    <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled">
+                      <ItemsControl ItemsSource="{Binding Status.History}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:StatusEntry">
+                            <Grid ColumnDefinitions="Auto,Auto,*" Margin="0,3">
+                              <PathIcon Classes="status" Classes.success="{Binding IsSuccess}" Classes.warn="{Binding IsWarn}" Classes.error="{Binding IsError}"
+                                        Width="13" Height="13" Margin="0,2,8,0" VerticalAlignment="Top"
+                                        Data="{Binding Severity, Converter={x:Static views:StatusIcons.Severity}}" />
+                              <TextBlock Grid.Column="1" Classes="faint small" Text="{Binding TimeText}" Margin="0,1,10,0" VerticalAlignment="Top" />
+                              <SelectableTextBlock Grid.Column="2" Text="{Binding Message}" TextWrapping="Wrap" FontSize="12" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
+                  </StackPanel>
+                </Flyout>
+              </Button.Flyout>
+            </Button>
+            <Button Grid.Column="1" Theme="{StaticResource DbxToolButton}" Classes="close" Tag="{StaticResource IconClose}" MinWidth="22" MinHeight="22" Padding="4"
+                    Command="{Binding Status.DismissCommand}" IsVisible="{Binding Status.IsSticky}"
+                    AutomationProperties.Name="Dismiss the message" ToolTip.Tip="Dismiss" />
+          </Grid>
 
-          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="10,0" VerticalAlignment="Center"
-                      IsVisible="{Binding Status.IsBusy}">
-            <ProgressBar IsIndeterminate="{Binding Status.IsBusy}" Width="90" Height="4" VerticalAlignment="Center" />
-            <TextBlock Classes="dim small" Text="{Binding Status.BusyText}" VerticalAlignment="Center" />
-            <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}" Content="Cancel"
-                    Command="{Binding Tree.CancelConnectCommand}" ToolTip.Tip="Cancel the connection attempt" />
-          </StackPanel>
+          <!-- a running operation replaces the message; Cancel only when the operation can be cancelled -->
+          <Grid Grid.Column="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" VerticalAlignment="Center" Margin="8,0"
+                IsVisible="{Binding Status.IsBusy}">
+            <ProgressBar Classes="thin" IsIndeterminate="{Binding Status.IsBusy}" Width="90" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Classes="dim" FontSize="12" Text="{Binding Status.BusyText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            <Button Grid.Column="2" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}" Content="Cancel" MinHeight="24"
+                    Command="{Binding Status.CancelBusyCommand}" IsVisible="{Binding Status.CanCancel}"
+                    ToolTip.Tip="Cancel this operation" AutomationProperties.Name="Cancel the running operation" />
+          </Grid>
 
-          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" x:DataType="model:ConnectionConfig"
-                        DataContext="{Binding CurrentConnection}"
-                        IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}">
-              <views:EngineIcon Kind="{Binding Kind}" Width="13" Height="13" />
-              <TextBlock Text="{Binding Name}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <!-- the connection the next action works on: state dot, name, engine, read-only -->
+          <Border Grid.Column="1" Padding="8,0" VerticalAlignment="Center" Background="Transparent"
+                  DataContext="{Binding CurrentConnectionNode}" x:DataType="vm:ConnectionNodeViewModel"
+                  IsVisible="{Binding $self.DataContext, Converter={x:Static ObjectConverters.IsNotNull}}"
+                  ToolTip.Tip="{Binding Tooltip}" AutomationProperties.Name="{Binding Title}" AutomationProperties.HelpText="{Binding StateText}">
+            <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+              <Ellipse Width="8" Height="8" VerticalAlignment="Center" Fill="{DynamicResource DbxSuccess}" IsVisible="{Binding IsConnected}" />
+              <Ellipse Width="8" Height="8" VerticalAlignment="Center" Fill="{DynamicResource DbxError}" IsVisible="{Binding HasError}" />
+              <Ellipse Width="8" Height="8" VerticalAlignment="Center" Fill="Transparent" Stroke="{DynamicResource DbxBorderStrong}" StrokeThickness="1.5"
+                       IsVisible="{Binding IsDisconnected}" />
+              <PathIcon Classes="spin" Data="{StaticResource IconRefresh}" Width="12" Height="12" Foreground="{DynamicResource DbxAccent}"
+                        IsVisible="{Binding IsConnecting}" />
+              <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
               <TextBlock Classes="dim" FontSize="12" VerticalAlignment="Center"
-                         Text="{Binding Kind, Converter={x:Static views:Icons.EngineName}}" />
-              <Border Classes="badge warn" IsVisible="{Binding ReadOnly}"
-                      ToolTip.Tip="This connection is read-only: no editing, scripts refuse writes">
+                         Text="{Binding Config.Kind, Converter={x:Static views:Icons.EngineName}}" />
+              <Border Classes="badge warn" IsVisible="{Binding IsReadOnly}">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                   <PathIcon Data="{StaticResource IconLock}" Width="10" Height="10" />
-                  <TextBlock Text="read-only" FontSize="11" />
+                  <TextBlock Text="Read-only" FontSize="11" />
                 </StackPanel>
               </Border>
             </StackPanel>
-            <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" Opacity="0.9">
-              <Border Classes="kbd"><TextBlock Text="Ctrl+T" /></Border>
-              <TextBlock Classes="dim small" Text="tables" VerticalAlignment="Center" />
-              <Border Classes="kbd" Margin="4,0,0,0"><TextBlock Text="Ctrl+Shift+P" /></Border>
-              <TextBlock Classes="dim small" Text="all" VerticalAlignment="Center" />
-              <Border Classes="kbd" Margin="4,0,0,0"><TextBlock Text="Ctrl+N" /></Border>
-              <TextBlock Classes="dim small" Text="script" VerticalAlignment="Center" />
-            </StackPanel>
+          </Border>
+
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+            <Border Classes="vsep" Margin="2,8" />
+            <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconKeyboard}" MinWidth="28" MinHeight="26" Padding="4,0"
+                    Command="{Binding ShowShortcutsCommand}" AutomationProperties.Name="Keyboard shortcuts">
+              <ToolTip.Tip>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="Keyboard shortcuts" />
+                  <Border Classes="kbd"><TextBlock Text="F1" /></Border>
+                </StackPanel>
+              </ToolTip.Tip>
+            </Button>
+            <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconSettings}" MinWidth="28" MinHeight="26" Padding="4,0"
+                    ToolTip.Tip="Settings" AutomationProperties.Name="Settings">
+              <Button.Flyout>
+                <MenuFlyout Placement="TopEdgeAlignedRight" Opening="OnSettingsFlyoutOpening">
+                  <MenuItem Header="Upgrade database…" Command="{Binding OpenUpgradeCommand}" />
+                  <MenuItem Header="Options…" Command="{Binding OpenOptionsCommand}" />
+                  <MenuItem Header="Keyboard shortcuts" Command="{Binding ShowShortcutsCommand}" InputGesture="F1" />
+                  <Separator />
+                  <MenuItem Header="Check for updates automatically" ToggleType="CheckBox"
+                            IsChecked="{Binding Update.AutoCheckEnabled, Mode=TwoWay}" />
+                </MenuFlyout>
+              </Button.Flyout>
+            </Button>
           </StackPanel>
         </Grid>
       </Border>
 
       <Grid>
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="304" MinWidth="190" MaxWidth="560" />
+          <ColumnDefinition Width="304" MinWidth="220" MaxWidth="560" />
           <ColumnDefinition Width="5" />
           <ColumnDefinition Width="*" MinWidth="320" />
         </Grid.ColumnDefinitions>
 
-        <!-- Navigator: tinted panel with a title strip and its own toolbar -->
+        <!-- Navigator: title strip with the + menu, refresh and collapse; a filter box; the tree (or its empty states) -->
         <Border Grid.Column="0" Background="{DynamicResource DbxNavBg}">
           <DockPanel>
             <Border DockPanel.Dock="Top" Classes="panelHeader">
               <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-                  <PathIcon Classes="dim" Data="{StaticResource IconDatabase}" />
-                  <TextBlock Text="CONNECTIONS" FontSize="11.5" FontWeight="SemiBold" LetterSpacing="0.5"
-                             Foreground="{DynamicResource DbxTextDim}" VerticalAlignment="Center" />
-                </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="1" VerticalAlignment="Center">
-                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconDatabaseAdd}" Command="{Binding Tree.AddConnectionCommand}"
-                          MinWidth="26" Padding="4,0" ToolTip.Tip="New connection…" />
-                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconFolderAdd}" Command="{Binding Tree.AddFolderCommand}"
-                          MinWidth="26" Padding="4,0" ToolTip.Tip="New folder…" />
-                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconGroupAdd}" Command="{Binding Tree.NewGroupCommand}"
-                          MinWidth="26" Padding="4,0" ToolTip.Tip="New group of databases that share one schema…" />
-                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconImport}" Command="{Binding Tree.ImportFromDBeaverCommand}"
-                          MinWidth="26" Padding="4,0" ToolTip.Tip="Import connections from the DBeaver workspace" />
-                  <Border Classes="vsep" Margin="3,7" />
-                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRefresh}" Command="{Binding Tree.RefreshSelectedCommand}"
-                          MinWidth="26" Padding="4,0" ToolTip.Tip="Refresh the schema of the selected connection" />
-                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconCollapseAll}" Command="{Binding Tree.CollapseAllCommand}"
-                          MinWidth="26" Padding="4,0" ToolTip.Tip="Collapse all" />
-                  <Border Classes="vsep" Margin="3,7" />
-                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconSettings}" MinWidth="26" Padding="4,0"
-                          ToolTip.Tip="Settings">
+                <TextBlock Text="Connections" FontWeight="SemiBold" VerticalAlignment="Center" Margin="4,0,0,0" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconAdd}" MinWidth="30" Padding="4,0"
+                          ToolTip.Tip="Add a connection, folder or group" AutomationProperties.Name="Add">
                     <Button.Flyout>
-                      <MenuFlyout Placement="BottomEdgeAlignedRight" Opening="OnSettingsFlyoutOpening">
-                        <MenuItem Header="Upgrade database..." Command="{Binding OpenUpgradeCommand}" />
-                        <MenuItem Header="Options..." Command="{Binding OpenOptionsCommand}" />
+                      <MenuFlyout Placement="BottomEdgeAlignedRight">
+                        <MenuItem Header="New connection…" Command="{Binding Tree.AddConnectionCommand}">
+                          <MenuItem.Icon><PathIcon Data="{StaticResource IconDatabaseAdd}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="New folder…" Command="{Binding Tree.AddFolderCommand}">
+                          <MenuItem.Icon><PathIcon Data="{StaticResource IconFolderAdd}" /></MenuItem.Icon>
+                        </MenuItem>
+                        <MenuItem Header="New group of databases…" Command="{Binding Tree.NewGroupCommand}">
+                          <MenuItem.Icon><PathIcon Data="{StaticResource IconGroupAdd}" /></MenuItem.Icon>
+                        </MenuItem>
                         <Separator />
-                        <MenuItem Header="Check for updates automatically" ToggleType="CheckBox"
-                                  IsChecked="{Binding Update.AutoCheckEnabled, Mode=TwoWay}" />
+                        <MenuItem Header="Import from DBeaver…" Command="{Binding Tree.ImportFromDBeaverCommand}">
+                          <MenuItem.Icon><PathIcon Data="{StaticResource IconImport}" /></MenuItem.Icon>
+                        </MenuItem>
                       </MenuFlyout>
                     </Button.Flyout>
                   </Button>
+                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRefresh}" Command="{Binding Tree.RefreshSelectedCommand}"
+                          MinWidth="30" Padding="4,0" AutomationProperties.Name="Refresh the schema">
+                    <ToolTip.Tip>
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Refresh the schema of the selected connection" />
+                        <Border Classes="kbd"><TextBlock Text="F5" /></Border>
+                      </StackPanel>
+                    </ToolTip.Tip>
+                  </Button>
+                  <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconCollapseAll}" Command="{Binding Tree.CollapseAllCommand}"
+                          MinWidth="30" Padding="4,0" ToolTip.Tip="Collapse all" AutomationProperties.Name="Collapse all" />
                 </StackPanel>
               </Grid>
             </Border>
 
-            <TreeView x:Name="ConnectionTree" ItemsSource="{Binding Tree.Nodes}"
-                      SelectedItem="{Binding Tree.SelectedNode, Mode=TwoWay}"
-                      DragDrop.AllowDrop="True" Background="Transparent" Padding="2,4">
-              <TreeView.Styles>
-                <Style Selector="TreeViewItem" x:DataType="vm:TreeNodeViewModel">
-                  <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
-                </Style>
-              </TreeView.Styles>
+            <Border DockPanel.Dock="Top" Padding="8,8,8,4" IsVisible="{Binding !Tree.IsEmpty}">
+              <TextBox x:Name="FilterBox" Text="{Binding Tree.FilterText, Mode=TwoWay}" Watermark="Filter connections and tables…"
+                       AutomationProperties.Name="Filter the navigator">
+                <TextBox.InnerRightContent>
+                  <Button Theme="{StaticResource DbxToolButton}" Classes="close" Tag="{StaticResource IconClose}" MinWidth="22" MinHeight="22" Padding="4"
+                          Command="{Binding Tree.ClearFilterCommand}" IsVisible="{Binding Tree.HasFilter}"
+                          AutomationProperties.Name="Clear the filter" ToolTip.Tip="Clear the filter (Esc)" />
+                </TextBox.InnerRightContent>
+              </TextBox>
+            </Border>
 
-              <TreeView.DataTemplates>
-                <TreeDataTemplate DataType="vm:FolderNodeViewModel" ItemsSource="{Binding Children}">
-                  <StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent">
-                    <Panel Width="16" Height="16" VerticalAlignment="Center">
-                      <PathIcon Data="{StaticResource IconFolder}" Width="15" Height="15" Foreground="{DynamicResource DbxIconFolder}"
-                                IsVisible="{Binding !IsExpanded}" />
-                      <PathIcon Data="{StaticResource IconFolderOpen}" Width="15" Height="15" Foreground="{DynamicResource DbxIconFolder}"
-                                IsVisible="{Binding IsExpanded}" />
-                    </Panel>
-                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                    <TextBlock Classes="faint small" VerticalAlignment="Center"
-                               Text="{Binding Children.Count, Converter={x:Static views:Icons.CountInParens}}" />
-                    <StackPanel.ContextMenu>
-                      <ContextMenu>
-                        <MenuItem Header="Rename..." Command="{Binding Tree.RenameFolderCommand}" CommandParameter="{Binding}" />
-                        <MenuItem Header="Delete" Command="{Binding Tree.DeleteFolderCommand}" CommandParameter="{Binding}" />
-                      </ContextMenu>
-                    </StackPanel.ContextMenu>
-                  </StackPanel>
-                </TreeDataTemplate>
+            <Panel>
+              <TreeView x:Name="ConnectionTree" ItemsSource="{Binding Tree.Nodes}"
+                        SelectedItem="{Binding Tree.SelectedNode, Mode=TwoWay}"
+                        DragDrop.AllowDrop="True" Background="Transparent" Padding="2,4" AutomationProperties.Name="Connections">
+                <TreeView.Styles>
+                  <Style Selector="TreeViewItem" x:DataType="vm:TreeNodeViewModel">
+                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                    <Setter Property="IsVisible" Value="{Binding IsShown}" />
+                  </Style>
+                </TreeView.Styles>
 
-                <TreeDataTemplate DataType="vm:ConnectionNodeViewModel" ItemsSource="{Binding Children}">
-                  <StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent">
-                    <Border Width="3" Height="14" CornerRadius="2" Background="{Binding ChipColor}" VerticalAlignment="Center"
-                            ToolTip.Tip="Colour of this connection (also shown on its tabs)" />
-                    <views:EngineIcon Kind="{Binding Config.Kind}" Width="15" Height="15" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding Title}" Classes.connected="{Binding IsConnected}" VerticalAlignment="Center" />
-                    <Ellipse Width="7" Height="7" Fill="{DynamicResource DbxSuccess}" VerticalAlignment="Center"
-                             IsVisible="{Binding IsConnected}" ToolTip.Tip="Connected" />
-                    <PathIcon Data="{StaticResource IconLock}" Width="11" Height="11" Foreground="{DynamicResource DbxWarn}"
-                              IsVisible="{Binding IsReadOnly}" ToolTip.Tip="Read-only connection" />
-                    <TextBlock Classes="faint small" Text="connecting…" VerticalAlignment="Center" IsVisible="{Binding IsConnecting}" />
-                    <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center" IsVisible="{Binding HasError}"
-                                ToolTip.Tip="{Binding ErrorMessage}">
-                      <PathIcon Data="{StaticResource IconError}" Width="12" Height="12" Foreground="{DynamicResource DbxError}" />
-                      <TextBlock Text="failed" FontSize="11" Foreground="{DynamicResource DbxError}" />
+                <TreeView.DataTemplates>
+                  <TreeDataTemplate DataType="vm:FolderNodeViewModel" ItemsSource="{Binding Children}">
+                    <StackPanel Orientation="Horizontal" Spacing="7" Background="Transparent">
+                      <Panel Width="16" Height="16" VerticalAlignment="Center">
+                        <PathIcon Data="{StaticResource IconFolder}" Width="15" Height="15" Foreground="{DynamicResource DbxIconFolder}"
+                                  IsVisible="{Binding !IsExpanded}" />
+                        <PathIcon Data="{StaticResource IconFolderOpen}" Width="15" Height="15" Foreground="{DynamicResource DbxIconFolder}"
+                                  IsVisible="{Binding IsExpanded}" />
+                      </Panel>
+                      <TextBlock Text="{Binding Title}" FontWeight="Medium" VerticalAlignment="Center" />
+                      <TextBlock Classes="faint small" VerticalAlignment="Center"
+                                 Text="{Binding Children.Count, Converter={x:Static views:Icons.CountInParens}}" />
+                      <StackPanel.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="Rename…" Command="{Binding Tree.RenameFolderCommand}" CommandParameter="{Binding}" InputGesture="F2" />
+                          <Separator />
+                          <MenuItem Classes="danger" Header="Delete folder" Command="{Binding Tree.DeleteFolderCommand}" CommandParameter="{Binding}" InputGesture="Delete">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconDelete}" /></MenuItem.Icon>
+                          </MenuItem>
+                        </ContextMenu>
+                      </StackPanel.ContextMenu>
                     </StackPanel>
-                    <StackPanel.ContextMenu>
-                      <ContextMenu>
-                        <MenuItem Header="Connect" Command="{Binding Tree.ConnectCommand}" CommandParameter="{Binding}" />
-                        <MenuItem Header="Disconnect" Command="{Binding Tree.DisconnectNodeCommand}" CommandParameter="{Binding}" />
-                        <MenuItem Header="Refresh schema" Command="{Binding Tree.RefreshCommand}" CommandParameter="{Binding}" />
-                        <Separator />
-                        <MenuItem Header="Add to group…" Command="{Binding Tree.AddToGroupCommand}" CommandParameter="{Binding}">
-                          <MenuItem.Icon><PathIcon Data="{StaticResource IconGroup}" /></MenuItem.Icon>
-                        </MenuItem>
-                        <Separator />
-                        <MenuItem Header="Read-only" ToggleType="CheckBox" IsChecked="{Binding IsReadOnly, Mode=OneWay}"
-                                  Command="{Binding Tree.ToggleReadOnlyCommand}" CommandParameter="{Binding}" />
-                        <MenuItem Header="Edit..." Command="{Binding Tree.EditConnectionCommand}" CommandParameter="{Binding}" />
-                        <MenuItem Header="Delete" Command="{Binding Tree.DeleteConnectionCommand}" CommandParameter="{Binding}" />
-                      </ContextMenu>
-                    </StackPanel.ContextMenu>
-                  </StackPanel>
-                </TreeDataTemplate>
+                  </TreeDataTemplate>
 
-                <!-- Groups: a section header, then one node per group, then shortcuts to the member connections -->
-                <TreeDataTemplate DataType="vm:GroupsSectionNodeViewModel" ItemsSource="{Binding Children}">
-                  <StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent">
-                    <PathIcon Data="{StaticResource IconGroup}" Width="15" Height="15" Foreground="{DynamicResource DbxAccent}" />
-                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                    <TextBlock Classes="faint small" VerticalAlignment="Center"
-                               Text="{Binding Children.Count, Converter={x:Static views:Icons.CountInParens}}" />
-                    <StackPanel.ContextMenu>
-                      <ContextMenu>
-                        <MenuItem Header="New group…" Command="{Binding Tree.NewGroupCommand}" />
-                      </ContextMenu>
-                    </StackPanel.ContextMenu>
-                  </StackPanel>
-                </TreeDataTemplate>
+                  <TreeDataTemplate DataType="vm:ConnectionNodeViewModel" ItemsSource="{Binding Children}">
+                    <Border Background="Transparent">
+                      <views:ConnectionRow />
+                      <Border.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="Connect" Command="{Binding Tree.ConnectCommand}" CommandParameter="{Binding}" FontWeight="SemiBold"
+                                    IsVisible="{Binding IsDisconnected}" InputGesture="Enter" />
+                          <MenuItem Header="Retry connection" Command="{Binding Tree.ConnectCommand}" CommandParameter="{Binding}" FontWeight="SemiBold"
+                                    IsVisible="{Binding HasError}" InputGesture="Enter" />
+                          <MenuItem Header="Show the error" Command="{Binding Tree.ShowErrorCommand}" CommandParameter="{Binding}" IsVisible="{Binding HasError}" />
+                          <MenuItem Header="Disconnect" Command="{Binding Tree.DisconnectNodeCommand}" CommandParameter="{Binding}" IsVisible="{Binding IsConnected}" />
+                          <Separator />
+                          <MenuItem Header="New SQL script" Command="{Binding Tree.NewScriptOnCommand}" CommandParameter="{Binding}" InputGesture="Ctrl+N">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconScript}" /></MenuItem.Icon>
+                          </MenuItem>
+                          <MenuItem Header="Go to table…" Command="{Binding Tree.PickTableOnCommand}" CommandParameter="{Binding}" InputGesture="Ctrl+T">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconTable}" /></MenuItem.Icon>
+                          </MenuItem>
+                          <MenuItem Header="Refresh schema" Command="{Binding Tree.RefreshCommand}" CommandParameter="{Binding}" IsVisible="{Binding IsConnected}"
+                                    InputGesture="F5">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconRefresh}" /></MenuItem.Icon>
+                          </MenuItem>
+                          <Separator />
+                          <MenuItem Header="Add to group…" Command="{Binding Tree.AddToGroupCommand}" CommandParameter="{Binding}">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconGroup}" /></MenuItem.Icon>
+                          </MenuItem>
+                          <MenuItem Header="Read-only" ToggleType="CheckBox" IsChecked="{Binding IsReadOnly, Mode=OneWay}"
+                                    Command="{Binding Tree.ToggleReadOnlyCommand}" CommandParameter="{Binding}" />
+                          <MenuItem Header="Copy name" Click="OnCopyNodeName" />
+                          <Separator />
+                          <MenuItem Header="Edit…" Command="{Binding Tree.EditConnectionCommand}" CommandParameter="{Binding}" InputGesture="F2" />
+                          <MenuItem Header="Duplicate" Command="{Binding Tree.DuplicateConnectionCommand}" CommandParameter="{Binding}" />
+                          <MenuItem Classes="danger" Header="Delete" Command="{Binding Tree.DeleteConnectionCommand}" CommandParameter="{Binding}" InputGesture="Delete">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconDelete}" /></MenuItem.Icon>
+                          </MenuItem>
+                        </ContextMenu>
+                      </Border.ContextMenu>
+                    </Border>
+                  </TreeDataTemplate>
 
-                <TreeDataTemplate DataType="vm:GroupNodeViewModel" ItemsSource="{Binding Children}">
-                  <StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent">
-                    <PathIcon Data="{StaticResource IconGroup}" Width="14" Height="14" Foreground="{DynamicResource DbxAccent}" />
-                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                    <TextBlock Classes="faint small" Text="{Binding Summary}" VerticalAlignment="Center" />
-                    <PathIcon Data="{StaticResource IconWarning}" Width="12" Height="12" Foreground="{DynamicResource DbxWarn}"
-                              IsVisible="{Binding IsUnderPopulated}"
-                              ToolTip.Tip="A group needs at least 2 databases to switch between them or compare them" />
-                    <StackPanel.ContextMenu>
-                      <ContextMenu>
-                        <MenuItem Header="Check schema differences" Command="{Binding Tree.CheckSchemaDifferencesCommand}" CommandParameter="{Binding Group}">
-                          <MenuItem.Icon><PathIcon Data="{StaticResource IconSchema}" /></MenuItem.Icon>
-                        </MenuItem>
-                        <Separator />
-                        <MenuItem Header="Edit group…" Command="{Binding Tree.EditGroupCommand}" CommandParameter="{Binding Group}" />
-                        <MenuItem Header="Rename…" Command="{Binding Tree.RenameGroupCommand}" CommandParameter="{Binding Group}" />
-                        <MenuItem Header="Delete group" Command="{Binding Tree.DeleteGroupCommand}" CommandParameter="{Binding Group}" />
-                        <Separator />
-                        <MenuItem Header="New group…" Command="{Binding Tree.NewGroupCommand}" />
-                      </ContextMenu>
-                    </StackPanel.ContextMenu>
-                  </StackPanel>
-                </TreeDataTemplate>
-
-                <TreeDataTemplate DataType="vm:GroupMemberNodeViewModel">
-                  <StackPanel Orientation="Horizontal" Spacing="6" Background="Transparent">
-                    <Border Width="3" Height="14" CornerRadius="2" Background="{Binding Target.ChipColor}" VerticalAlignment="Center" />
-                    <views:EngineIcon Kind="{Binding Target.Config.Kind}" Width="15" Height="15" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding Target.Title}" Classes.connected="{Binding Target.IsConnected}" VerticalAlignment="Center" />
-                    <Ellipse Width="7" Height="7" Fill="{DynamicResource DbxSuccess}" VerticalAlignment="Center"
-                             IsVisible="{Binding Target.IsConnected}" ToolTip.Tip="Connected" />
-                    <PathIcon Data="{StaticResource IconLock}" Width="11" Height="11" Foreground="{DynamicResource DbxWarn}"
-                              IsVisible="{Binding Target.IsReadOnly}" ToolTip.Tip="Read-only connection" />
-                    <TextBlock Classes="faint small" Text="connecting…" VerticalAlignment="Center" IsVisible="{Binding Target.IsConnecting}" />
-                    <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center" IsVisible="{Binding Target.HasError}"
-                                ToolTip.Tip="{Binding Target.ErrorMessage}">
-                      <PathIcon Data="{StaticResource IconError}" Width="12" Height="12" Foreground="{DynamicResource DbxError}" />
-                      <TextBlock Text="failed" FontSize="11" Foreground="{DynamicResource DbxError}" />
+                  <!-- Groups: a section header, then one node per group, then shortcuts to the member connections -->
+                  <TreeDataTemplate DataType="vm:GroupsSectionNodeViewModel" ItemsSource="{Binding Children}">
+                    <StackPanel Orientation="Horizontal" Spacing="7" Background="Transparent">
+                      <PathIcon Classes="dim" Data="{StaticResource IconGroup}" Width="15" Height="15" />
+                      <TextBlock Text="{Binding Title}" FontWeight="Medium" VerticalAlignment="Center" />
+                      <TextBlock Classes="faint small" VerticalAlignment="Center"
+                                 Text="{Binding Children.Count, Converter={x:Static views:Icons.CountInParens}}" />
+                      <StackPanel.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="New group…" Command="{Binding Tree.NewGroupCommand}" />
+                        </ContextMenu>
+                      </StackPanel.ContextMenu>
                     </StackPanel>
-                    <StackPanel.ContextMenu>
-                      <ContextMenu>
-                        <MenuItem Header="Connect" Command="{Binding Tree.OpenGroupMemberCommand}" CommandParameter="{Binding}" />
-                        <MenuItem Header="Remove from group" Command="{Binding Tree.RemoveMemberCommand}" CommandParameter="{Binding}" />
-                      </ContextMenu>
-                    </StackPanel.ContextMenu>
-                  </StackPanel>
-                </TreeDataTemplate>
+                  </TreeDataTemplate>
 
-                <TreeDataTemplate DataType="vm:SchemaNodeViewModel" ItemsSource="{Binding Children}">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <PathIcon Classes="dim" Data="{StaticResource IconSchema}" Width="13" Height="13" />
-                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
-                    <TextBlock Classes="faint small" Text="{Binding TableCount}" VerticalAlignment="Center" />
-                  </StackPanel>
-                </TreeDataTemplate>
+                  <TreeDataTemplate DataType="vm:GroupNodeViewModel" ItemsSource="{Binding Children}">
+                    <StackPanel Orientation="Horizontal" Spacing="7" Background="Transparent">
+                      <PathIcon Classes="dim" Data="{StaticResource IconGroup}" Width="14" Height="14" />
+                      <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                      <TextBlock Classes="faint small" Text="{Binding Summary}" VerticalAlignment="Center" />
+                      <PathIcon Data="{StaticResource IconWarning}" Width="12" Height="12" Foreground="{DynamicResource DbxWarn}"
+                                IsVisible="{Binding IsUnderPopulated}"
+                                ToolTip.Tip="A group needs at least 2 databases to switch between them or compare them. Drag a connection onto it to add one." />
+                      <StackPanel.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="Check schema differences" Command="{Binding Tree.CheckSchemaDifferencesCommand}" CommandParameter="{Binding Group}">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconSchema}" /></MenuItem.Icon>
+                          </MenuItem>
+                          <Separator />
+                          <MenuItem Header="Edit group…" Command="{Binding Tree.EditGroupCommand}" CommandParameter="{Binding Group}" />
+                          <MenuItem Header="Rename…" Command="{Binding Tree.RenameGroupCommand}" CommandParameter="{Binding Group}" InputGesture="F2" />
+                          <MenuItem Header="New group…" Command="{Binding Tree.NewGroupCommand}" />
+                          <Separator />
+                          <MenuItem Classes="danger" Header="Delete group" Command="{Binding Tree.DeleteGroupCommand}" CommandParameter="{Binding Group}" InputGesture="Delete">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconDelete}" /></MenuItem.Icon>
+                          </MenuItem>
+                        </ContextMenu>
+                      </StackPanel.ContextMenu>
+                    </StackPanel>
+                  </TreeDataTemplate>
 
-                <TreeDataTemplate DataType="vm:PlaceholderNodeViewModel">
-                  <TextBlock Classes="faint" Text="{Binding Title}" />
-                </TreeDataTemplate>
+                  <TreeDataTemplate DataType="vm:GroupMemberNodeViewModel">
+                    <Border Background="Transparent">
+                      <views:ConnectionRow DataContext="{Binding Target}" />
+                      <Border.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="Connect" Command="{Binding Tree.OpenGroupMemberCommand}" CommandParameter="{Binding}" FontWeight="SemiBold" />
+                          <MenuItem Header="Remove from group" Command="{Binding Tree.RemoveMemberCommand}" CommandParameter="{Binding}" />
+                        </ContextMenu>
+                      </Border.ContextMenu>
+                    </Border>
+                  </TreeDataTemplate>
 
-                <TreeDataTemplate DataType="vm:TableNodeViewModel">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <PathIcon Classes.view="{Binding IsView}" Foreground="{DynamicResource DbxIconTable}" Width="13" Height="13"
-                              Data="{Binding IsView, Converter={x:Static views:Icons.TableOrView}}" />
-                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
-                  </StackPanel>
-                </TreeDataTemplate>
-              </TreeView.DataTemplates>
-            </TreeView>
+                  <TreeDataTemplate DataType="vm:SchemaNodeViewModel" ItemsSource="{Binding Children}">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                      <PathIcon Classes="dim" Data="{StaticResource IconSchema}" Width="14" Height="14" />
+                      <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                      <TextBlock Classes="faint small" Text="{Binding TableCount, Converter={x:Static views:Icons.CountInParens}}" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </TreeDataTemplate>
+
+                  <TreeDataTemplate DataType="vm:PlaceholderNodeViewModel">
+                    <TextBlock Classes="faint" Text="{Binding Title}" />
+                  </TreeDataTemplate>
+
+                  <TreeDataTemplate DataType="vm:TableNodeViewModel">
+                    <StackPanel Orientation="Horizontal" Spacing="7" Background="Transparent">
+                      <PathIcon Classes="dim" Width="14" Height="14" Data="{Binding IsView, Converter={x:Static views:Icons.TableOrView}}" />
+                      <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                      <TextBlock Classes="faint small" Text="view" VerticalAlignment="Center" IsVisible="{Binding IsView}" />
+                      <StackPanel.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="Open" Click="OnOpenTableNode" FontWeight="SemiBold" InputGesture="Enter" />
+                          <MenuItem Header="Copy name" Click="OnCopyNodeName" />
+                        </ContextMenu>
+                      </StackPanel.ContextMenu>
+                    </StackPanel>
+                  </TreeDataTemplate>
+                </TreeView.DataTemplates>
+              </TreeView>
+
+              <!-- nothing configured yet -->
+              <StackPanel Classes="empty" Margin="16" IsVisible="{Binding Tree.IsEmpty}">
+                <PathIcon Data="{StaticResource IconDatabaseAdd}" />
+                <TextBlock Classes="h2" Text="No connections yet" />
+                <TextBlock Classes="dim" Text="Add a PostgreSQL, SQL Server or SQLite database, or bring your DBeaver connections." />
+                <Button Classes="accent" Content="Add a connection" Command="{Binding Tree.AddConnectionCommand}" />
+                <Button Classes="ghost" Content="Import from DBeaver" Command="{Binding Tree.ImportFromDBeaverCommand}" />
+              </StackPanel>
+
+              <!-- the filter matches nothing -->
+              <StackPanel Classes="empty" Margin="16" IsVisible="{Binding Tree.NoMatch}">
+                <PathIcon Data="{StaticResource IconSearch}" />
+                <TextBlock Classes="h2" Text="No match" />
+                <TextBlock Classes="dim" Text="Nothing in the navigator contains that text. Tables are searched in the connections you opened; Ctrl+Shift+P searches every cached table." />
+                <Button Content="Clear the filter" Command="{Binding Tree.ClearFilterCommand}" />
+              </StackPanel>
+            </Panel>
           </DockPanel>
         </Border>
 
         <!-- visible, grabbable divider -->
-        <GridSplitter Grid.Column="1" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Width="5" />
+        <GridSplitter x:Name="NavSplitter" Grid.Column="1" ResizeDirection="Columns" ResizeBehavior="PreviousAndNext" Width="5"
+                      AutomationProperties.Name="Navigator width" ToolTip.Tip="Drag to resize, double-click to reset" />
 
         <!-- Editor area: document tabs, or the welcome panel while nothing is open -->
         <Grid Grid.Column="2" Background="{DynamicResource DbxContentBg}">
-          <TabControl x:Name="DocTabs" Theme="{StaticResource DbxDocTabControl}" ItemContainerTheme="{StaticResource DbxDocTabItem}" ItemsSource="{Binding Tabs}" SelectedItem="{Binding ActiveTab}"
+          <TabControl x:Name="DocTabs" Theme="{StaticResource MainDocTabControl}" ItemContainerTheme="{StaticResource DbxDocTabItem}" ItemsSource="{Binding Tabs}" SelectedItem="{Binding ActiveTab}"
                       IsVisible="{Binding !IsEmptyState}">
             <TabControl.ItemTemplate>
               <DataTemplate x:DataType="vm:TabViewModel">
@@ -330,7 +443,7 @@
                             Data="{Binding IconKey, Converter={x:Static views:Icons.ByKey}}" />
                   <TextBlock Grid.Column="2" Text="{Binding Title, Converter={x:Static views:Icons.WithoutBullet}}"
                              TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                  <Ellipse Grid.Column="3" Width="8" Height="8" Margin="7,1,0,0" Fill="{DynamicResource DbxAccent}"
+                  <Ellipse Grid.Column="3" Classes="dirty" Width="8" Height="8" Margin="7,1,0,0" Fill="{DynamicResource DbxAccent}"
                            VerticalAlignment="Center" IsVisible="{Binding HasUnsavedWork}" ToolTip.Tip="Unsaved changes" />
                   <PathIcon Grid.Column="4" Data="{StaticResource IconLock}" Width="11" Height="11" Margin="7,0,0,0"
                             Foreground="{DynamicResource DbxWarn}" VerticalAlignment="Center"
@@ -339,7 +452,21 @@
                   <Button Grid.Column="5" Classes="close" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}"
                           MinWidth="22" MinHeight="22" Padding="4" Margin="6,0,0,0"
                           Command="{Binding $parent[TabControl].((vm:MainViewModel)DataContext).CloseTabCommand}"
-                          CommandParameter="{Binding}" ToolTip.Tip="Close (Ctrl+W)" />
+                          CommandParameter="{Binding}" AutomationProperties.Name="Close tab" ToolTip.Tip="Close (Ctrl+W)" />
+                  <Grid.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="Close" InputGesture="Ctrl+W" Command="{Binding $parent[TabControl].((vm:MainViewModel)DataContext).CloseTabCommand}"
+                                CommandParameter="{Binding}" />
+                      <MenuItem Header="Close other tabs" Command="{Binding $parent[TabControl].((vm:MainViewModel)DataContext).CloseOtherTabsCommand}"
+                                CommandParameter="{Binding}" />
+                      <MenuItem Header="Close tabs to the right" Command="{Binding $parent[TabControl].((vm:MainViewModel)DataContext).CloseTabsToTheRightCommand}"
+                                CommandParameter="{Binding}" />
+                      <MenuItem Header="Close all tabs" Command="{Binding $parent[TabControl].((vm:MainViewModel)DataContext).CloseAllTabsCommand}" />
+                      <Separator />
+                      <MenuItem Header="Reopen closed tab" InputGesture="Ctrl+Shift+T"
+                                Command="{Binding $parent[TabControl].((vm:MainViewModel)DataContext).ReopenClosedTabCommand}" />
+                    </ContextMenu>
+                  </Grid.ContextMenu>
                 </Grid>
               </DataTemplate>
             </TabControl.ItemTemplate>
@@ -347,28 +474,30 @@
 
           <!-- Welcome panel (no tab open) -->
           <ScrollViewer IsVisible="{Binding IsEmptyState}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-            <StackPanel MaxWidth="560" Margin="24,48,24,32" Spacing="22" HorizontalAlignment="Center">
-              <StackPanel Spacing="4" HorizontalAlignment="Center">
-                <PathIcon Data="{StaticResource IconDatabase}" Width="44" Height="44" Foreground="{DynamicResource DbxAccent}"
+            <StackPanel MaxWidth="520" Margin="24,56,24,32" Spacing="24" HorizontalAlignment="Center">
+              <StackPanel Spacing="6" HorizontalAlignment="Center">
+                <PathIcon Data="{StaticResource IconDatabase}" Width="36" Height="36" Foreground="{DynamicResource DbxAccent}"
                           HorizontalAlignment="Center" />
-                <TextBlock Text="dbExplorer" FontSize="28" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,6,0,0" />
-                <TextBlock Classes="dim" Text="Explore and edit your databases, fast." FontSize="14" HorizontalAlignment="Center" />
+                <TextBlock Classes="h1" Text="dbExplorer" HorizontalAlignment="Center" Margin="0,6,0,0" />
+                <TextBlock Classes="dim" Text="{Binding WelcomeHint}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" />
               </StackPanel>
 
               <StackPanel Spacing="8">
-                <Button Classes="card" Command="{Binding ShowTablePickerCommand}">
+                <Button Classes="card" Command="{Binding ShowTablePickerCommand}" IsVisible="{Binding HasConnections}"
+                        IsEnabled="{Binding HasTarget}" ToolTip.ShowOnDisabled="True" ToolTip.Tip="{Binding WelcomeHint}">
                   <Grid ColumnDefinitions="Auto,*,Auto">
-                    <PathIcon Data="{StaticResource IconTable}" Width="20" Height="20" Foreground="{DynamicResource DbxIconTable}" Margin="0,0,12,0" />
+                    <PathIcon Classes="dim" Data="{StaticResource IconTable}" Width="20" Height="20" Margin="0,0,12,0" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                      <TextBlock Text="Open a table" FontWeight="SemiBold" />
+                      <TextBlock Text="Go to a table" FontWeight="SemiBold" />
                       <TextBlock Classes="dim small" Text="Search tables and views of the selected connection" />
                     </StackPanel>
                     <Border Grid.Column="2" Classes="kbd"><TextBlock Text="Ctrl+T" /></Border>
                   </Grid>
                 </Button>
-                <Button Classes="card" Command="{Binding NewScriptTabCommand}">
+                <Button Classes="card" Command="{Binding NewScriptTabCommand}" IsVisible="{Binding HasConnections}"
+                        IsEnabled="{Binding HasTarget}" ToolTip.ShowOnDisabled="True" ToolTip.Tip="{Binding WelcomeHint}">
                   <Grid ColumnDefinitions="Auto,*,Auto">
-                    <PathIcon Data="{StaticResource IconScript}" Width="20" Height="20" Foreground="{DynamicResource DbxIcon}" Margin="0,0,12,0" />
+                    <PathIcon Classes="dim" Data="{StaticResource IconScript}" Width="20" Height="20" Margin="0,0,12,0" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                       <TextBlock Text="New SQL script" FontWeight="SemiBold" />
                       <TextBlock Classes="dim small" Text="An editor on the selected connection" />
@@ -378,7 +507,7 @@
                 </Button>
                 <Button Classes="card" Command="{Binding Tree.AddConnectionCommand}">
                   <Grid ColumnDefinitions="Auto,*">
-                    <PathIcon Data="{StaticResource IconDatabaseAdd}" Width="20" Height="20" Foreground="{DynamicResource DbxAccent}" Margin="0,0,12,0" />
+                    <PathIcon Classes="dim" Data="{StaticResource IconDatabaseAdd}" Width="20" Height="20" Margin="0,0,12,0" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                       <TextBlock Text="Add a connection" FontWeight="SemiBold" />
                       <TextBlock Classes="dim small" Text="PostgreSQL, SQL Server or a SQLite file" />
@@ -387,7 +516,7 @@
                 </Button>
                 <Button Classes="card" Command="{Binding Tree.ImportFromDBeaverCommand}">
                   <Grid ColumnDefinitions="Auto,*">
-                    <PathIcon Data="{StaticResource IconImport}" Width="20" Height="20" Foreground="{DynamicResource DbxIcon}" Margin="0,0,12,0" />
+                    <PathIcon Classes="dim" Data="{StaticResource IconImport}" Width="20" Height="20" Margin="0,0,12,0" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                       <TextBlock Text="Import from DBeaver" FontWeight="SemiBold" />
                       <TextBlock Classes="dim small" Text="Folders, connections and credentials" />
@@ -396,48 +525,25 @@
                 </Button>
               </StackPanel>
 
-              <Border BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
+              <Border BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,1,0,0" Padding="0,16,0,0">
                 <StackPanel Spacing="8">
-                  <TextBlock Classes="section" Text="KEYBOARD SHORTCUTS" Margin="0" />
-                  <Grid ColumnDefinitions="Auto,*,Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="7" ColumnSpacing="10">
-                    <Border Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Shift+P" /></Border>
-                    <TextBlock Grid.Column="1" Classes="dim" Text="table in any connection" VerticalAlignment="Center" />
-                    <Border Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+L" /></Border>
-                    <TextBlock Grid.Column="3" Classes="dim" Text="jump to a column" VerticalAlignment="Center" />
-
-                    <Border Grid.Row="1" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+O" /></Border>
-                    <TextBlock Grid.Row="1" Grid.Column="1" Classes="dim" Text="open a script file" VerticalAlignment="Center" />
-                    <Border Grid.Row="1" Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Enter" /></Border>
-                    <TextBlock Grid.Row="1" Grid.Column="3" Classes="dim" Text="run statement" VerticalAlignment="Center" />
-
-                    <Border Grid.Row="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="F5" /></Border>
-                    <TextBlock Grid.Row="2" Grid.Column="1" Classes="dim" Text="run script / reload" VerticalAlignment="Center" />
-                    <Border Grid.Row="2" Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+S" /></Border>
-                    <TextBlock Grid.Row="2" Grid.Column="3" Classes="dim" Text="save / review changes" VerticalAlignment="Center" />
-
-                    <Border Grid.Row="3" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+W" /></Border>
-                    <TextBlock Grid.Row="3" Grid.Column="1" Classes="dim" Text="close tab" VerticalAlignment="Center" />
-                    <Border Grid.Row="3" Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Tab" /></Border>
-                    <TextBlock Grid.Row="3" Grid.Column="3" Classes="dim" Text="next tab" VerticalAlignment="Center" />
-
-                    <Border Grid.Row="4" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="F2" /></Border>
-                    <TextBlock Grid.Row="4" Grid.Column="1" Classes="dim" Text="edit a cell" VerticalAlignment="Center" />
-                    <Border Grid.Row="4" Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+0" /></Border>
-                    <TextBlock Grid.Row="4" Grid.Column="3" Classes="dim" Text="set a cell to NULL" VerticalAlignment="Center" />
-
-                    <Border Grid.Row="5" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Alt+PgDn" /></Border>
-                    <TextBlock Grid.Row="5" Grid.Column="1" Classes="dim" Text="next database of the group" VerticalAlignment="Center" />
-                    <Border Grid.Row="5" Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Alt+PgUp" /></Border>
-                    <TextBlock Grid.Row="5" Grid.Column="3" Classes="dim" Text="previous database" VerticalAlignment="Center" />
-
-                    <Border Grid.Row="6" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Shift+Enter" /></Border>
-                    <TextBlock Grid.Row="6" Grid.Column="1" Classes="dim" Text="run on the whole group" VerticalAlignment="Center" />
-                    <Border Grid.Row="6" Grid.Column="2" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Shift+F5" /></Border>
-                    <TextBlock Grid.Row="6" Grid.Column="3" Classes="dim" Text="script on the group" VerticalAlignment="Center" />
-
-                    <Border Grid.Row="7" Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="Ctrl+Shift+T" /></Border>
-                    <TextBlock Grid.Row="7" Grid.Column="1" Classes="dim" Text="reopen a closed tab" VerticalAlignment="Center" />
-                  </Grid>
+                  <TextBlock Classes="section" Text="SHORTCUTS" Margin="0" />
+                  <ItemsControl ItemsSource="{x:Static views:ShortcutCatalog.Highlights}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="views:ShortcutItem">
+                        <Grid ColumnDefinitions="150,*" Margin="0,3">
+                          <Border Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="{Binding Keys}" /></Border>
+                          <TextBlock Grid.Column="1" Classes="dim" Text="{Binding Text}" VerticalAlignment="Center" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Button Classes="ghost link" Padding="6,4" Margin="-6,0,0,0" HorizontalAlignment="Left" Command="{Binding ShowShortcutsCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="All keyboard shortcuts" />
+                      <Border Classes="kbd"><TextBlock Text="F1" /></Border>
+                    </StackPanel>
+                  </Button>
                 </StackPanel>
               </Border>
             </StackPanel>
@@ -454,5 +560,43 @@
         </DataTemplate>
       </ContentControl.DataTemplates>
     </ContentControl>
+
+    <!-- Keyboard shortcuts card (F1) -->
+    <Border x:Name="ShortcutsScrim" Background="{DynamicResource DbxScrim}" IsVisible="{Binding IsShortcutsVisible}"
+            PointerPressed="OnShortcutsScrimPressed">
+      <Border x:Name="ShortcutsCard" Classes="card" Padding="0" Width="620" MaxHeight="560" VerticalAlignment="Center" HorizontalAlignment="Center"
+              BoxShadow="{DynamicResource DbxCardShadow}" PointerPressed="OnShortcutsCardPressed">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Padding="20,14,12,12" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="h2" Text="Keyboard shortcuts" VerticalAlignment="Center" />
+              <Button Grid.Column="1" Theme="{StaticResource DbxToolButton}" Classes="close" Tag="{StaticResource IconClose}" MinWidth="28" MinHeight="28"
+                      Command="{Binding HideShortcutsCommand}" AutomationProperties.Name="Close" ToolTip.Tip="Close (Esc)" />
+            </Grid>
+          </Border>
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="20,8,20,16">
+            <ItemsControl ItemsSource="{x:Static views:ShortcutCatalog.Sections}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="views:ShortcutSection">
+                  <StackPanel Margin="0,10,0,4" Spacing="2">
+                    <TextBlock Classes="section" Text="{Binding Title}" Margin="0,0,0,4" />
+                    <ItemsControl ItemsSource="{Binding Items}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="views:ShortcutItem">
+                          <Grid ColumnDefinitions="190,*" Margin="0,3">
+                            <Border Classes="kbd" HorizontalAlignment="Left"><TextBlock Text="{Binding Keys}" /></Border>
+                            <TextBlock Grid.Column="1" Text="{Binding Text}" VerticalAlignment="Center" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Border>
   </Grid>
 </Window>

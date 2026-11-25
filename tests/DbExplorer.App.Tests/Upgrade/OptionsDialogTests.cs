@@ -24,15 +24,15 @@ public class OptionsDialogTests
         window.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Content as string == text);
 
     [AvaloniaFact]
-    public void ShowsThePathBox_Browse_Ok_AndCancel()
+    public void ShowsThePathBox_Browse_Save_AndCancel()
     {
         var vm = new OptionsViewModel(@"C:\dbupdate", _ => null);
         var window = Show(vm, out _);
 
         var box = window.GetVisualDescendants().OfType<TextBox>().Single();
         Assert.Equal(@"C:\dbupdate", box.Text);
-        Assert.NotNull(ButtonNamed(window, "Browse..."));
-        Assert.NotNull(ButtonNamed(window, "OK"));
+        Assert.NotNull(ButtonNamed(window, "Choose folder…"));
+        Assert.NotNull(ButtonNamed(window, "Save"));
         Assert.NotNull(ButtonNamed(window, "Cancel"));
 
         vm.DbUpdatePath = @"D:\other";   // the box follows the view model
@@ -52,7 +52,7 @@ public class OptionsDialogTests
         Dispatcher.UIThread.RunJobs();
         Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Folder not found." && t.IsEffectivelyVisible);
 
-        ButtonNamed(window, "OK")!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        ButtonNamed(window, "Save")!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
         Dispatcher.UIThread.RunJobs();
 
         Assert.False(closed());
@@ -61,7 +61,7 @@ public class OptionsDialogTests
     }
 
     [AvaloniaFact]
-    public void ValidPath_OkConfirmsAndCloses_AndInfoLineShows()
+    public void ValidPath_SaveConfirmsAndCloses_AndInfoLineShows()
     {
         var vm = new OptionsViewModel(null, _ => null, _ => "147 version folders found") { DbUpdatePath = @"C:\dbupdate" };
         var window = Show(vm, out var closed);
@@ -70,7 +70,7 @@ public class OptionsDialogTests
         Dispatcher.UIThread.RunJobs();
         Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "147 version folders found" && t.IsEffectivelyVisible);
 
-        ButtonNamed(window, "OK")!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        ButtonNamed(window, "Save")!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(closed());

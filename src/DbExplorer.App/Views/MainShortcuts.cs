@@ -24,6 +24,12 @@ public static class MainShortcuts
         bool Ready() => commitOpenEdit?.Invoke() ?? true;
         switch (key, modifiers)
         {
+            case (Key.F1, KeyModifiers.None):
+                main.ShowShortcutsCommand.Execute(null);
+                return true;
+            case (Key.Escape, KeyModifiers.None) when main.IsShortcutsVisible:
+                main.HideShortcutsCommand.Execute(null);
+                return true;
             case (Key.T, KeyModifiers.Control):
                 main.ShowTablePickerCommand.Execute(null);
                 return true;

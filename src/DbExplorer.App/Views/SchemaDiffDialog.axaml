@@ -1,52 +1,74 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:DbExplorer.App.ViewModels"
+        xmlns:views="using:DbExplorer.App.Views"
         x:Class="DbExplorer.App.Views.SchemaDiffDialog"
         x:DataType="vm:SchemaDiffViewModel"
         Title="{Binding Title}"
-        Width="780" Height="580" MinWidth="520" MinHeight="320"
+        Width="820" Height="620" MinWidth="560" MinHeight="360"
         WindowStartupLocation="CenterOwner">
 
+  <Window.Resources>
+    <!-- chevron pointing down (the open state of a folding header); the right one is Icons.axaml's IconChevronRight -->
+    <StreamGeometry x:Key="DlgIconChevronDown">M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z</StreamGeometry>
+  </Window.Resources>
+
+  <Window.Styles>
+    <!-- The folding header of a card: the whole strip is the toggle, the chevron turns when the card is open -->
+    <Style Selector="ToggleButton.fold">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Padding" Value="12,10" />
+    </Style>
+    <Style Selector="ToggleButton.fold:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxText}" />
+    </Style>
+    <Style Selector="ToggleButton.fold:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource DbxHover}" />
+    </Style>
+    <Style Selector="ToggleButton.fold:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource DbxHover}" />
+    </Style>
+  </Window.Styles>
+
   <DockPanel>
-    <!-- Footer -->
-    <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxWindowBg}" BorderBrush="{DynamicResource DbxBorder}"
-            BorderThickness="0,1,0,0" Padding="20,12">
-      <Button Content="Close" IsDefault="True" IsCancel="True" Classes="accent" Click="OnCloseClick" MinWidth="88"
-              HorizontalAlignment="Right" HorizontalContentAlignment="Center" />
-    </Border>
+    <views:DialogFooter DockPanel.Dock="Bottom">
+      <DockPanel>
+        <Button x:Name="CopyButton" DockPanel.Dock="Left" Content="Copy report" Click="OnCopyClick"
+                ToolTip.Tip="Copy the report as text" AutomationProperties.Name="Copy the report as text" />
+        <Button Content="Close" IsDefault="True" IsCancel="True" Classes="accent" Click="OnCloseClick" MinWidth="88"
+                HorizontalAlignment="Right" HorizontalContentAlignment="Center" />
+      </DockPanel>
+    </views:DialogFooter>
 
-    <!-- Header: what was compared and the verdict -->
-    <Border DockPanel.Dock="Top" Background="{DynamicResource DbxPanelHeaderBg}" BorderBrush="{DynamicResource DbxBorder}"
-            BorderThickness="0,0,0,1" Padding="20,14">
-      <StackPanel Orientation="Horizontal" Spacing="12">
-        <PathIcon Data="{StaticResource IconSchema}" Width="30" Height="30" Foreground="{DynamicResource DbxAccent}" />
-        <StackPanel VerticalAlignment="Center">
-          <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" />
-          <TextBlock Classes="dim" Text="{Binding Summary}" TextWrapping="Wrap" />
-        </StackPanel>
-      </StackPanel>
-    </Border>
+    <!-- Header: what was compared and the verdict, with the totals as chips -->
+    <views:DialogHeader DockPanel.Dock="Top" Icon="{StaticResource IconSchema}" Title="{Binding Title}" Subtitle="{Binding Summary}" />
 
-    <Border DockPanel.Dock="Top" Classes="banner info" Padding="20,8" IsVisible="{Binding IsIdentical}">
+    <Border DockPanel.Dock="Top" Classes="banner success" Padding="24,10" IsVisible="{Binding IsIdentical}">
       <StackPanel Orientation="Horizontal" Spacing="8">
         <PathIcon Classes="bi" Data="{StaticResource IconCheck}" />
         <TextBlock Text="No difference found: the same tables, columns and types everywhere." VerticalAlignment="Center" />
       </StackPanel>
     </Border>
 
-    <Border DockPanel.Dock="Top" Classes="banner warn" Padding="20,8" IsVisible="{Binding HasUnreachable}">
+    <Border DockPanel.Dock="Top" Classes="banner warn" Padding="24,10" IsVisible="{Binding HasUnreachable}">
       <Grid ColumnDefinitions="Auto,*">
-        <PathIcon Classes="bi" Data="{StaticResource IconWarning}" VerticalAlignment="Top" Margin="0,1,8,0" />
+        <PathIcon Classes="bi" Data="{StaticResource IconWarning}" VerticalAlignment="Top" Margin="0,2,8,0" />
         <StackPanel Grid.Column="1" Spacing="2">
           <TextBlock Text="These databases could not be loaded and are not part of the comparison:" TextWrapping="Wrap" />
           <ItemsControl ItemsSource="{Binding Unreachable}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:UnreachableMember">
-                <TextBlock TextWrapping="Wrap" Margin="0,2,0,0">
+                <SelectableTextBlock TextWrapping="Wrap" Margin="0,2,0,0">
                   <Run Text="{Binding Database, Mode=OneWay}" FontWeight="SemiBold" />
                   <Run Text=" — " />
                   <Run Text="{Binding Error, Mode=OneWay}" />
-                </TextBlock>
+                </SelectableTextBlock>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -54,46 +76,101 @@
       </Grid>
     </Border>
 
-    <!-- One card per database, listing what differs from the rest of the group -->
     <Border Background="{DynamicResource DbxContentBg}">
-      <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-        <ItemsControl ItemsSource="{Binding Members}" Margin="20,14">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:MemberDiffViewModel">
-              <Border Background="{DynamicResource DbxToolbarBg}" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="1"
-                      CornerRadius="6" Margin="0,0,0,10">
-                <StackPanel>
-                  <Grid ColumnDefinitions="Auto,*,Auto" Margin="12,9">
-                    <PathIcon Data="{StaticResource IconDatabase}" Foreground="{DynamicResource DbxAccent}" Margin="0,0,8,0" />
-                    <TextBlock Grid.Column="1" Text="{Binding Database}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                    <Border Grid.Column="2" Classes="badge" Classes.ok="{Binding IsClean}" Classes.warn="{Binding !IsClean}">
-                      <TextBlock Text="{Binding Summary}" FontSize="11.5" />
-                    </Border>
-                  </Grid>
-                  <ItemsControl ItemsSource="{Binding Findings}" IsVisible="{Binding !IsClean}">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="vm:DiffFinding">
-                        <Border BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,1,0,0" Padding="12,5">
-                          <Grid ColumnDefinitions="112,*">
-                            <Border Classes="badge" HorizontalAlignment="Left"
-                                    Classes.error="{Binding IsError}" Classes.warn="{Binding IsWarn}" Classes.info="{Binding IsInfo}">
-                              <TextBlock Text="{Binding Label}" FontSize="11.5" />
-                            </Border>
-                            <TextBlock Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap">
-                              <Run Text="{Binding Subject, Mode=OneWay}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12.5" />
-                              <Run Text="{Binding Detail, Mode=OneWay, StringFormat='  {0}'}" Foreground="{DynamicResource DbxTextDim}" />
-                            </TextBlock>
-                          </Grid>
-                        </Border>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </StackPanel>
+      <Panel>
+        <!-- Fewer than two databases were loaded: say why instead of showing an empty area -->
+        <StackPanel Classes="empty" IsVisible="{Binding IsEmptyReport}">
+          <PathIcon Data="{StaticResource IconSchema}" />
+          <TextBlock Classes="h2" Text="Nothing to compare" />
+          <TextBlock Classes="dim" Text="{Binding Summary}" TextWrapping="Wrap" TextAlignment="Center" />
+          <TextBlock Classes="dim small" Text="Fix the databases listed above, then run the comparison again." TextAlignment="Center" />
+        </StackPanel>
+
+        <!-- Everything matches: say so in the body too, with the databases that were compared -->
+        <StackPanel Classes="empty" IsVisible="{Binding IsIdentical}">
+          <PathIcon Data="{StaticResource IconCheck}" />
+          <TextBlock Classes="h2" Text="The schemas match" />
+          <TextBlock Classes="dim" Text="{Binding IdenticalText}" TextWrapping="Wrap" TextAlignment="Center" />
+        </StackPanel>
+
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsVisible="{Binding ShowCards}">
+          <StackPanel Margin="24,16,24,20" Spacing="12">
+            <!-- Totals over every database -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Border Classes="badge error" IsVisible="{Binding !!MissingCount}">
+                <TextBlock Text="{Binding MissingText}" FontSize="11.5" />
               </Border>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
+              <Border Classes="badge warn" IsVisible="{Binding !!DifferentCount}">
+                <TextBlock Text="{Binding DifferentText}" FontSize="11.5" />
+              </Border>
+              <Border Classes="badge info" IsVisible="{Binding !!ExtraCount}">
+                <TextBlock Text="{Binding ExtraText}" FontSize="11.5" />
+              </Border>
+            </StackPanel>
+
+            <!-- One card per database that differs, tables listed once with their lines -->
+            <ItemsControl ItemsSource="{Binding DifferingMembers}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:MemberDiffViewModel">
+                  <Border Classes="surface" Margin="0,0,0,10" ClipToBounds="True">
+                    <StackPanel>
+                      <ToggleButton Classes="fold" IsChecked="{Binding IsExpanded}" AutomationProperties.Name="{Binding Database}"
+                                    ToolTip.Tip="Show or hide the differences of this database">
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                          <Panel Margin="0,0,10,0" VerticalAlignment="Center">
+                            <PathIcon Data="{StaticResource IconChevronRight}" Width="12" Height="12" IsVisible="{Binding !IsExpanded}" />
+                            <PathIcon Data="{StaticResource DlgIconChevronDown}" Width="12" Height="12" IsVisible="{Binding IsExpanded}" />
+                          </Panel>
+                          <PathIcon Grid.Column="1" Classes="dim" Data="{StaticResource IconDatabase}" Width="15" Height="15" Margin="0,0,8,0" />
+                          <TextBlock Grid.Column="2" Text="{Binding Database}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                          <Border Grid.Column="3" Classes="badge warn">
+                            <TextBlock Text="{Binding Summary}" FontSize="11.5" />
+                          </Border>
+                        </Grid>
+                      </ToggleButton>
+                      <ItemsControl ItemsSource="{Binding Tables}" IsVisible="{Binding IsExpanded}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:TableDiffGroup">
+                            <Border BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,1,0,0" Padding="12,8">
+                              <Grid ColumnDefinitions="200,*">
+                                <SelectableTextBlock Text="{Binding Table}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12.5"
+                                                     FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="0,2,12,0"
+                                                     VerticalAlignment="Top" ToolTip.Tip="{Binding Table}" />
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding Findings}">
+                                  <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DiffFinding">
+                                      <Grid ColumnDefinitions="116,*" Margin="0,2">
+                                        <Border Classes="badge" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                Classes.error="{Binding IsError}" Classes.warn="{Binding IsWarn}" Classes.info="{Binding IsInfo}">
+                                          <TextBlock Text="{Binding Label}" FontSize="11.5" />
+                                        </Border>
+                                        <SelectableTextBlock Grid.Column="1" TextWrapping="Wrap" Margin="0,2,0,0">
+                                          <Run Text="{Binding ColumnText, Mode=OneWay}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12.5" />
+                                          <Run Text="{Binding Detail, Mode=OneWay, StringFormat='  {0}'}" Foreground="{DynamicResource DbxTextDim}" />
+                                        </SelectableTextBlock>
+                                      </Grid>
+                                    </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                              </Grid>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- The databases that match the rest take one line, not a card each -->
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IdenticalText, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <PathIcon Data="{StaticResource IconCheck}" Width="13" Height="13" Foreground="{DynamicResource DbxSuccess}" VerticalAlignment="Top" Margin="0,2,0,0" />
+              <TextBlock Classes="dim" Text="{Binding IdenticalText}" TextWrapping="Wrap" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+      </Panel>
     </Border>
   </DockPanel>
 </Window>

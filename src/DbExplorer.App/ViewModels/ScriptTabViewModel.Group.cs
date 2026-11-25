@@ -50,6 +50,16 @@ public sealed partial class ScriptTabViewModel
     {
         OnPropertyChanged(nameof(CanRun));
         OnPropertyChanged(nameof(IsBusy));
+        OnPropertyChanged(nameof(RunDisabledReason));
+    }
+
+    partial void OnIsGroupRunningChanged(bool value) => OnPropertyChanged(nameof(RunDisabledReason));
+
+    /// <summary>Closes the group run panel (the results of an ordinary run, if any, are shown again). Not while it still runs.</summary>
+    [RelayCommand]
+    public void CloseGroupRunPanel()
+    {
+        if (!IsGroupRunning) GroupRun = null;
     }
 
     /// <summary>The connections the latest group run opened (for tests: each one is disposed once its member ended).</summary>
@@ -93,22 +103,22 @@ public sealed partial class ScriptTabViewModel
         }
         if (IsGroupRunning)
         {
-            _status.Info("A group run is already in progress — cancel it first.");
+            _status.Info("A group run is already in progress. Stop it first.");
             return;
         }
         if (IsRunning)
         {
-            _status.Info("A script is already running — cancel it first.");
+            _status.Info("A script is already running. Stop it first.");
             return;
         }
         if (IsSwitching)
         {
-            _status.Info("Switching database — try again in a moment.");
+            _status.Info("Switching database. Try again in a moment.");
             return;
         }
         if (_reconnecting)
         {
-            _status.Info("Reconnecting — try again when it has finished.");
+            _status.Info("Reconnecting. Try again when it has finished.");
             return;
         }
 
@@ -131,6 +141,12 @@ public sealed partial class ScriptTabViewModel
 
         IsGroupRunning = true;   // set before the first await: the caller sees it at once
         ErrorMessage = null;
+        RunSummary = null;
+        _lastRunWasGroup = true;
+        _lastGroupWhole = wholeScript;
+        _runText = Text;   // the member tabs point into this text
+        RunStartedAt = DateTime.Now;
+        RunProgressText = members.Count == 1 ? "Running on 1 database" : $"Running on {members.Count} databases";
         var generation = ++_groupGeneration;
         using var cts = _groupCts = new CancellationTokenSource();
         var ct = cts.Token;
@@ -204,6 +220,8 @@ public sealed partial class ScriptTabViewModel
             {
                 _groupRunner = null;
                 _groupCts = null;
+                RunStartedAt = null;
+                RunProgressText = null;
             }
             IsGroupRunning = false;
         }

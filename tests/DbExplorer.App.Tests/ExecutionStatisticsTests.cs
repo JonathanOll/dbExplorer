@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.Common;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -123,7 +124,7 @@ public class ExecutionStatisticsTests
         await tab.RunScriptAsync();
 
         Assert.Equal(2, tab.Results.Count);   // Results is still one entry per statement
-        Assert.Equal(["1: SELECT 1", "2: SELECT 2", "Statistics", "Messages"], tab.ResultTabs.Select(t => t.Header).ToArray());
+        Assert.Equal(["1 · SELECT 1", "2 · SELECT 2", "Statistics", "Messages"], tab.ResultTabs.Select(t => t.Header).ToArray());
         Assert.Same(tab.Results[1], tab.SelectedResult);
         Assert.Same(tab.Results[1], tab.SelectedResultTab);   // the statement stays selected, the grids are one click away
         Assert.Equal(
@@ -206,7 +207,7 @@ public class ExecutionStatisticsTests
 
         await tab.RunScriptAsync();
 
-        Assert.Equal(["1: SELECT 1", "! 2: SELECT 2", "Statistics", "Messages"], tab.ResultTabs.Select(t => t.Header).ToArray());
+        Assert.Equal(["1 · SELECT 1", "2 · SELECT 2", "Statistics", "Messages"], tab.ResultTabs.Select(t => t.Header).ToArray());
         Assert.Same(tab.Results[1], tab.SelectedResult);   // the failed one
         Assert.Equal(2, ((GridResultTab)tab.ResultTabs[2]).Rows.Count(r => (string?)r[1] is "IO" or "Execution"));
         tab.Close();
@@ -252,7 +253,7 @@ public class ExecutionStatisticsTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var toggle = window.GetVisualDescendants().OfType<CheckBox>().Single(c => (string?)c.Content == "Statistics");
+        var toggle = window.GetVisualDescendants().OfType<ToggleButton>().Single(c => (string?)c.Content == "Statistics");
         Assert.True(toggle.IsVisible);
         toggle.IsChecked = true;
         Assert.True(tab.StatisticsEnabled);
@@ -275,7 +276,7 @@ public class ExecutionStatisticsTests
         var liteWindow = new Window { Content = new ContentControl { Content = lite }, Width = 900, Height = 600 };
         liteWindow.Show();
         Dispatcher.UIThread.RunJobs();
-        Assert.False(liteWindow.GetVisualDescendants().OfType<CheckBox>().Single(c => (string?)c.Content == "Statistics").IsVisible);
+        Assert.False(liteWindow.GetVisualDescendants().OfType<ToggleButton>().Single(c => (string?)c.Content == "Statistics").IsVisible);
         liteWindow.Close();
         lite.Close();
     }
