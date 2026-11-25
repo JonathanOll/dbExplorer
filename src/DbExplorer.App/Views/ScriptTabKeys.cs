@@ -30,6 +30,9 @@ public enum ScriptKeyAction
 
     /// <summary>Ctrl+M: switches "Actual plan" on or off for the next runs.</summary>
     ToggleActualPlan,
+
+    /// <summary>Ctrl+Shift+F: formats the selection, or the whole script when nothing is selected.</summary>
+    FormatSql,
 }
 
 /// <summary>One line of the shortcuts flyout.</summary>
@@ -56,6 +59,7 @@ public static class ScriptTabKeys
         (Key.Space, KeyModifiers.Control) => ScriptKeyAction.Complete,
         (Key.L, KeyModifiers.Control) => ScriptKeyAction.EstimatedPlan,
         (Key.M, KeyModifiers.Control) => ScriptKeyAction.ToggleActualPlan,
+        (Key.F, KeyModifiers.Control | KeyModifiers.Shift) => ScriptKeyAction.FormatSql,
         _ => ScriptKeyAction.None,
     };
 
@@ -73,6 +77,7 @@ public static class ScriptTabKeys
         new("Open a script file", "Ctrl+O"),
         new("Find in the script", "Ctrl+F"),
         new("Comment or uncomment the selected lines", "Ctrl+/"),
+        new("Format the selection, or the whole script", "Ctrl+Shift+F"),
         new("Complete tables, columns and keywords (also while typing)", "Ctrl+Space"),
         new("Open result tab 1 to 9", "Ctrl+1 to 9"),
         new("Move between the editor and the results", "F6"),

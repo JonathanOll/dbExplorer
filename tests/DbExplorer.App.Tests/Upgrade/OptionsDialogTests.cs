@@ -29,7 +29,7 @@ public class OptionsDialogTests
         var vm = new OptionsViewModel(@"C:\dbupdate", _ => null);
         var window = Show(vm, out _);
 
-        var box = window.GetVisualDescendants().OfType<TextBox>().Single();
+        var box = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "PathBox");
         Assert.Equal(@"C:\dbupdate", box.Text);
         Assert.NotNull(ButtonNamed(window, "Choose folder…"));
         Assert.NotNull(ButtonNamed(window, "Save"));

@@ -191,6 +191,31 @@ The history is a plain JSON-lines file (`history.jsonl` in the data folder), rea
 means nothing is remembered. Tools > Options switches the recording off and has a "Clear history" button (setting `RecordHistory`).
 Group runs (one statement on every database) are not recorded.
 
+## SQL formatting
+
+`Ctrl+Shift+F`, the toolbar button next to Save and **Script > Format SQL** format the selection, or the whole script when
+nothing is selected. It is one edit of the editor: `Ctrl+Z` brings the old text back in a single step, and the caret stays on
+the token it was on. The formatter is our own (no dependency) and built to be safe:
+
+- it only moves whitespace and, optionally, changes the case of keywords. Strings, quoted identifiers (`"x"`, `` `x` ``, `[x]`),
+  comments (a trailing `-- note` stays at the end of its line), `$$ ... $$` bodies, `GO` lines, `;`, variables (`@x`, `:x`,
+  `$1`), operators and numbers are never rewritten. Function names and identifiers keep their case (SQLite names an
+  unaliased column after its text);
+- every statement is re-read after formatting and compared token by token with the original. A difference, or a character the
+  lexer cannot classify, leaves that statement as it was; statements it does not lay out (`DECLARE`, `ALTER`, procedures,
+  anything unknown) only get their runs of spaces collapsed and keywords cased, line breaks and indentation stay;
+- formatting twice gives the same text.
+
+Layout: one clause per line (`SELECT`, `FROM`, `WHERE`, `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`, `UNION`...), the select
+list one item per line when there are several, `JOIN ... ON` with the condition on an indented line, `AND` / `OR` at the start of
+a line, subqueries and CTEs as indented blocks, `CASE WHEN ... THEN ... END` on separate lines, `INSERT ... VALUES`, `UPDATE ... SET`,
+`DELETE`, `MERGE` and `CREATE TABLE` (one column per line) laid out the same way, short lists (`IN (1, 2, 3)`, function calls)
+kept on one line and long ones wrapped at 100 columns. The rules follow the tab's engine (`TOP` on SQL Server, `RETURNING`
+and `::` on PostgreSQL, `GO` lines on SQL Server).
+
+**Tools > Options > SQL formatting** sets the keyword case (upper, lower, as typed), the indent (2, 4, 8 spaces or a tab) and
+the comma position (end or start of the line), with a live preview. They are saved in `config.json` (`Format`).
+
 ## Execution statistics
 
 SQL Server script tabs have a **Statistics** check box in the toolbar (hidden for PostgreSQL and SQLite). With it on, the
@@ -317,6 +342,7 @@ select a result, Enter opens it, Esc closes (the last results are shown again th
 | `Enter` / `F2` / `Delete` | navigator, a script or script folder | Open / rename / delete it (see [Script library](#script-library)) |
 | `Ctrl+Enter` | script tab | Run the statement under the cursor (ends at `;`, a `GO` line or a blank line) or the selection |
 | `F5` | script tab | Run the whole script; in a table tab: reload the data |
+| `Ctrl+Shift+F` | script tab | Format the selection, or the whole script when nothing is selected (see [SQL formatting](#sql-formatting)) |
 | `Ctrl+Shift+Enter` | script tab on a connection in a group | Run the statement under the cursor / the selection on **every database of the group** (read-only, see [Linked database groups](#linked-database-groups)); in a script tab that is not in a group the status bar only says so (no ordinary run) |
 | `Ctrl+Shift+F5` | script tab on a connection in a group | Run the whole script on every database of the group (read-only) |
 | `Ctrl+S` | script tab / table tab | Save the script (the first time: name and library folder) / review the SQL and apply staged edits |
@@ -514,7 +540,7 @@ Everything lives in `%APPDATA%\dbExplorer`:
 
 | Path | Content |
 | --- | --- |
-| `config.json` | folders, connections (passwords DPAPI-encrypted for the current Windows user), virtual keys, linked groups, the automatic-update setting, the N2F dbupdate folder (`DbUpdatePath`, empty = upgrade off) |
+| `config.json` | folders, connections (passwords DPAPI-encrypted for the current Windows user), virtual keys, linked groups, the automatic-update setting, the N2F dbupdate folder (`DbUpdatePath`, empty = upgrade off), the SQL formatting style (`Format`) |
 | `cache\` | per-connection metadata cache (schema/table/column names) used by `Ctrl+Shift+P` |
 | `scripts\` | unsaved script tabs, restored at the next start |
 | `library\` | the script library: your saved `.sql` scripts and their folders ([Script library](#script-library)) |

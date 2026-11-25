@@ -44,10 +44,12 @@ public partial class MainViewModel
                 DbUpdateCatalog.Validate,
                 path => $"{DbUpdateCatalog.Scan(path).Folders.Count} version folders found",
                 Tree.Config.RecordHistory,
-                _history is { } history ? history.Clear : null);
+                _history is { } history ? history.Clear : null,
+                Tree.Config.Format);
             if (!await dialogs.ShowOptionsAsync(vm) || vm.Result is not { } result) return;
             Tree.SetDbUpdatePath(result.DbUpdatePath);
             if (result.RecordHistory != Tree.Config.RecordHistory) Tree.SetRecordHistory(result.RecordHistory);
+            if (result.Format is { } format && format != Tree.Config.Format) Tree.SetFormatOptions(format);
             RefreshUpgradeAvailability();
         }
         catch (Exception ex)

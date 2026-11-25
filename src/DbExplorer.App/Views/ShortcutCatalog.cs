@@ -56,6 +56,7 @@ public static class ShortcutCatalog
             new("Ctrl+Space", "Complete tables, columns and keywords"),
             new("Ctrl+L", "Show the estimated execution plan (nothing runs)"),
             new("Ctrl+M", "Include the actual execution plan in the runs"),
+            new("Ctrl+Shift+F", "Format the selection, or the whole script"),
         ]),
         new("Linked databases", [
             new("Ctrl+Alt+PageDown", "Next database of the group"),

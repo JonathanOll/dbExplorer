@@ -1,3 +1,5 @@
+using DbExplorer.Core.Scripting;
+
 namespace DbExplorer.Core.Model;
 
 /// <summary>Application configuration. VirtualKeys: connection id -> "schema.table" -> key columns.</summary>
@@ -26,6 +28,9 @@ public record AppConfig(
 
     /// <summary>Whether the statements run from script tabs are recorded in the query history. Missing in old files: on.</summary>
     public bool RecordHistory { get; set; } = true;
+
+    /// <summary>SQL formatter style (Options dialog). Missing in old files: the defaults.</summary>
+    public SqlFormatOptions Format { get; set; } = new();
 
     public static AppConfig Empty() => new(new(), new(), new());
 }

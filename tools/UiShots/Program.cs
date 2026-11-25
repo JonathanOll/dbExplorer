@@ -347,6 +347,8 @@ internal static class Scenes
         ("history", HistoryScene),
         ("search", SearchScripts),
         ("search-data", SearchData),
+        ("format-sql", FormatSql),
+        ("options-format", OptionsFormat),
     ];
 
     private static string Theme = "light";
@@ -677,6 +679,34 @@ internal static class Scenes
     }
 
     // The first save of a script: a name and a folder of the library.
+    // A cramped query after Ctrl+Shift+F: one clause per line, the join conditions indented, the comment kept where it was.
+    private static async Task<Window?> FormatSql(Demo d)
+    {
+        await Open(d);
+        var script = d.Main.NewScript()!;
+        script.Text = """
+            -- Best customers this year
+            select c.name,c.country,count(*) as orders,round(sum(o.total),2) as total from orders o join customers c on c.id=o.customer_id left join (select order_id, count(*) n from lines group by order_id) l on l.order_id=o.id where o.status<>'open' and (c.vip=1 or c.credit>600) group by c.id order by total desc limit 8;
+
+            update customers set vip=1,credit=credit+10 where id in (select customer_id from orders where total>100); -- bonus
+            """;
+        d.Window.Show();
+        Pump();
+        script.FormatSqlCommand.Execute(null);
+        await Settle();
+        Pump();
+        return null;
+    }
+
+    private static async Task<Window?> OptionsFormat(Demo d)
+    {
+        await Open(d);
+        var dialog = new OptionsDialog { DataContext = new OptionsViewModel(null, _ => null, null, true, () => { }, null) };
+        dialog.Show(d.Window);
+        await Settle();
+        return dialog;
+    }
+
     private static async Task<Window?> SaveScriptDialogScene(Demo d)
     {
         await Open(d);

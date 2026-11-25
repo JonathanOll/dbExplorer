@@ -48,7 +48,8 @@ public sealed record ScriptTabHooks(
     ScriptLibrary? Library = null,
     Action<string>? FileUsed = null,
     QueryHistory? History = null,
-    Func<bool>? RecordHistory = null);
+    Func<bool>? RecordHistory = null,
+    Func<SqlFormatOptions>? FormatOptions = null);
 
 /// <summary>
 /// A SQL script editor on one connection. Runs the statement under the caret / the selection (Ctrl+Enter) or the

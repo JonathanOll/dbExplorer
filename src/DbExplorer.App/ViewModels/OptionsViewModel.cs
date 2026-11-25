@@ -1,10 +1,12 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using DbExplorer.Core.Model;
+using DbExplorer.Core.Scripting;
 
 namespace DbExplorer.App.ViewModels;
 
-/// <summary>What the Options dialog hands back: the dbupdate folder, or null to switch the upgrade feature off.</summary>
-public sealed record OptionsResult(string? DbUpdatePath, bool RecordHistory = true);
+/// <summary>What the Options dialog hands back: the dbupdate folder (null switches the upgrade feature off), the query history switch and the SQL formatting style.</summary>
+public sealed record OptionsResult(string? DbUpdatePath, bool RecordHistory = true, SqlFormatOptions? Format = null);
 
 /// <summary>
 /// The Options dialog: today one setting, the dbupdate folder of the n2f repo. Validation and the optional info line are
@@ -21,14 +23,20 @@ public sealed partial class OptionsViewModel : ObservableObject
     /// <param name="describe">Returns the info line shown for a valid folder (e.g. "147 version folders found"), or null.</param>
     /// <param name="recordHistory">The stored "record the query history" setting.</param>
     /// <param name="clearHistory">Empties the history (the "Clear history" button); null hides the button.</param>
+    /// <param name="format">The stored SQL formatting style (null: the defaults).</param>
     public OptionsViewModel(string? currentDbUpdatePath, Func<string, string?> validate, Func<string, string?>? describe = null,
-        bool recordHistory = true, Action? clearHistory = null)
+        bool recordHistory = true, Action? clearHistory = null, SqlFormatOptions? format = null)
     {
         _validate = validate;
         _describe = describe;
         _dbUpdatePath = currentDbUpdatePath ?? "";
         _recordHistory = recordHistory;
         _clearHistory = clearHistory;
+        _format = (format ?? new SqlFormatOptions()).Normalized();
+        _keywordCaseIndex = (int)_format.KeywordCase;
+        _indentIndex = _format.UseTabs ? IndentChoices.Count - 1 : Math.Max(0, Array.IndexOf(IndentSizes, _format.IndentSize));
+        _commaIndex = (int)_format.CommaPosition;
+        _preview = BuildPreview();
     }
 
     private readonly Action? _clearHistory;
@@ -66,6 +74,57 @@ public sealed partial class OptionsViewModel : ObservableObject
         ClearHistoryText = "Clear history…";
         ClearHistoryInfo = "History cleared.";
     }
+
+    // ---- SQL formatting (live preview) ----
+
+    public static IReadOnlyList<string> KeywordCaseChoices { get; } = ["UPPER CASE", "lower case", "As typed"];
+    public static IReadOnlyList<string> IndentChoices { get; } = ["2 spaces", "4 spaces", "8 spaces", "Tab"];
+    public static IReadOnlyList<string> CommaChoices { get; } = ["End of the line", "Start of the line"];
+
+    private static readonly int[] IndentSizes = [2, 4, 8];
+
+    private const string PreviewSql =
+        "select o.id, c.name, sum(l.qty * l.price) as total from orders o join customers c on c.id = o.customer_id " +
+        "left join lines l on l.order_id = o.id where o.status in ('new', 'paid') and o.created >= '2024-01-01' " +
+        "group by o.id, c.name order by total desc";
+
+    private SqlFormatOptions _format;
+
+    [ObservableProperty]
+    private int _keywordCaseIndex;
+
+    [ObservableProperty]
+    private int _indentIndex;
+
+    [ObservableProperty]
+    private int _commaIndex;
+
+    /// <summary>A sample statement formatted with the options chosen above.</summary>
+    [ObservableProperty]
+    private string _preview;
+
+    /// <summary>The formatting style chosen in the dialog.</summary>
+    public SqlFormatOptions FormatOptions => _format;
+
+    partial void OnKeywordCaseIndexChanged(int value) => UpdateFormat();
+    partial void OnIndentIndexChanged(int value) => UpdateFormat();
+    partial void OnCommaIndexChanged(int value) => UpdateFormat();
+
+    private void UpdateFormat()
+    {
+        var tabs = IndentIndex == IndentChoices.Count - 1;
+        _format = new SqlFormatOptions
+        {
+            KeywordCase = Enum.IsDefined((KeywordCase)KeywordCaseIndex) ? (KeywordCase)KeywordCaseIndex : KeywordCase.Upper,
+            UseTabs = tabs,
+            IndentSize = tabs || IndentIndex < 0 || IndentIndex >= IndentSizes.Length ? _format.IndentSize : IndentSizes[IndentIndex],
+            CommaPosition = Enum.IsDefined((CommaPosition)CommaIndex) ? (CommaPosition)CommaIndex : CommaPosition.Trailing,
+            MaxLineWidth = _format.MaxLineWidth,
+        };
+        Preview = BuildPreview();
+    }
+
+    private string BuildPreview() => SqlFormatter.Format(PreviewSql, DbKind.Postgres, _format).Replace("	", "    ");
 
     [ObservableProperty]
     private string _dbUpdatePath;
@@ -187,7 +246,7 @@ public sealed partial class OptionsViewModel : ObservableObject
         ValidatePath();
         if (PathError is not null) return false;
         var path = DbUpdatePath.Trim();
-        Result = new OptionsResult(path.Length == 0 ? null : path, RecordHistory);
+        Result = new OptionsResult(path.Length == 0 ? null : path, RecordHistory, _format);
         return true;
     }
 }

@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using DbExplorer.Core.Config;
 using DbExplorer.Core.Groups;
 using DbExplorer.Core.Model;
+using DbExplorer.Core.Scripting;
 using DbExplorer.Core.Sessions;
 
 namespace DbExplorer.App.ViewModels;
@@ -603,6 +604,13 @@ public partial class ConnectionTreeViewModel : ObservableObject
     public bool SetRecordHistory(bool enabled)
     {
         Config.RecordHistory = enabled;
+        return SaveSetting();
+    }
+
+    /// <summary>Stores the SQL formatter style, with the same contract as <see cref="SetAutoUpdateCheck"/>.</summary>
+    public bool SetFormatOptions(SqlFormatOptions options)
+    {
+        Config.Format = options.Normalized();
         return SaveSetting();
     }
 
