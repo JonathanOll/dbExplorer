@@ -12,13 +12,15 @@ namespace DbExplorer.App.ViewModels;
 public sealed partial class MemberStatusViewModel : ObservableObject
 {
     private readonly Action<Guid>? _cancel;
+    private readonly Action<Guid>? _select;
 
-    internal MemberStatusViewModel(ConnectionConfig connection, string name, Action<Guid>? cancel)
+    internal MemberStatusViewModel(ConnectionConfig connection, string name, Action<Guid>? cancel, Action<Guid>? select = null)
     {
         Id = connection.Id;
         Name = name;
         ConnectionName = connection.Name;
         _cancel = cancel;
+        _select = select;
     }
 
     public Guid Id { get; }
@@ -29,13 +31,13 @@ public sealed partial class MemberStatusViewModel : ObservableObject
     public string ConnectionName { get; }
 
     [NotifyPropertyChangedFor(nameof(IsPending), nameof(IsRunning), nameof(IsDone), nameof(IsFailed), nameof(IsCancelled),
-        nameof(CanCancel), nameof(StatusText))]
+        nameof(CanCancel), nameof(StatusText), nameof(ShortStatusText), nameof(StateName), nameof(HasResultTab))]
     [ObservableProperty] private MemberState _state = MemberState.Pending;
 
-    [NotifyPropertyChangedFor(nameof(StatusText))]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(ShortStatusText))]
     [ObservableProperty] private int? _rows;
 
-    [NotifyPropertyChangedFor(nameof(StatusText), nameof(Ms))]
+    [NotifyPropertyChangedFor(nameof(StatusText), nameof(ShortStatusText), nameof(Ms))]
     [ObservableProperty] private TimeSpan? _duration;
 
     [NotifyPropertyChangedFor(nameof(StatusText))]
@@ -60,7 +62,34 @@ public sealed partial class MemberStatusViewModel : ObservableObject
         _ => Error ?? "failed",
     };
 
-    private string RowsText => Rows is 1 ? "1 row" : $"{(Rows ?? 0).ToString(CultureInfo.InvariantCulture)} rows";
+    /// <summary>The line on the member's chip: short, the full error is in the tooltip and in the member's tab.</summary>
+    public string ShortStatusText => State switch
+    {
+        MemberState.Pending => "Waiting…",
+        MemberState.Running => "Running…",
+        MemberState.Done => $"{RowsText} · {MsText} ms",
+        MemberState.Cancelled => "Cancelled",
+        _ => "Failed",
+    };
+
+    /// <summary>The state as a word (spoken name of the chip).</summary>
+    public string StateName => State switch
+    {
+        MemberState.Pending => "waiting",
+        MemberState.Running => "running",
+        MemberState.Done => "done",
+        MemberState.Cancelled => "cancelled",
+        _ => "failed",
+    };
+
+    /// <summary>The member has ended, so it has a result tab to open.</summary>
+    public bool HasResultTab => State is MemberState.Done or MemberState.Failed or MemberState.Cancelled;
+
+    /// <summary>Opens the member's own result tab (a click on its chip).</summary>
+    [RelayCommand(CanExecute = nameof(HasResultTab))]
+    private void Select() => _select?.Invoke(Id);
+
+    private string RowsText => Rows is 1 ? "1 row" : $"{(Rows ?? 0).ToString("N0", CultureInfo.InvariantCulture)} rows";
 
     /// <summary>Time spent on the member in milliseconds, once it ended; null before.</summary>
     public long? Ms => Duration is { } d ? (long)d.TotalMilliseconds : null;
@@ -71,7 +100,11 @@ public sealed partial class MemberStatusViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanCancel))]
     private void Cancel() => _cancel?.Invoke(Id);
 
-    partial void OnStateChanged(MemberState value) => CancelCommand.NotifyCanExecuteChanged();
+    partial void OnStateChanged(MemberState value)
+    {
+        CancelCommand.NotifyCanExecuteChanged();
+        SelectCommand.NotifyCanExecuteChanged();
+    }
 
     internal void Set(MemberState state, int? rows, TimeSpan? duration, string? error)
     {
@@ -102,6 +135,9 @@ public sealed class GroupResultTab(GroupRunViewModel run, string title, Statemen
     public bool IsMember => Member is not null;
 
     public bool HasError => Member?.HasError == true;
+
+    /// <summary>Spoken name of the tab, with a failure said in words.</summary>
+    public string AutomationName => HasError ? $"Failed: {Title}" : Title;
 }
 
 /// <summary>
@@ -124,7 +160,14 @@ public sealed partial class GroupRunViewModel : ObservableObject
         _cancelMember = cancelMember;
         var names = UniqueNames(members.Select(m => m.Name));
         for (var i = 0; i < members.Count; i++)
-            Members.Add(new MemberStatusViewModel(members[i], names[i], CancelMember));
+        {
+            var member = new MemberStatusViewModel(members[i], names[i], CancelMember, SelectMember);
+            member.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(MemberStatusViewModel.StatusText)) OnPropertyChanged(nameof(SummaryText));
+            };
+            Members.Add(member);
+        }
         IsRunning = members.Count > 0;
     }
 
@@ -144,11 +187,77 @@ public sealed partial class GroupRunViewModel : ObservableObject
     [ObservableProperty] private GroupResultTab? _selectedTab;
 
     /// <summary>True from the start of the run until <see cref="Complete"/> / <see cref="Detach"/> / a refusal.</summary>
-    [NotifyPropertyChangedFor(nameof(CanShowDifferences))]
+    [NotifyPropertyChangedFor(nameof(CanShowDifferences), nameof(SummaryText))]
     [ObservableProperty] private bool _isRunning;
 
     /// <summary>Everything that needs the user's attention about this run (one line per notice), or null.</summary>
     [ObservableProperty] private string? _notice;
+
+    /// <summary>The notices that are about the comparison itself ("compares statement 3", "identical rows"): an info band.</summary>
+    [ObservableProperty] private IReadOnlyList<string> _infoNotices = [];
+
+    /// <summary>The notices that say something was left out or refused: a warning band.</summary>
+    [ObservableProperty] private IReadOnlyList<string> _warnNotices = [];
+
+    public bool HasInfoNotices => InfoNotices.Count > 0;
+
+    public bool HasWarnNotices => WarnNotices.Count > 0;
+
+    partial void OnNoticeChanged(string? value)
+    {
+        var lines = value is null
+            ? []
+            : value.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        InfoNotices = lines.Where(IsInfoLine).ToList();
+        WarnNotices = lines.Where(l => !IsInfoLine(l)).ToList();
+        OnPropertyChanged(nameof(HasInfoNotices));
+        OnPropertyChanged(nameof(HasWarnNotices));
+    }
+
+    private static bool IsInfoLine(string line) =>
+        (line.StartsWith("The script has ", StringComparison.Ordinal) && line.Contains("compare statement", StringComparison.Ordinal))
+        || line.Contains("returned identical rows", StringComparison.Ordinal);
+
+    /// <summary>"3 of 3 databases done · 24 ms", or how many have finished while the run goes on.</summary>
+    public string SummaryText
+    {
+        get
+        {
+            var total = Members.Count;
+            var ended = Members.Count(m => !m.CanCancel);
+            if (IsRunning) return $"{ended} of {total} databases finished";
+            var text = $"{Members.Count(m => m.IsDone)} of {total} databases done";
+            if (Members.Count(m => m.IsFailed) is > 0 and var failed) text += $" · {failed} failed";
+            if (Members.Count(m => m.IsCancelled) is > 0 and var cancelled) text += $" · {cancelled} cancelled";
+            var slowest = Members.Where(m => m.Ms is not null).Select(m => m.Ms!.Value).DefaultIfEmpty(-1).Max();
+            return slowest >= 0 ? text + $" · {slowest.ToString("N0", CultureInfo.InvariantCulture)} ms" : text;
+        }
+    }
+
+    /// <summary>The "All" tab shows every row (the counterpart of <see cref="ShowDifferences"/>, for the segmented control).</summary>
+    public bool ShowAllRows
+    {
+        get => !ShowDifferences;
+        set => ShowDifferences = !value;
+    }
+
+    /// <summary>How many rows differ across the members; null until the run is complete or when fewer than two members returned rows.</summary>
+    public int? DifferenceCount => _prepared is { Differences.Included: >= 2 } p ? p.Differences.Result.Rows.Count : null;
+
+    /// <summary>The members returned identical rows (nothing differs and nothing was cut at the row limit).</summary>
+    public bool IsIdentical => _prepared is { Differences.Identical: true };
+
+    /// <summary>"4 differ", "Identical" or null: the chip next to the segmented control.</summary>
+    public string? DifferenceChipText => IsIdentical ? "Identical" : DifferenceCount is { } n and > 0 ? $"{n:N0} differ" : null;
+
+    public bool HasDifferenceChip => DifferenceChipText is not null;
+
+    /// <summary>Selects the result tab of a member (a click on its chip).</summary>
+    public void SelectMember(Guid id)
+    {
+        if (Members.FirstOrDefault(m => m.Id == id) is not { } member) return;
+        if (Tabs.FirstOrDefault(t => t.IsMember && t.Title == member.Name) is { } tab) SelectedTab = tab;
+    }
 
     /// <summary>The "All" tab shows only the rows that are not identical across the members, with a "Present in" column.</summary>
     [ObservableProperty] private bool _showDifferences;
@@ -166,7 +275,11 @@ public sealed partial class GroupRunViewModel : ObservableObject
 
     public bool CanShowDifferences => !IsRunning && _prepared is not null;
 
-    partial void OnShowDifferencesChanged(bool value) => ShowView();
+    partial void OnShowDifferencesChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowAllRows));
+        ShowView();
+    }
 
     /// <summary>The run was refused before anything was contacted: no member runs, the notice says why.</summary>
     public static GroupRunViewModel CreateRefused(string notice) =>
@@ -210,6 +323,7 @@ public sealed partial class GroupRunViewModel : ObservableObject
         IsRunning = false;
         if (notice is not null) Notice = notice;
         OnPropertyChanged(nameof(CanShowDifferences));
+        OnPropertyChanged(nameof(SummaryText));
     }
 
     /// <summary>The run failed as a whole (not a member): shown as a notice, the members that did not end read "cancelled".</summary>
@@ -234,7 +348,7 @@ public sealed partial class GroupRunViewModel : ObservableObject
         GridResultTab? Messages = null);
 
     /// <summary>What the "All" tab shows in one mode: columns, rows and the notices that go with it.</summary>
-    public sealed record AllView(MergedResult Result, IReadOnlyList<string> Notices, string Status);
+    public sealed record AllView(MergedResult Result, IReadOnlyList<string> Notices, string Status, int Included = 0, bool Identical = false);
 
     /// <summary>
     /// Merges and compares the results of the members. Pure: no UI state is touched, so it can run on the pool.
@@ -336,10 +450,12 @@ public sealed partial class GroupRunViewModel : ObservableObject
             }
         }
 
+        var databases = included.Count == 1 ? "1 database" : $"{included.Count} databases";
         var status = differences
-            ? $"{Rows(result.Rows.Count)} that differ across {included.Count} member(s)"
-            : $"{Rows(result.Rows.Count)} from {included.Count} member(s)";
-        return new AllView(result, notices, status);
+            ? $"{Rows(result.Rows.Count)} that differ across {databases}"
+            : $"{Rows(result.Rows.Count)} from {databases}";
+        var identical = differences && included.Count >= 2 && result.Rows.Count == 0 && truncated.Count == 0 && result.Columns.Count > 1;
+        return new AllView(result, notices, status, included.Count, identical);
     }
 
     /// <summary>Shows a prepared outcome: overwrites every status line (authoritative), builds the tabs and the All view.</summary>
@@ -366,6 +482,11 @@ public sealed partial class GroupRunViewModel : ObservableObject
         SelectedTab = Tabs[0];
         OnPropertyChanged(nameof(HasResults));
         OnPropertyChanged(nameof(CanShowDifferences));
+        OnPropertyChanged(nameof(DifferenceCount));
+        OnPropertyChanged(nameof(IsIdentical));
+        OnPropertyChanged(nameof(DifferenceChipText));
+        OnPropertyChanged(nameof(HasDifferenceChip));
+        OnPropertyChanged(nameof(SummaryText));
     }
 
     /// <summary>Convenience for tests and callers that are already on the UI thread.</summary>
@@ -441,7 +562,7 @@ public sealed partial class GroupRunViewModel : ObservableObject
         return new StatementResult(new ScriptStatement("", 0, 0), [], null, member.Duration, error);
     }
 
-    private static string Rows(long n) => n == 1 ? "1 row" : $"{n.ToString(CultureInfo.InvariantCulture)} rows";
+    private static string Rows(long n) => n == 1 ? "1 row" : $"{n.ToString("N0", CultureInfo.InvariantCulture)} rows";
 }
 
 /// <summary>

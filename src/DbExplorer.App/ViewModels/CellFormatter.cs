@@ -54,6 +54,17 @@ public static class CellFormatter
         };
     }
 
+    /// <summary>Filter-box text that drops the rows equal to <paramref name="value"/>: "!null" for NULL, otherwise "!=" and the text.</summary>
+    public static string ExcludeText(object? value, string column = "")
+    {
+        return value switch
+        {
+            null => "!null",
+            byte[] => throw new FilterException(column, "binary values cannot be used as a filter."),
+            _ => "!=" + ToInvariantText(value),
+        };
+    }
+
     private static FormattedCell FormatText(string s)
     {
         var newline = s.AsSpan().IndexOfAny('\r', '\n');

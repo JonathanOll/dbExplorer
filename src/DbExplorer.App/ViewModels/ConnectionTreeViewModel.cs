@@ -46,6 +46,65 @@ public partial class ConnectionTreeViewModel : ObservableObject
 
     public ObservableCollection<TreeNodeViewModel> Nodes { get; } = new();
 
+    /// <summary>True while nothing is configured: the navigator shows its empty state instead of a blank tree.</summary>
+    public bool IsEmpty => Nodes.Count == 0;
+
+    /// <summary>The navigator filter box: connections, folders, groups and the tables of the opened connections that contain it.</summary>
+    [ObservableProperty] private string _filterText = "";
+
+    /// <summary>True when a filter is typed and nothing matches it.</summary>
+    [ObservableProperty] private bool _noMatch;
+
+    /// <summary>True while a filter is typed.</summary>
+    public bool HasFilter => FilterText.Trim().Length > 0;
+
+    partial void OnFilterTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasFilter));
+        ApplyFilter();
+    }
+
+    /// <summary>Clears the filter box.</summary>
+    [RelayCommand]
+    public void ClearFilter() => FilterText = "";
+
+    /// <summary>
+    /// Shows the nodes whose title contains the filter (case-insensitive) or that have such a node below them; everything
+    /// under a matching node stays visible. Ancestors of a match are expanded. Only nodes already created are searched
+    /// (tables of a collapsed schema are not realized).
+    /// </summary>
+    public void ApplyFilter()
+    {
+        var text = FilterText.Trim();
+        var any = false;
+        foreach (var node in Nodes) any |= Apply(node, text, ancestorMatches: false);
+        NoMatch = text.Length > 0 && !any && Nodes.Count > 0;
+
+        static bool Apply(TreeNodeViewModel node, string text, bool ancestorMatches)
+        {
+            if (text.Length == 0)
+            {
+                node.IsShown = true;
+                foreach (var child in node.Children) Apply(child, text, false);
+                return true;
+            }
+
+            var self = node is not PlaceholderNodeViewModel && node.Title.Contains(text, StringComparison.OrdinalIgnoreCase);
+            var below = false;
+            foreach (var child in node.Children) below |= Apply(child, text, ancestorMatches || self);
+            var shown = ancestorMatches || self || below;
+            node.IsShown = shown;
+            if (below && !self && !ancestorMatches) node.IsExpanded = true;
+            return shown;
+        }
+    }
+
+    /// <summary>Opens a script tab on the selected connection (wired to <see cref="MainViewModel.NewScript"/>).</summary>
+    public Action? ScriptOpener { get; set; }
+
+    /// <summary>Opens the table picker of the selected connection (wired to <see cref="MainViewModel.ShowTablePicker"/>).</summary>
+    public Action? TablePickerOpener { get; set; }
+
     /// <summary>Called when a table node is activated; wired to <see cref="MainViewModel.OpenTable"/>.</summary>
     public Func<Session, TableRef, Task>? TableOpener { get; set; }
 
@@ -159,7 +218,6 @@ public partial class ConnectionTreeViewModel : ObservableObject
         }
 
         Nodes.Clear();
-        if (BuildGroupsSection() is { } groupsSection) Nodes.Add(groupsSection);
         var seenFolders = new Dictionary<string, FolderNodeViewModel>(StringComparer.OrdinalIgnoreCase);
         foreach (var name in folderNames)
         {
@@ -180,6 +238,11 @@ public partial class ConnectionTreeViewModel : ObservableObject
                      .Where(c => string.IsNullOrWhiteSpace(c.Folder))
                      .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase))
             Nodes.Add(_connectionNodes[c.Id]);
+
+        // The Groups section comes last: its members repeat connections that already sit in a folder above.
+        if (BuildGroupsSection() is { } groupsSection) Nodes.Add(groupsSection);
+        OnPropertyChanged(nameof(IsEmpty));
+        ApplyFilter();
     }
 
     /// <summary>
@@ -458,8 +521,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
         _connecting[config.Id] = cts;
         node.State = ConnectionState.Connecting;
         node.ErrorMessage = null;
-        _status.Info($"Connecting to {config.Name}...");
-        using var busy = _status.Busy($"Connecting to {config.Name}...");
+        using var busy = _status.Busy($"Connecting to {config.Name}…", () => cts.Cancel());
         try
         {
             var session = await _sessions.GetOrOpenAsync(config, cts.Token);
@@ -469,7 +531,8 @@ public partial class ConnectionTreeViewModel : ObservableObject
                 session.UpdateConfig(node.Config);
             ApplySchema(node, session);
             node.State = ConnectionState.Connected;
-            _status.Info($"Connected to {config.Name}: {session.Schema.Count} tables and views.");
+            var count = session.Schema.Count;
+            _status.Success($"Connected to {config.Name}: {count} {(count == 1 ? "table or view" : "tables and views")}.");
         }
         catch (OperationCanceledException)
         {
@@ -480,7 +543,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
         {
             node.State = ConnectionState.Failed;
             node.ErrorMessage = ErrorText.Describe(e);
-            _status.Error($"Cannot connect to {config.Name}: {node.ErrorMessage}");
+            _status.Error($"Cannot connect to {config.Name}: {node.ErrorMessage?.TrimEnd('.')}. Check the connection settings, then double-click it to retry.");
         }
         finally
         {
@@ -547,7 +610,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
     [RelayCommand]
     public async Task ImportFromDBeaverAsync()
     {
-        using var busy = _status.Busy("Importing DBeaver connections...");
+        using var busy = _status.Busy("Importing DBeaver connections…");
         try
         {
             // A copy of EVERYTHING in the config (a positional `new AppConfig(...)` would silently drop the groups).
@@ -604,14 +667,26 @@ public partial class ConnectionTreeViewModel : ObservableObject
     private async Task DeleteConnectionAsync(ConnectionNodeViewModel? node)
     {
         if (node is null) return;
-        if (!await _dialogs.ConfirmAsync("Delete connection", $"Delete connection '{node.Config.Name}'?")) return;
+        var groups = GroupRules.GroupsOf(Config, node.Config.Id);
+        var detail = "Its saved settings and password are removed from dbExplorer; the database itself is not touched." +
+                     (groups.Count > 0 ? $" It leaves {(groups.Count == 1 ? "the group" : "the groups")} {string.Join(", ", groups.Select(g => $"'{g.Name}'"))}." : "");
+        if (!await _dialogs.ConfirmAsync(new ConfirmRequest("Delete connection", $"Delete connection '{node.Config.Name}'?", "Delete", detail, DialogTone.Danger))) return;
         DeleteConnection(node.Config);
     }
+
+    /// <summary>Live validation of a folder name for the prompt: empty, or already used by another folder.</summary>
+    private Func<string, string?> FolderNameProblem(string? current) => text =>
+    {
+        text = text.Trim();
+        if (text.Length == 0) return "Enter a name for the folder.";
+        if (string.Equals(text, current, StringComparison.OrdinalIgnoreCase)) return null;
+        return Config.Folders.Contains(text, StringComparer.OrdinalIgnoreCase) ? $"A folder named '{text}' already exists." : null;
+    };
 
     [RelayCommand]
     private async Task AddFolderAsync()
     {
-        var name = await _dialogs.PromptTextAsync("New folder", "Folder name", "");
+        var name = await _dialogs.PromptTextAsync(new PromptRequest("New folder", "Folder name", "", "Create", FolderNameProblem(null)));
         if (name is not null) AddFolder(name);
     }
 
@@ -619,7 +694,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
     private async Task RenameFolderAsync(FolderNodeViewModel? node)
     {
         if (node is null) return;
-        var name = await _dialogs.PromptTextAsync("Rename folder", "Folder name", node.Name);
+        var name = await _dialogs.PromptTextAsync(new PromptRequest("Rename folder", "Folder name", node.Name, "Rename", FolderNameProblem(node.Name)));
         if (name is not null) RenameFolder(node.Name, name);
     }
 
@@ -627,11 +702,49 @@ public partial class ConnectionTreeViewModel : ObservableObject
     private async Task DeleteFolderAsync(FolderNodeViewModel? node)
     {
         if (node is null) return;
-        if (!await _dialogs.ConfirmAsync("Delete folder", $"Delete folder '{node.Name}'? Its connections move to the root.")) return;
+        if (!await _dialogs.ConfirmAsync(new ConfirmRequest("Delete folder", $"Delete folder '{node.Name}'?", "Delete",
+                "Its connections are kept: they move to the root of the navigator.", DialogTone.Danger))) return;
         DeleteFolder(node.Name);
     }
 
 
+
+    /// <summary>Duplicates a connection (same target and password, name "X (copy)", same folder); nothing is connected.</summary>
+    [RelayCommand]
+    public void DuplicateConnection(ConnectionNodeViewModel? node)
+    {
+        if (node is null) return;
+        var names = Config.Connections.Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var name = $"{node.Config.Name} (copy)";
+        for (var i = 2; names.Contains(name); i++) name = $"{node.Config.Name} (copy {i})";
+        AddConnection(node.Config with { Id = Guid.NewGuid(), Name = name });
+        _status.Success($"Duplicated {node.Config.Name} as {name}.");
+    }
+
+    /// <summary>Puts the failure of a connection back in the status bar (history and tooltip hold it too).</summary>
+    [RelayCommand]
+    public void ShowError(ConnectionNodeViewModel? node)
+    {
+        if (node is { HasError: true }) _status.Error($"Cannot connect to {node.Config.Name}: {node.ErrorMessage}");
+    }
+
+    /// <summary>Context menu "New SQL script" on a connection: selects it, then opens the script tab like Ctrl+N.</summary>
+    [RelayCommand]
+    public void NewScriptOn(ConnectionNodeViewModel? node)
+    {
+        if (node is null) return;
+        SelectedNode = node;
+        ScriptOpener?.Invoke();
+    }
+
+    /// <summary>Context menu "Open table…" on a connection: selects it, then opens the table picker like Ctrl+T (connecting first).</summary>
+    [RelayCommand]
+    public void PickTableOn(ConnectionNodeViewModel? node)
+    {
+        if (node is null) return;
+        SelectedNode = node;
+        TablePickerOpener?.Invoke();
+    }
 
     // ---- group commands ----
 
@@ -659,7 +772,8 @@ public partial class ConnectionTreeViewModel : ObservableObject
     private async Task RenameGroupAsync(ConnectionGroup? group)
     {
         if (group is null || CurrentGroup(group) is not { } current) return;
-        var name = await _dialogs.PromptTextAsync("Rename group", "Group name", current.Name);
+        var name = await _dialogs.PromptTextAsync(new PromptRequest("Rename group", "Group name", current.Name, "Rename",
+            text => text.Trim().Length == 0 ? "Enter a name for the group." : null));
         if (name is not null) RenameGroup(current, name);
     }
 
@@ -667,7 +781,8 @@ public partial class ConnectionTreeViewModel : ObservableObject
     private async Task DeleteGroupAsync(ConnectionGroup? group)
     {
         if (group is null || CurrentGroup(group) is not { } current) return;
-        if (!await _dialogs.ConfirmAsync("Delete group", $"Delete group '{current.Name}'? Its connections are kept.")) return;
+        if (!await _dialogs.ConfirmAsync(new ConfirmRequest("Delete group", $"Delete group '{current.Name}'?", "Delete",
+                "Only the group is deleted: its databases stay in the navigator.", DialogTone.Danger))) return;
         DeleteGroup(current);
     }
 
@@ -745,7 +860,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
         var adopted = false;
         try
         {
-            using (_status.Busy($"Checking schema differences of {current.Name}..."))
+            using (_status.Busy($"Checking schema differences of {current.Name}…", () => cts.Cancel()))
             {
                 _status.Info($"Loading the schemas of the {members.Count} databases of '{current.Name}'...");
                 using var gate = new SemaphoreSlim(SchemaCheckParallelism);
@@ -870,7 +985,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
             await _sessions.RefreshSchemaAsync(node.Config.Id, CancellationToken.None);
             var session = _sessions.Find(node.Config.Id);
             if (session is not null) ApplySchema(node, session);
-            _status.Info($"Refreshed {node.Config.Name}.");
+            _status.Success($"Refreshed {node.Config.Name}.");
         }
         catch (Exception e)
         {

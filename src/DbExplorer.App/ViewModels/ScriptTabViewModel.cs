@@ -66,8 +66,78 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     [ObservableProperty] private int _caretOffset;
     [ObservableProperty] private bool _isRunning;
     [ObservableProperty] private bool _isDirty;
+    [NotifyPropertyChangedFor(nameof(ErrorTitle), nameof(ErrorHint))]
     [ObservableProperty] private string? _errorMessage;
+    [NotifyPropertyChangedFor(nameof(ErrorTitle), nameof(ErrorHint))]
     [ObservableProperty] private bool _needsReconnect;
+
+    /// <summary>The error message is a caution (the connection was reset), not a failure: the banner is amber.</summary>
+    [NotifyPropertyChangedFor(nameof(ErrorTitle), nameof(ErrorHint))]
+    [ObservableProperty] private bool _errorIsWarning;
+
+    /// <summary>Bold first line of the run-level banner, or null when the message says everything.</summary>
+    public string? ErrorTitle => NeedsReconnect ? "Connection lost" : ErrorIsWarning ? "Connection reset" : null;
+
+    /// <summary>Dim line under the message that says what the user can do.</summary>
+    public string? ErrorHint => NeedsReconnect
+        ? "Reconnecting reopens the connection of this tab: open transactions, temp tables and variables are gone."
+        : null;
+
+    partial void OnErrorMessageChanged(string? value) => ErrorIsWarning = false;   // a caution says so explicitly (ShowReset)
+
+    // ---- what the run is doing and did ----
+
+    /// <summary>When the running script or group run started (the view shows the elapsed time); null when nothing runs.</summary>
+    [ObservableProperty] private DateTime? _runStartedAt;
+
+    /// <summary>"Running statement 2 of 5" / "Running on 3 databases" while something runs; null otherwise.</summary>
+    [ObservableProperty] private string? _runProgressText;
+
+    /// <summary>One line under the toolbar about the last run when it has several statements, failed or was cancelled; null otherwise.</summary>
+    [NotifyPropertyChangedFor(nameof(HasRunSummary), nameof(RunSummaryIsSuccess))]
+    [ObservableProperty] private string? _runSummary;
+
+    /// <summary>The summary is about a failed run (red icon).</summary>
+    [NotifyPropertyChangedFor(nameof(RunSummaryIsSuccess))]
+    [ObservableProperty] private bool _runSummaryIsError;
+
+    /// <summary>The summary is about a cancelled run (neutral icon).</summary>
+    [NotifyPropertyChangedFor(nameof(RunSummaryIsSuccess))]
+    [ObservableProperty] private bool _runSummaryIsCancelled;
+
+    /// <summary>The summary is about a run that went through (green icon).</summary>
+    public bool RunSummaryIsSuccess => HasRunSummary && !RunSummaryIsError && !RunSummaryIsCancelled;
+
+    public bool HasRunSummary => RunSummary is not null;
+
+    /// <summary>Why the run buttons are disabled right now (null when they are enabled): the tooltip says it.</summary>
+    public string? RunDisabledReason =>
+        IsRunning ? "A script is running. Stop it first."
+        : IsGroupRunning ? "A group run is in progress. Stop it first."
+        : IsSwitching ? "Switching database. Try again in a moment."
+        : null;
+
+    /// <summary>The tab's connection refuses writes (a lock badge in the toolbar).</summary>
+    public bool IsReadOnly => Connection.ReadOnly;
+
+    /// <summary>"Shop (local) · SQLite · localhost:5432 / shop": what the connection badge's tooltip says.</summary>
+    public string ConnectionDescription
+    {
+        get
+        {
+            var c = Connection;
+            var where = string.IsNullOrWhiteSpace(c.Host) ? c.Database : $"{c.Host}{(c.Port is { } port ? ":" + port : "")} / {c.Database}";
+            var text = $"{c.Name} · {c.Kind}" + (string.IsNullOrWhiteSpace(where) ? "" : $" · {where}");
+            return c.ReadOnly ? text + " · read-only" : text;
+        }
+    }
+
+    // The statements of the last ordinary run and the text they came from (the result tabs point into it).
+    private IReadOnlyList<ScriptStatement> _lastStatements = [];
+    private string _runText = "";
+    private bool _lastRunWasGroup;
+    private bool _lastGroupWhole;
+    private int _totalStatements;
 
     /// <param name="session">The live session, or null (restored tab): it is resolved through the hooks on first run.</param>
     /// <param name="number">The N of "Script N" in the title.</param>
@@ -127,7 +197,67 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     public int RowLimit
     {
         get => _rowLimit;
-        set => SetProperty(ref _rowLimit, Math.Clamp(value, MinRowLimit, MaxRowLimit));
+        set
+        {
+            if (SetProperty(ref _rowLimit, Math.Clamp(value, MinRowLimit, MaxRowLimit)))
+            {
+                OnPropertyChanged(nameof(RowLimitText));
+                OnPropertyChanged(nameof(IsDefaultRowLimit));
+            }
+        }
+    }
+
+    /// <summary>The row limit as the toolbar button says it: "1,000 rows".</summary>
+    public string RowLimitText => StatementResultViewModel.RowsText(RowLimit);
+
+    public bool IsDefaultRowLimit => RowLimit == DefaultRowLimit;
+
+    /// <summary>Limits offered by the row limit menu.</summary>
+    public static IReadOnlyList<int> RowLimitPresets { get; } = [100, 500, 1_000, 5_000, 10_000, 100_000];
+
+    /// <summary>
+    /// "Raise limit" of a truncated result: the limit grows tenfold (at most <see cref="MaxRowLimit"/>) and what ran last
+    /// runs again, here or on the group. Says so when the limit is already at its maximum.
+    /// </summary>
+    public Task RaiseRowLimitAndRerunAsync()
+    {
+        if (RowLimit >= MaxRowLimit)
+        {
+            _status.Info($"The row limit is already at its maximum ({MaxRowLimit:N0}). Narrow the query with WHERE or TOP.");
+            return Task.CompletedTask;
+        }
+        RowLimit = (int)Math.Min((long)RowLimit * 10, MaxRowLimit);
+        return _lastRunWasGroup ? RunOnGroupAsync(_lastGroupWhole) : RunAsync(_lastStatements);
+    }
+
+    /// <summary>Raised when the view should select a range of the text and bring it into view (Go to statement).</summary>
+    public event Action<int, int>? RevealRequested;
+
+    /// <summary>
+    /// "Go to statement" of a result: selects the statement in the editor. The tab points into the text of the run, so it
+    /// says so, and does nothing, when the script was edited since.
+    /// </summary>
+    public void GoToStatement(StatementResultViewModel result)
+    {
+        if (!result.HasRange) return;
+        if (_runText != Text)
+        {
+            _status.Info("The script changed since this run, so the statement cannot be located. Run it again.");
+            return;
+        }
+        RevealRequested?.Invoke(result.StartOffset, result.EndOffset);
+    }
+
+    /// <summary>The statement results still point at the text in the editor (it was not edited since the run).</summary>
+    public bool ResultsMatchText => _runText == Text;
+
+    /// <summary>1-based line of <paramref name="offset"/> in <paramref name="text"/>.</summary>
+    private static int LineOf(string text, int offset)
+    {
+        var line = 1;
+        for (var i = 0; i < Math.Min(offset, text.Length); i++)
+            if (text[i] == '\n') line++;
+        return line;
     }
 
     /// <summary>Results of the last run, one per executed statement.</summary>
@@ -169,7 +299,13 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
-        if (e.PropertyName == nameof(Connection)) OnPropertyChanged(nameof(CanUseStatistics));
+        if (e.PropertyName == nameof(Connection))
+        {
+            OnPropertyChanged(nameof(CanUseStatistics));
+            OnPropertyChanged(nameof(IsReadOnly));
+            OnPropertyChanged(nameof(ConnectionDescription));
+        }
+        else if (e.PropertyName == nameof(IsSwitching)) OnPropertyChanged(nameof(RunDisabledReason));
     }
 
     partial void OnTextChanged(string value)
@@ -211,7 +347,9 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         {
             var start = Math.Clamp(Math.Min(sel.Start, sel.End), 0, text.Length);
             var end = Math.Clamp(Math.Max(sel.Start, sel.End), 0, text.Length);
-            if (end > start) return ScriptSplitter.Split(text[start..end], kind);
+            if (end > start)
+                return ScriptSplitter.Split(text[start..end], kind)
+                    .Select(s => s with { Start = s.Start + start, End = s.End + start }).ToList();   // offsets in the whole script
         }
 
         // No selection: a blank line also ends a statement (T-SQL needs no ';'), so only the one under the caret runs.
@@ -236,17 +374,17 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     {
         if (IsRunning)
         {
-            _status.Info("A script is already running — cancel it first.");
+            _status.Info("A script is already running. Stop it first.");
             return;
         }
         if (IsGroupRunning)
         {
-            _status.Info("A group run is in progress — cancel it first.");
+            _status.Info("A group run is in progress. Stop it first.");
             return;
         }
         if (IsSwitching)
         {
-            _status.Info("Switching database — try again in a moment.");
+            _status.Info("Switching database. Try again in a moment.");
             return;
         }
         if (statements.Count == 0)
@@ -259,6 +397,13 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         GroupRun = null;    // the results of this run replace those of a group run
         ErrorMessage = null;
         NeedsReconnect = false;
+        RunSummary = null;
+        _lastStatements = statements;
+        _lastRunWasGroup = false;
+        _runText = Text;    // the result tabs point into this text
+        _totalStatements = statements.Count;
+        RunStartedAt = DateTime.Now;
+        RunProgressText = statements.Count > 1 ? $"Running statement 1 of {statements.Count}" : "Running…";
         Results.Clear();
         ResultTabs.Clear();
         SelectedResult = null;
@@ -315,10 +460,11 @@ public sealed partial class ScriptTabViewModel : TabViewModel
             // running statement (SQLite finishes it in the background; its late results are dropped).
             await foreach (var r in channel.Reader.ReadAllAsync(ct))
             {
-                var vm = new StatementResultViewModel(++ran, r, maxRows);
+                var vm = new StatementResultViewModel(++ran, r, maxRows) { StartLine = LineOf(_runText, r.Statement.Start) };
                 Results.Add(vm);
                 ResultTabs.Add(vm);
                 SelectedResult = vm;
+                if (ran < _totalStatements) RunProgressText = $"Running statement {ran + 1} of {_totalStatements}";
             }
 
             if (await producer is { } failure) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
@@ -328,7 +474,8 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         }
         catch (OperationCanceledException)
         {
-            _status.Info(ran == 0 ? "Cancelled." : $"Cancelled after {ran} statement(s).");
+            _status.Info(ran == 0 ? "Cancelled." : $"Cancelled after {Plural(ran, "statement")}.");
+            SetRunSummary(cancelled: true);
             ReportResetWhenTheCancelledWorkEnds(started, startedWork);
         }
         catch (ObjectDisposedException) when (_closed)
@@ -352,7 +499,46 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         finally
         {
             _runCts = null;
+            RunStartedAt = null;
+            RunProgressText = null;
             IsRunning = false;
+        }
+    }
+
+    private static string Plural(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n:N0} {noun}s";
+
+    /// <summary>
+    /// The line under the toolbar about a run that had several statements or was cancelled: how far it got, and what was not
+    /// run. A single statement that worked or failed says everything in its own tab, so it gets none.
+    /// </summary>
+    private void SetRunSummary(bool cancelled)
+    {
+        var total = _totalStatements;
+        var ran = Results.Count;
+        var failed = Results.LastOrDefault(r => r.HasError);
+        var ms = (long)Results.Sum(r => r.Duration.TotalMilliseconds);
+        RunSummaryIsCancelled = cancelled;
+        RunSummaryIsError = !cancelled && failed is not null;
+        if (cancelled)
+        {
+            var notRun = total - ran;
+            RunSummary = ran == 0
+                ? "Run cancelled before the first statement finished."
+                : $"Run cancelled after {ran} of {Plural(total, "statement")}" + (notRun > 0 ? $" · {notRun:N0} not run" : "") + ".";
+        }
+        else if (total <= 1)
+        {
+            RunSummary = null;
+        }
+        else if (failed is not null)
+        {
+            var notRun = total - ran;
+            RunSummary = $"Stopped at statement {failed.Index} of {total:N0}" + (notRun > 0 ? $" · {notRun:N0} not run" : "")
+                         + $" · {ms:N0} ms";
+        }
+        else
+        {
+            RunSummary = $"{Plural(total, "statement")} completed · {ms:N0} ms";
         }
     }
 
@@ -378,9 +564,11 @@ public sealed partial class ScriptTabViewModel : TabViewModel
         }
         else
         {
-            _status.Info((ran == 1 ? Results[0].StatusText : $"{ran} statements ran.") + note);
+            var ms = (long)Results.Sum(r => r.Duration.TotalMilliseconds);
+            _status.Info((ran == 1 ? Results[0].StatusText : $"{ran} statements completed in {ms:N0} ms.") + note);
         }
 
+        SetRunSummary(cancelled: false);
         if (reset) ShowReset();
     }
 
@@ -388,6 +576,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     private void ShowReset()
     {
         ErrorMessage = ScriptConnection.ResetMessage;
+        ErrorIsWarning = true;   // a caution: the statements may well have worked
         _status.Error(ScriptConnection.ResetMessage);
     }
 

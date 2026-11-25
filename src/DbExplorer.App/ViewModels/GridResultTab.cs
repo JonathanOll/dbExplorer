@@ -14,6 +14,18 @@ public interface IResultTab
     bool ShowOk { get; }
 
     string? ToolTipText { get; }
+
+    /// <summary>The tab is a run-level grid (Statistics, Messages), not one statement: it gets its own icon.</summary>
+    bool IsGrid { get; }
+
+    /// <summary>The failure icon is shown (a statement that failed in the database; not a blocked one, not a grid).</summary>
+    bool ShowFailure { get; }
+
+    /// <summary>The read-only guard refused this statement (a policy block, shown with a lock instead of the error icon).</summary>
+    bool IsBlocked { get; }
+
+    /// <summary>Spoken name of the tab, with the failure said in words.</summary>
+    string AutomationName { get; }
 }
 
 public enum GridTabKind { Statistics, Messages }
@@ -48,6 +60,24 @@ public sealed class GridResultTab : IResultTab
 
     public bool ShowOk => false;
 
+    public bool IsGrid => true;
+
+    public bool IsBlocked => false;
+
+    public bool ShowFailure => false;
+
+    public string AutomationName => Header;
+
+    /// <summary>The grid has no rows: the view shows <see cref="StatusText"/> as an explanation instead of an empty grid.</summary>
+    public bool IsEmpty => Rows.Count == 0;
+
+    public bool HasRows => Rows.Count > 0;
+
+    /// <summary>Why the grid is empty, said in the middle of the area.</summary>
+    public string EmptyText => Kind == GridTabKind.Statistics
+        ? "The server returned no STATISTICS IO or TIME lines for this run. Statements that read no table report only times."
+        : "The server sent no messages during this run.";
+
     /// <summary>
     /// The two tabs of a run with statistics on: the Statistics table (IO and TIME rows, totals) and the Messages lines.
     /// <paramref name="sources"/> are the statements' messages; a group run names the database of each.
@@ -57,10 +87,8 @@ public sealed class GridResultTab : IResultTab
         var stats = StatisticsReport.BuildStatistics(sources);
         var messages = StatisticsReport.BuildMessages(sources);
 
-        var statsStatus = stats.Rows.Count > 0
-            ? Summary(stats)
-            : "The server returned no STATISTICS IO / TIME lines for this run (statements that read no table report only times).";
-        var messageStatus = messages.Rows.Count == 1 ? "1 line" : $"{messages.Rows.Count.ToString(CultureInfo.InvariantCulture)} lines";
+        var statsStatus = stats.Rows.Count > 0 ? Summary(stats) : "0 rows";
+        var messageStatus = messages.Rows.Count == 1 ? "1 line" : $"{messages.Rows.Count.ToString("N0", CultureInfo.InvariantCulture)} lines";
         return (new GridResultTab(GridTabKind.Statistics, stats, statsStatus,
                     "STATISTICS IO / TIME of the run: one row per table / time line, a Total per statement"),
                 new GridResultTab(GridTabKind.Messages, messages, messageStatus, "Every message the server sent during the run"));

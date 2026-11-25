@@ -1,20 +1,30 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="using:DbExplorer.App.Views"
         x:Class="DbExplorer.App.Views.SqlPreviewDialog"
         Title="Review changes"
         Width="780" Height="520" MinWidth="460" MinHeight="300"
         WindowStartupLocation="CenterOwner">
 
   <DockPanel>
-    <!-- Footer: Cancel is the default and focused button (a stray Enter must never run writes); Apply is a deliberate click -->
+    <!-- Footer: Cancel is the default and focused button (a stray Enter must never run writes); Apply is a deliberate click or Ctrl+Enter -->
     <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxWindowBg}" BorderBrush="{DynamicResource DbxBorder}"
             BorderThickness="0,1,0,0" Padding="20,12">
-      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-        <Button x:Name="ApplyButton" Content="Apply changes" Classes="accent" MinWidth="110" HorizontalContentAlignment="Center"
-                Click="OnApplyClick" />
-        <Button x:Name="CancelButton" Content="Cancel" IsDefault="True" IsCancel="True" MinWidth="90" HorizontalContentAlignment="Center"
-                Click="OnCancelClick" />
-      </StackPanel>
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+          <Button x:Name="ApplyButton" Content="Apply changes" Classes="accent" MinWidth="110" HorizontalContentAlignment="Center"
+                  Click="OnApplyClick" ToolTip.Tip="Run all the statements in one transaction (Ctrl+Enter)" />
+          <Button x:Name="CancelButton" Content="Cancel" IsDefault="True" IsCancel="True" MinWidth="90" HorizontalContentAlignment="Center"
+                  Click="OnCancelClick" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+          <Button x:Name="CopyButton" Content="Copy SQL" Click="OnCopyClick" ToolTip.Tip="Copy all the statements to the clipboard" />
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <Border Classes="kbd"><TextBlock Text="Ctrl+Enter" /></Border>
+            <TextBlock Classes="faint small" Text="applies" VerticalAlignment="Center" />
+          </StackPanel>
+        </StackPanel>
+      </DockPanel>
     </Border>
 
     <!-- Header: what will run, and where -->
@@ -25,6 +35,7 @@
         <StackPanel Grid.Column="1" VerticalAlignment="Center">
           <TextBlock Text="Review changes" FontSize="17" FontWeight="SemiBold" />
           <TextBlock x:Name="Summary" Classes="dim" />
+          <TextBlock x:Name="Breakdown" Classes="dim small" />
         </StackPanel>
         <Border Grid.Column="2" Classes="badge" VerticalAlignment="Center" Padding="9,3" Margin="12,0,0,0">
           <StackPanel Orientation="Horizontal" Spacing="6">
@@ -39,7 +50,7 @@
       <Grid ColumnDefinitions="Auto,*">
         <PathIcon Classes="bi" Data="{StaticResource IconInfo}" VerticalAlignment="Top" Margin="0,1,8,0" />
         <TextBlock Grid.Column="1" TextWrapping="Wrap" FontSize="12"
-                   Text="Display only: values are shown inline here, the real statements run with bound parameters. Everything runs in one transaction; any failure rolls it all back." />
+                   Text="Preview only. Values are shown inline here; the real run uses bound parameters. Everything runs in one transaction: if one statement fails, nothing is written." />
       </Grid>
     </Border>
 
@@ -47,11 +58,16 @@
       <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
         <ItemsControl x:Name="Statements" Margin="20,14">
           <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="x:String">
-              <Border Background="{DynamicResource DbxInputBg}" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="1"
-                      CornerRadius="4" Margin="0,0,0,8" Padding="4">
-                <TextBox Text="{Binding Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent"
-                         FontFamily="{DynamicResource DbxMonoFont}" FontSize="13" MinHeight="0" />
+            <DataTemplate x:DataType="views:StatementItem">
+              <Border Classes="surface" Margin="0,0,0,8" Padding="10,8">
+                <Grid ColumnDefinitions="64,*">
+                  <Border Classes="badge" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,3,0,0"
+                          Classes.warn="{Binding IsUpdate}" Classes.error="{Binding IsDelete}" Classes.success="{Binding IsInsert}">
+                    <TextBlock Text="{Binding Kind}" FontSize="10.5" FontWeight="SemiBold" />
+                  </Border>
+                  <TextBox Grid.Column="1" Text="{Binding Sql, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" Classes="bare"
+                           Background="Transparent" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12.5" MinHeight="0" Padding="2" />
+                </Grid>
               </Border>
             </DataTemplate>
           </ItemsControl.ItemTemplate>

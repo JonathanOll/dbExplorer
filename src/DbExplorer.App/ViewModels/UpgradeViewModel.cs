@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Data.Common;
+using System.Diagnostics;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -23,6 +25,20 @@ public sealed record UpgradeWarningBadge(string Text, string Tip);
 public sealed record UpgradeWarningLine(string ScriptName, ScriptWarning Warning)
 {
     public string Text => $"{ScriptName}: {Warning.Kind} - {Warning.Reason} (line {Warning.Line})";
+}
+
+/// <summary>How a run ended, for the colour and wording of the outcome banner.</summary>
+public enum UpgradeOutcome { None, Success, Partial, Failed, Cancelled }
+
+/// <summary>The scripts of one folder in the preview (the folder name is shown once, then its scripts).</summary>
+public sealed record UpgradeFolderGroup(string Folder, IReadOnlyList<UpgradeScriptRow> Rows);
+
+/// <summary>One script of a finished database, as listed under its "Details".</summary>
+public sealed record UpgradeScriptLine(string Name, ScriptOutcomeState State, string Text)
+{
+    public bool IsDone => State == ScriptOutcomeState.Done;
+    public bool IsFailed => State == ScriptOutcomeState.Failed;
+    public bool IsOther => State is ScriptOutcomeState.Cancelled or ScriptOutcomeState.Skipped;
 }
 
 /// <summary>One script of the preview: its checkbox, its labels and its warnings.</summary>
@@ -124,6 +140,71 @@ public sealed partial class UpgradeMemberViewModel : ObservableObject
     public bool IsFailed => State == MemberState.Failed;
     public bool IsCancelled => State == MemberState.Cancelled;
 
+    // ---- what the card shows while running and after ----
+
+    /// <summary>0..1 through the scripts: the ones already played over all of them (1 once the database is done).</summary>
+    public double ProgressValue => State == MemberState.Done ? 1 : ScriptCount > 0 ? Math.Clamp((ScriptIndex - 1.0) / ScriptCount, 0, 1) : 0;
+
+    /// <summary>Running but the script count is not known yet: the bar is indeterminate.</summary>
+    public bool IsIndeterminate => IsRunning && ScriptCount == 0;
+
+    /// <summary><c>script 3 of 12</c>; empty before the first script.</summary>
+    public string ProgressText => ScriptCount > 0 && ScriptIndex > 0 ? $"script {ScriptIndex} of {ScriptCount}" : "";
+
+    /// <summary>The script being played, for the mono line under the name.</summary>
+    public string CurrentScript => ScriptName ?? "";
+
+    /// <summary>The database failed with a message: the card shows it in the error colour, selectable.</summary>
+    public bool HasError => IsFailed && Error is not null;
+
+    /// <summary>The failure as the status line words it (<c>failed at script: ...</c>).</summary>
+    public string ErrorText => IsFailed ? FailedText() : "";
+
+    /// <summary><c>12 scripts · 4.2 s</c> once done.</summary>
+    public string DoneSummary => IsDone ? DoneText()["done - ".Length..].Replace(" - ", " · ") : "";
+
+    /// <summary>The state as a word for the card's right edge.</summary>
+    public string StateLabel => State switch
+    {
+        MemberState.Pending => "Waiting",
+        MemberState.Running => "Running",
+        MemberState.Done => "Done",
+        MemberState.Cancelled => "Cancelled",
+        _ => "Failed",
+    };
+
+    /// <summary>The scripts of the finished database with their outcome (listed under "Details").</summary>
+    [NotifyPropertyChangedFor(nameof(HasDetails))]
+    [ObservableProperty] private IReadOnlyList<UpgradeScriptLine> _scriptLines = [];
+
+    public bool HasDetails => ScriptLines.Count > 0;
+
+    /// <summary>The "Details" list is open.</summary>
+    [ObservableProperty] private bool _isDetailsOpen;
+
+    /// <summary>Something to know about the database that is not an error (it was listed twice and ran once).</summary>
+    [NotifyPropertyChangedFor(nameof(HasNote))]
+    [ObservableProperty] private string? _note;
+
+    public bool HasNote => Note is not null;
+
+    protected override void OnPropertyChanged(PropertyChangedEventArgs e)
+    {
+        base.OnPropertyChanged(e);
+        if (e.PropertyName is nameof(State) or nameof(ScriptIndex) or nameof(ScriptCount) or nameof(ScriptName) or nameof(Error)
+            or nameof(ScriptsDone) or nameof(Duration))
+        {
+            OnPropertyChanged(nameof(ProgressValue));
+            OnPropertyChanged(nameof(IsIndeterminate));
+            OnPropertyChanged(nameof(ProgressText));
+            OnPropertyChanged(nameof(CurrentScript));
+            OnPropertyChanged(nameof(HasError));
+            OnPropertyChanged(nameof(ErrorText));
+            OnPropertyChanged(nameof(DoneSummary));
+            OnPropertyChanged(nameof(StateLabel));
+        }
+    }
+
     /// <summary>The database has not ended: its Cancel button is live.</summary>
     public bool CanCancel => State is MemberState.Pending or MemberState.Running;
 
@@ -188,7 +269,17 @@ public sealed partial class UpgradeMemberViewModel : ObservableObject
         Duration = result.Duration;
         Error = result.Error;
         State = result.State;
+        Note = result.Note;
+        ScriptLines = [.. result.Scripts.Select(s => new UpgradeScriptLine(s.Name, s.State, LineText(s)))];
     }
+
+    private static string LineText(ScriptOutcome s) => s.State switch
+    {
+        ScriptOutcomeState.Done => $"{s.Duration.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture)} s",
+        ScriptOutcomeState.Failed => s.Error ?? "failed",
+        ScriptOutcomeState.Cancelled => "cancelled",
+        _ => "not run",
+    };
 
     /// <summary>The run was abandoned before this database reported its end.</summary>
     internal void Abandon()
@@ -311,8 +402,99 @@ public sealed partial class UpgradeViewModel : ObservableObject
         BackCommand.NotifyCanExecuteChanged();
         ConfirmRunCommand.NotifyCanExecuteChanged();
         CancelAllCommand.NotifyCanExecuteChanged();
+        RequestStopCommand.NotifyCanExecuteChanged();
         CopyLogCommand.NotifyCanExecuteChanged();
+        if (value != UpgradePhase.Running)
+        {
+            ConfirmingStop = false;
+            IsStopping = false;
+        }
+        foreach (var name in new[]
+                 {
+                     nameof(ChooseDone), nameof(ConfirmDone), nameof(InChoose), nameof(InConfirm), nameof(InRun), nameof(ShowRunReason),
+                     nameof(RunDisabledReason), nameof(OutcomeIsSuccess), nameof(OutcomeIsWarn), nameof(OutcomeIsError), nameof(ShowOverall),
+                     nameof(CanGoBack), nameof(ShowCopyLog), nameof(RunDone), nameof(ShowStopButton), nameof(RunButtonText), nameof(IsDangerRun),
+                 })
+            OnPropertyChanged(name);
     }
+
+    // ---- the steps of the dialog (the stepper in the header) ----
+
+    /// <summary>Step 1 (scripts and target) is the current one.</summary>
+    public bool InChoose => Phase is UpgradePhase.Setup or UpgradePhase.Preview;
+
+    /// <summary>Step 2 (confirmation) is the current one.</summary>
+    public bool InConfirm => Phase == UpgradePhase.Confirm;
+
+    /// <summary>Step 3 (the run and its result) is the current one.</summary>
+    public bool InRun => Phase is UpgradePhase.Running or UpgradePhase.Finished;
+
+    public bool RunDone => Phase == UpgradePhase.Finished;
+
+    public bool ChooseDone => Phase is UpgradePhase.Confirm or UpgradePhase.Running or UpgradePhase.Finished;
+    public bool ConfirmDone => Phase is UpgradePhase.Running or UpgradePhase.Finished;
+
+    // ---- how the run ended ----
+
+    /// <summary>How the finished run ended: picks the colour and the icon of the outcome banner.</summary>
+    [NotifyPropertyChangedFor(nameof(OutcomeIsSuccess), nameof(OutcomeIsWarn), nameof(OutcomeIsError))]
+    [ObservableProperty] private UpgradeOutcome _outcome;
+
+    private bool HasOutcomeMessage => Message is not null && Phase == UpgradePhase.Finished;
+
+    public bool OutcomeIsSuccess => HasOutcomeMessage && Outcome == UpgradeOutcome.Success;
+    public bool OutcomeIsWarn => HasOutcomeMessage && Outcome is UpgradeOutcome.Partial or UpgradeOutcome.Cancelled;
+    public bool OutcomeIsError => HasOutcomeMessage && Outcome == UpgradeOutcome.Failed;
+
+    private UpgradeOutcome OutcomeOfMembers()
+    {
+        var done = Members.Count(m => m.IsDone);
+        var failed = Members.Count(m => m.IsFailed);
+        if (failed > 0) return done > 0 ? UpgradeOutcome.Partial : UpgradeOutcome.Failed;
+        return Members.Any(m => m.IsCancelled) ? UpgradeOutcome.Cancelled : UpgradeOutcome.Success;
+    }
+
+    // ---- the overall progress of the run ----
+
+    private Stopwatch? _clock;
+    private int _tickGeneration;
+
+    /// <summary>Elapsed time of the run, <c>mm:ss</c> (updated every second while running).</summary>
+    [ObservableProperty] private string _elapsedText = "00:00";
+
+    /// <summary>The overall bar shows (while running and after).</summary>
+    public bool ShowOverall => InRun;
+
+    /// <summary><c>2 of 4 databases finished</c>.</summary>
+    public string OverallText
+    {
+        get
+        {
+            var ended = Members.Count(m => !m.CanCancel);
+            return $"{ended} of {Members.Count} {(Members.Count == 1 ? "database" : "databases")} finished";
+        }
+    }
+
+    /// <summary>0..1 over all databases: finished ones count 1, running ones their own progress.</summary>
+    public double OverallProgress => Members.Count == 0 ? 0 : Members.Sum(m => m.CanCancel ? m.ProgressValue : 1.0) / Members.Count;
+
+    private void RefreshOverall()
+    {
+        OnPropertyChanged(nameof(OverallText));
+        OnPropertyChanged(nameof(OverallProgress));
+    }
+
+    private async Task TickAsync(int generation)
+    {
+        while (generation == _tickGeneration && Phase == UpgradePhase.Running && _clock is { } clock)
+        {
+            ElapsedText = FormatElapsed(clock.Elapsed);
+            try { await Task.Delay(500); }
+            catch (Exception) { return; }
+        }
+    }
+
+    private static string FormatElapsed(TimeSpan t) => t.TotalHours >= 1 ? t.ToString(@"h\:mm\:ss") : t.ToString(@"mm\:ss");
 
     // ---- preview ----
 
@@ -351,7 +533,17 @@ public sealed partial class UpgradeViewModel : ObservableObject
     [ObservableProperty] private IReadOnlyList<string> _confirmDatabases = [];
 
     [NotifyCanExecuteChangedFor(nameof(ConfirmRunCommand))]
+    [NotifyPropertyChangedFor(nameof(ConfirmMatches))]
     [ObservableProperty] private string _confirmInput = "";
+
+    partial void OnConfirmInputChanged(string value)
+    {
+        OnPropertyChanged(nameof(RunDisabledReason));
+        OnPropertyChanged(nameof(ShowRunReason));
+    }
+
+    /// <summary>The typed confirmation matches (the green check beside the box).</summary>
+    public bool ConfirmMatches => NeedsTypedConfirmation && string.Equals(ConfirmInput.Trim(), ConfirmToken, StringComparison.OrdinalIgnoreCase);
 
     private bool CanLoad() => Phase is UpgradePhase.Setup or UpgradePhase.Preview;
 
@@ -411,6 +603,8 @@ public sealed partial class UpgradeViewModel : ObservableObject
         ConfirmToken = plan.ConfirmToken;
         Rows.Clear();
         foreach (var item in plan.Items) Rows.Add(new UpgradeScriptRow(item, RecomputeSelection));
+        Groups = [.. Rows.GroupBy(r => r.Folder).Select(g => new UpgradeFolderGroup(g.Key, [.. g]))];
+        OnPropertyChanged(nameof(PlanLabel));
         OnPropertyChanged(nameof(HasRows));
         IgnoredNote = plan.Ignored.Count == 0 ? null : "Ignored (not a .sql file): " + string.Join(", ", plan.Ignored);
         RecomputeSelection();
@@ -423,6 +617,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
     {
         _plan = null;
         Rows.Clear();
+        Groups = [];
         OnPropertyChanged(nameof(HasRows));
         IgnoredNote = null;
         RecomputeSelection();
@@ -459,10 +654,128 @@ public sealed partial class UpgradeViewModel : ObservableObject
         WarningSummary = total == 0 ? "" : $"{total} {(total == 1 ? "warning" : "warnings")}: {string.Join(", ", parts)}";
 
         OnPropertyChanged(nameof(ConfirmHeading));
+        OnPropertyChanged(nameof(TickedText));
+        OnPropertyChanged(nameof(RunDisabledReason));
+        OnPropertyChanged(nameof(ShowRunReason));
+        OnPropertyChanged(nameof(RunButtonText));
+        OnPropertyChanged(nameof(IsDangerRun));
         RequestRunCommand.NotifyCanExecuteChanged();
     }
 
     private bool CanRequestRun() => Phase == UpgradePhase.Preview && SelectedCount > 0 && Rows.All(r => !r.HasLoadError);
+
+    /// <summary>Why the primary button is off: in Preview nothing ticked or an unreadable script, in Confirm the token is not typed yet; null when it is on.</summary>
+    public string? RunDisabledReason
+    {
+        get
+        {
+            if (Phase == UpgradePhase.Confirm)
+                return NeedsTypedConfirmation && !ConfirmMatches ? $"Type {ConfirmToken} in the box to enable the run." : null;
+            if (Phase != UpgradePhase.Preview) return null;
+            if (LoadErrorCount() is > 0 and var errors) return LoadErrorMessage(errors);
+            return SelectedCount == 0 ? "Tick at least one script to continue." : null;
+        }
+    }
+
+    public bool ShowRunReason => RunDisabledReason is not null;
+
+    /// <summary><c>12 of 27 scripts ticked</c> above the script list.</summary>
+    public string TickedText => $"{SelectedCount} of {Rows.Count} {(Rows.Count == 1 ? "script" : "scripts")} ticked";
+
+    /// <summary>The scripts of the preview by version folder (the folder name once, then its files).</summary>
+    [ObservableProperty] private IReadOnlyList<UpgradeFolderGroup> _groups = [];
+
+    /// <summary>The plan's label (<c>Sprint 143</c>), for the confirmation summary.</summary>
+    public string PlanLabel => _plan?.Label ?? "";
+
+    /// <summary>The newest sprint of the catalog, as the placeholder of the sprint box.</summary>
+    public string SprintHint => _catalog.Folders.Select(f => f.Sprint).Where(s => s.HasValue).Select(s => s!.Value).DefaultIfEmpty().Max() is > 0 and var sprint
+        ? sprint.ToString(CultureInfo.InvariantCulture)
+        : "143";
+
+    /// <summary>Ticks every script that can be played.</summary>
+    [RelayCommand]
+    private void SelectAll() => SetTicks(r => r.CanSelect);
+
+    /// <summary>Unticks every script.</summary>
+    [RelayCommand]
+    private void SelectNone() => SetTicks(_ => false);
+
+    /// <summary>Ticks the scripts that do not target specific servers (the default after a load).</summary>
+    [RelayCommand]
+    private void SelectNonProduction() => SetTicks(r => r.CanSelect && !r.IsProduction);
+
+    private void SetTicks(Func<UpgradeScriptRow, bool> want)
+    {
+        foreach (var row in Rows) row.IsSelected = want(row);
+    }
+
+    /// <summary>The confirmation button: a verb and what it does (<c>Run 9 scripts on 3 databases</c>).</summary>
+    public string RunButtonText
+    {
+        get
+        {
+            var scripts = $"{SelectedCount} {(SelectedCount == 1 ? "script" : "scripts")}";
+            var count = (_confirmedTarget ?? SelectedTarget)?.Members.DistinctBy(c => c.Id).Count() ?? 0;
+            return count == 0 ? $"Run {scripts}" : $"Run {scripts} on {count} {(count == 1 ? "database" : "databases")}";
+        }
+    }
+
+    /// <summary>The run touches several databases or Production scripts: the run button is the red one.</summary>
+    public bool IsDangerRun => NeedsTypedConfirmation || ProductionSelectedCount > 0;
+
+    /// <summary>Back is offered in the confirmation (it sits left of the primary button).</summary>
+    public bool CanGoBack => Phase == UpgradePhase.Confirm;
+
+    /// <summary>The log can be copied or saved (after the run).</summary>
+    public bool ShowCopyLog => Phase == UpgradePhase.Finished;
+
+    // ---- stopping a run: asked first, inside the window ----
+
+    /// <summary>"Stop all" was pressed (or the window closed): the dialog asks before interrupting the databases.</summary>
+    [NotifyPropertyChangedFor(nameof(ShowStopButton))]
+    [ObservableProperty] private bool _confirmingStop;
+
+    /// <summary>Stopping is under way (the databases are being interrupted).</summary>
+    [NotifyPropertyChangedFor(nameof(ShowStopButton))]
+    [ObservableProperty] private bool _isStopping;
+
+    /// <summary>The "Stop all" button shows (not while asking, not while stopping).</summary>
+    public bool ShowStopButton => IsRunning && !ConfirmingStop;
+
+    private bool CanRequestStop() => Phase == UpgradePhase.Running && !IsStopping;
+
+    /// <summary>Asks to stop the run: the window shows "Stop the upgrade?" with its buttons. Nothing is interrupted yet.</summary>
+    [RelayCommand(CanExecute = nameof(CanRequestStop))]
+    private void RequestStop()
+    {
+        if (Phase == UpgradePhase.Running) ConfirmingStop = true;
+    }
+
+    /// <summary>Keeps the run going after "Stop all?".</summary>
+    [RelayCommand]
+    private void KeepRunning() => ConfirmingStop = false;
+
+    /// <summary>The user confirmed: every database is cancelled.</summary>
+    [RelayCommand]
+    private void ConfirmStop()
+    {
+        ConfirmingStop = false;
+        CancelAll();
+    }
+
+    partial void OnMessageChanged(string? value)
+    {
+        OnPropertyChanged(nameof(OutcomeIsSuccess));
+        OnPropertyChanged(nameof(OutcomeIsWarn));
+        OnPropertyChanged(nameof(OutcomeIsError));
+    }
+
+    partial void OnSelectedTargetChanged(UpgradeTarget? value)
+    {
+        OnPropertyChanged(nameof(RunButtonText));
+        OnPropertyChanged(nameof(IsDangerRun));
+    }
 
     /// <summary>
     /// "Run...": checks the ticks and the target (read-only and engine rules) and moves to the confirmation. A refusal says why in
@@ -539,7 +852,11 @@ public sealed partial class UpgradeViewModel : ObservableObject
         _ignoreProgress = false;
         using var cts = _runCts = new CancellationTokenSource();
         var ct = cts.Token;
+        _clock = Stopwatch.StartNew();
+        ElapsedText = "00:00";
+        RefreshOverall();
         Phase = UpgradePhase.Running;
+        _ = TickAsync(++_tickGeneration);
 
         // One resolve per database, started here on the UI thread.
         var sessions = new Dictionary<Guid, Task<Session?>>();
@@ -578,6 +895,8 @@ public sealed partial class UpgradeViewModel : ObservableObject
                 foreach (var member in Members) member.Abandon();
                 Log = AbandonedLog(label);
                 Message = "Upgrade cancelled: some databases were still stopping and may be partly upgraded.";
+                Outcome = UpgradeOutcome.Cancelled;
+                EndClock();
                 Phase = UpgradePhase.Finished;
                 return;
             }
@@ -586,6 +905,8 @@ public sealed partial class UpgradeViewModel : ObservableObject
                 Members.FirstOrDefault(m => m.Id == result.Connection.Id)?.Complete(result);
             Log = UpgradeLog.Format(label, results);
             Message = Summary();
+            Outcome = OutcomeOfMembers();
+            EndClock();
             Phase = UpgradePhase.Finished;
         }
         catch (UpgradeRefusedException refused)
@@ -599,6 +920,8 @@ public sealed partial class UpgradeViewModel : ObservableObject
             foreach (var member in Members) member.Abandon();
             Log = AbandonedLog(label);
             Message = $"The upgrade failed: {ErrorText.Describe(e)}";
+            Outcome = UpgradeOutcome.Failed;
+            EndClock();
             Phase = UpgradePhase.Finished;
         }
         finally
@@ -635,7 +958,18 @@ public sealed partial class UpgradeViewModel : ObservableObject
     private string AbandonedLog(string label) =>
         label + string.Concat(Members.Select(m => $"\n== {m.Name}: {m.StatusText}"));
 
-    private void ApplyProgress(UpgradeProgress p) => Members.FirstOrDefault(m => m.Id == p.ConnectionId)?.Apply(p);
+    private void ApplyProgress(UpgradeProgress p)
+    {
+        Members.FirstOrDefault(m => m.Id == p.ConnectionId)?.Apply(p);
+        RefreshOverall();
+    }
+
+    private void EndClock()
+    {
+        _clock?.Stop();
+        if (_clock is { } clock) ElapsedText = FormatElapsed(clock.Elapsed);
+        RefreshOverall();
+    }
 
     private Task<Session?> StartResolve(Guid id, CancellationToken ct)
     {
@@ -668,8 +1002,10 @@ public sealed partial class UpgradeViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanCancelAll))]
     private void CancelAll()
     {
+        if (Phase == UpgradePhase.Running) IsStopping = true;
         try { _runCts?.Cancel(); }
         catch (ObjectDisposedException) { /* the run just ended */ }
+        RequestStopCommand.NotifyCanExecuteChanged();
     }
 
     private void CancelMember(Guid id)
@@ -677,6 +1013,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
         if (Phase != UpgradePhase.Running || _ignoreProgress) return;
         _runner?.CancelMember(id);
         Members.FirstOrDefault(m => m.Id == id)?.MarkCancelled();
+        RefreshOverall();
     }
 
     private bool CanCopyLog() => Phase == UpgradePhase.Finished;

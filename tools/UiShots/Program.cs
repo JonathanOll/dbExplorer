@@ -355,7 +355,9 @@ internal static class Scenes
 
     private static void Save(TopLevel window, string path)
     {
-        for (var i = 0; i < 3; i++) { window.UpdateLayout(); Pump(); }
+        // Several passes with a pause: the headless renderer otherwise hands back a frame from before the last layout settled
+        // (wrapped or missing tabs, clipped texts) and the output differs from one run to the next.
+        for (var i = 0; i < 12; i++) { window.UpdateLayout(); Pump(); Thread.Sleep(40); }
         var frame = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("no frame captured");
         frame.Save(path);
     }
@@ -627,9 +629,11 @@ internal static class Scenes
     private static async Task<Window?> ConfirmDialog(Demo d)
     {
         await Open(d);
+        // The destructive look of ConfirmAsync(ConfirmRequest): red verb button, red icon, Cancel is the default.
         var window = DbExplorer.App.DialogShell.Create("Delete connection", "IconWarning",
-            DbExplorer.App.DialogShell.Message("Delete connection 'Billing'?"),
-            [DbExplorer.App.DialogShell.Button("Yes", isDefault: true, primary: true), DbExplorer.App.DialogShell.Button("No", isCancel: true)]);
+            DbExplorer.App.DialogShell.Message("Delete connection 'Billing'?", "Its saved password is removed. Open tabs on it are closed."),
+            [DbExplorer.App.DialogShell.Button("Delete", danger: true), DbExplorer.App.DialogShell.Button("Cancel", isDefault: true, isCancel: true)],
+            tone: DbExplorer.App.ViewModels.DialogTone.Danger);
         window.Show(d.Window);
         await Settle();
         return window;

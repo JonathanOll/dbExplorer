@@ -27,6 +27,9 @@ public partial class MainWindow : Window
         tree.PointerReleased += (_, _) => _dragStart = null;
         tree.AddHandler(DragDrop.DragOverEvent, OnTreeDragOver);
         tree.AddHandler(DragDrop.DropEvent, OnTreeDrop);
+        tree.AddHandler(DragDrop.DragLeaveEvent, (_, _) => ClearDropTarget());
+        this.FindControl<TextBox>("FilterBox")!.KeyDown += OnFilterKeyDown;
+        this.FindControl<GridSplitter>("NavSplitter")!.DoubleTapped += OnNavigatorSplitterDoubleTapped;
         this.FindControl<TabControl>("DocTabs")!.AddHandler(PointerReleasedEvent, OnDocTabsPointerReleased, RoutingStrategies.Tunnel);
     }
 
@@ -186,6 +189,14 @@ public partial class MainWindow : Window
     // Their commands catch their own exceptions, so nothing can escape from here.
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
+        // F5 with the navigator focused refreshes the schema; elsewhere it belongs to the table tab (MainShortcuts)
+        if (e.Key == Key.F5 && e.KeyModifiers == KeyModifiers.None
+            && this.FindControl<TreeView>("ConnectionTree") is { IsKeyboardFocusWithin: true } && Tree is { } navigator)
+        {
+            navigator.RefreshSelectedCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
         if (DataContext is MainViewModel main && MainShortcuts.Handle(main, e.Key, e.KeyModifiers, CommitOpenCellEdit)) e.Handled = true;
     }
 
@@ -209,9 +220,97 @@ public partial class MainWindow : Window
 
     private async void OnTreeKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter || sender is not TreeView { SelectedItem: { } node }) return;
-        e.Handled = true;
-        await Safe(() => Activate(node));
+        if (sender is not TreeView { SelectedItem: { } node }) return;
+        switch (e.Key, e.KeyModifiers)
+        {
+            case (Key.Enter, KeyModifiers.None):
+                e.Handled = true;
+                await Safe(() => Activate(node));
+                break;
+            case (Key.F2, KeyModifiers.None):
+                e.Handled = true;
+                Edit(node);
+                break;
+            case (Key.Delete, KeyModifiers.None):
+                e.Handled = true;
+                Delete(node);
+                break;
+            case (Key.F, KeyModifiers.Control):
+                e.Handled = true;
+                this.FindControl<TextBox>("FilterBox")?.Focus();
+                break;
+        }
+    }
+
+    // F2 / Delete on the selected node: the same commands (and confirmations) as the context menu.
+    private void Edit(object node)
+    {
+        if (Tree is not { } tree) return;
+        switch (node)
+        {
+            case ConnectionNodeViewModel c: tree.EditConnectionCommand.Execute(c); break;
+            case FolderNodeViewModel f: tree.RenameFolderCommand.Execute(f); break;
+            case GroupNodeViewModel g: tree.RenameGroupCommand.Execute(g.Group); break;
+        }
+    }
+
+    private void Delete(object node)
+    {
+        if (Tree is not { } tree) return;
+        switch (node)
+        {
+            case ConnectionNodeViewModel c: tree.DeleteConnectionCommand.Execute(c); break;
+            case FolderNodeViewModel f: tree.DeleteFolderCommand.Execute(f); break;
+            case GroupNodeViewModel g: tree.DeleteGroupCommand.Execute(g.Group); break;
+            case GroupMemberNodeViewModel m: tree.RemoveMemberCommand.Execute(m); break;
+        }
+    }
+
+    // In the filter box: Escape clears it, Down goes into the tree.
+    private void OnFilterKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && Tree is { HasFilter: true } tree)
+        {
+            tree.ClearFilter();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Down)
+        {
+            var list = this.FindControl<TreeView>("ConnectionTree")!;
+            if (list.SelectedItem is null && Tree?.Nodes.FirstOrDefault(n => n.IsShown) is { } first) list.SelectedItem = first;
+            list.Focus();
+            e.Handled = true;
+        }
+    }
+
+    private void OnNavigatorSplitterDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is Control { Parent: Grid grid }) grid.ColumnDefinitions[0].Width = new GridLength(304);
+    }
+
+    private void OnShortcutsScrimPressed(object? sender, PointerPressedEventArgs e) =>
+        (DataContext as MainViewModel)?.HideShortcutsCommand.Execute(null);
+
+    // a click inside the card must not reach the scrim
+    private void OnShortcutsCardPressed(object? sender, PointerPressedEventArgs e) => e.Handled = true;
+
+    private async void OnOpenTableNode(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is TableNodeViewModel table) await Safe(() => Activate(table));
+    }
+
+    // "Copy name" of a connection or a table.
+    private async void OnCopyNodeName(object? sender, RoutedEventArgs e)
+    {
+        var text = (sender as Control)?.DataContext switch
+        {
+            ConnectionNodeViewModel c => c.Title,
+            TableNodeViewModel t => t.Table.Ref.ToString(),
+            _ => null,
+        };
+        if (text is null || TopLevel.GetTopLevel(this)?.Clipboard is not { } clipboard) return;
+        await Safe(() => clipboard.SetTextAsync(text));
+        (DataContext as MainViewModel)?.Status.Info($"Copied {text}.");
     }
 
     private async Task Activate(object node)
@@ -268,10 +367,51 @@ public partial class MainWindow : Window
         });
     }
 
-    private void OnTreeDragOver(object? sender, DragEventArgs e) =>
-        e.DragEffects = e.DataTransfer.Contains(ConnectionFormat) && !IsInGroupsSection(e.Source) ? DragDropEffects.Move : DragDropEffects.None;
+    private TreeViewItem? _dropTarget;
 
-    /// <summary>True over the Groups section (header, group or member): a drop there must not move the connection to the root.</summary>
+    // Over a folder (or a connection inside one): move into it. Over a group (or one of its members): add to it.
+    // Over the Groups header: refused. Elsewhere: the root. The container that would receive the drop is outlined.
+    private void OnTreeDragOver(object? sender, DragEventArgs e)
+    {
+        if (!e.DataTransfer.Contains(ConnectionFormat))
+        {
+            e.DragEffects = DragDropEffects.None;
+            ClearDropTarget();
+            return;
+        }
+
+        var target = DropContainerAt(e.Source);
+        e.DragEffects = target?.DataContext switch
+        {
+            FolderNodeViewModel => DragDropEffects.Move,
+            GroupNodeViewModel => DragDropEffects.Link,
+            _ when IsInGroupsSection(e.Source) => DragDropEffects.None,
+            _ => DragDropEffects.Move,
+        };
+        SetDropTarget(e.DragEffects == DragDropEffects.None ? null : target);
+    }
+
+    private void SetDropTarget(TreeViewItem? item)
+    {
+        if (ReferenceEquals(item, _dropTarget)) return;
+        _dropTarget?.Classes.Remove("drop");
+        _dropTarget = item;
+        _dropTarget?.Classes.Add("drop");
+    }
+
+    private void ClearDropTarget() => SetDropTarget(null);
+
+    /// <summary>The folder or group container a drop at the visual would land in; null for the root.</summary>
+    private static TreeViewItem? DropContainerAt(object? source)
+    {
+        for (var item = (source as Visual)?.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+             item is not null;
+             item = item.FindAncestorOfType<TreeViewItem>())
+            if (item.DataContext is FolderNodeViewModel or GroupNodeViewModel) return item;
+        return null;
+    }
+
+    /// <summary>True over the Groups section (header, group or member).</summary>
     private static bool IsInGroupsSection(object? source)
     {
         for (var item = (source as Visual)?.FindAncestorOfType<TreeViewItem>(includeSelf: true);
@@ -283,13 +423,22 @@ public partial class MainWindow : Window
 
     private void OnTreeDrop(object? sender, DragEventArgs e)
     {
+        ClearDropTarget();
+        if (Tree is not { } tree || e.DataTransfer.TryGetValue(ConnectionFormat) is not { } text || !Guid.TryParse(text, out var id)) return;
+        var connection = tree.Config.Connections.FirstOrDefault(c => c.Id == id);
+
+        if (DropContainerAt(e.Source)?.DataContext is GroupNodeViewModel group)
+        {
+            e.Handled = true;
+            if (connection is not null && tree.AddToGroup(connection, group.Group))
+                (DataContext as MainViewModel)?.Status.Success($"Added {connection.Name} to group {group.Group.Name}.");
+            return;
+        }
         if (IsInGroupsSection(e.Source))
         {
             e.Handled = true;
             return;
         }
-        if (Tree is not { } tree || e.DataTransfer.TryGetValue(ConnectionFormat) is not { } text || !Guid.TryParse(text, out var id)) return;
-        var connection = tree.Config.Connections.FirstOrDefault(c => c.Id == id);
         if (connection is null) return;
 
         var folder = DropTargetAt(e.Source) switch

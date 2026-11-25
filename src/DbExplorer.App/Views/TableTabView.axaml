@@ -10,26 +10,23 @@
       <Setter Property="AutoGenerateColumns" Value="False" />
       <Setter Property="GridLinesVisibility" Value="Horizontal" />
       <Setter Property="CanUserResizeColumns" Value="True" />
-      <Setter Property="FontSize" Value="12.5" />
       <Setter Property="RowBackground" Value="Transparent" />
       <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
       <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
     </Style>
     <Style Selector="DataGrid.structure DataGridColumnHeader">
       <Setter Property="Padding" Value="10,0,6,0" />
-      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="MinHeight" Value="30" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
-    <Style Selector="DataGrid.structure DataGridRow"><Setter Property="MinHeight" Value="26" /></Style>
-    <Style Selector="DataGrid.structure DataGridCell"><Setter Property="MinHeight" Value="26" /><Setter Property="FontSize" Value="12.5" /></Style>
     <Style Selector="DataGrid.structure TextBlock"><Setter Property="Margin" Value="10,0" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
+    <Style Selector="DataGrid.structure Border.badge TextBlock"><Setter Property="Margin" Value="0" /></Style>
+    <Style Selector="TextBlock.req"><Setter Property="FontWeight" Value="SemiBold" /></Style>
     <Style Selector="Button.link"><Setter Property="Foreground" Value="{DynamicResource DbxLink}" /></Style>
-    <Style Selector="Border.structCard">
-      <Setter Property="BorderBrush" Value="{DynamicResource DbxBorder}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="ClipToBounds" Value="True" />
-    </Style>
+    <Style Selector="PathIcon.keyIcon"><Setter Property="Foreground" Value="{DynamicResource DbxIconKey}" /></Style>
+    <Style Selector="PathIcon.linkIcon"><Setter Property="Foreground" Value="{DynamicResource DbxLink}" /></Style>
+    <!-- rows shown while a reload runs over them: dimmed and inert -->
+    <Style Selector="views|ResultGrid.reloading"><Setter Property="Opacity" Value="0.55" /><Setter Property="IsHitTestVisible" Value="False" /></Style>
   </UserControl.Styles>
 
   <DockPanel>
@@ -46,7 +43,7 @@
         <Button Grid.Column="2" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRefresh}" Content="Reload" Margin="8,0,0,0"
                 Command="{Binding ReloadCommand}" IsVisible="{Binding NeedsReload}" />
         <Button Grid.Column="3" Classes="close" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}" Margin="4,0,0,0"
-                Command="{Binding DismissErrorCommand}" ToolTip.Tip="Dismiss" />
+                Command="{Binding DismissErrorCommand}" ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss the error" />
       </Grid>
     </Border>
     <!-- Cell rejected by validation -->
@@ -56,21 +53,21 @@
         <PathIcon Classes="bi" Data="{StaticResource IconWarning}" Margin="0,0,8,0" VerticalAlignment="Center" />
         <TextBlock Grid.Column="1" Text="{Binding CellError}" TextWrapping="Wrap" VerticalAlignment="Center" />
         <Button Grid.Column="2" Classes="close" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}" Margin="4,0,0,0"
-                Command="{Binding DismissCellErrorCommand}" ToolTip.Tip="Dismiss" />
+                Command="{Binding DismissCellErrorCommand}" ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss the cell error" />
       </Grid>
     </Border>
-    <!-- Informational notice -->
+    <!-- Informational notice (a "Saved" notice goes away by itself) -->
     <Border DockPanel.Dock="Top" Classes="banner info"
             IsVisible="{Binding Notice, Converter={x:Static ObjectConverters.IsNotNull}}">
       <Grid ColumnDefinitions="Auto,*,Auto">
         <PathIcon Classes="bi" Data="{StaticResource IconInfo}" Margin="0,0,8,0" VerticalAlignment="Center" />
         <TextBlock Grid.Column="1" Text="{Binding Notice}" TextWrapping="Wrap" VerticalAlignment="Center" />
         <Button Grid.Column="2" Classes="close" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}" Margin="4,0,0,0"
-                Command="{Binding DismissNoticeCommand}" ToolTip.Tip="Dismiss" />
+                Command="{Binding DismissNoticeCommand}" ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss the notice" />
       </Grid>
     </Border>
-    <!-- IsIndeterminate follows IsLoading: a hidden-but-indeterminate bar keeps its animation (and the whole view) alive -->
-    <ProgressBar DockPanel.Dock="Top" IsIndeterminate="{Binding IsLoading}" Height="3" IsVisible="{Binding IsLoading}" />
+    <!-- IsIndeterminate follows IsBusy: a hidden-but-indeterminate bar keeps its animation (and the whole view) alive -->
+    <ProgressBar DockPanel.Dock="Top" Classes="thin" IsIndeterminate="{Binding IsBusy}" IsVisible="{Binding IsBusy}" />
 
     <TabControl x:Name="SubTabs" Theme="{StaticResource DbxSubTabControl}" ItemContainerTheme="{StaticResource DbxSubTabItem}">
       <TabItem>
@@ -81,69 +78,185 @@
           </StackPanel>
         </TabItem.Header>
         <DockPanel>
-          <!-- Toolbar: reload and paging | count | editing | key and read-only state. Edits are only staged; Save shows the SQL first. -->
+          <!-- Toolbar: actions on the left (reload, filters, add, delete), the state of editing on the right (key, read-only badge).
+               Paging, count and timing live in the status strip under the grid; saving in the pending-changes bar. -->
           <Border DockPanel.Dock="Top" Classes="toolbar">
-            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRefresh}" Command="{Binding RefreshCommand}"
-                      ToolTip.Tip="Reload this page (F5)" />
-              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconChevronLeft}" Command="{Binding PrevPageCommand}"
-                      IsEnabled="{Binding !!PageIndex}" ToolTip.Tip="Previous page" />
-              <TextBlock Text="{Binding RangeText}" MinWidth="104" TextAlignment="Center" VerticalAlignment="Center" Margin="2,0"
-                         FontWeight="SemiBold" FontSize="12.5" />
-              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconChevronRight}" Command="{Binding NextPageCommand}"
-                      IsEnabled="{Binding HasNextPage}" ToolTip.Tip="Next page" />
-              <Border Classes="vsep" />
-              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconCount}" Content="Count" Command="{Binding CountCommand}"
-                      ToolTip.Tip="Count all matching rows (runs only when clicked)" />
-              <TextBlock Classes="dim small" Text="{Binding ElapsedText}" VerticalAlignment="Center" Margin="4,0,0,0" />
-              <Border Classes="vsep" />
-              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconAdd}" Content="+ Row" Click="OnAddRowClick"
-                      IsEnabled="{Binding CanInsert}" ToolTip.Tip="{Binding AddRowTip}" ToolTip.ShowOnDisabled="True" />
-              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconDelete}" Content="Delete row" Click="OnDeleteRowsClick"
-                      IsEnabled="{Binding CanEdit}" ToolTip.Tip="{Binding DeleteRowTip}" ToolTip.ShowOnDisabled="True" />
-              <Button Theme="{StaticResource DbxToolButton}" Classes="tint" Tag="{StaticResource IconSave}" Content="Save"
-                      Command="{Binding ReviewAndSaveCommand}" IsEnabled="{Binding HasPendingEdits}"
-                      ToolTip.Tip="Review the SQL, then apply all pending changes in one transaction (Ctrl+S)" />
-              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconUndo}" Content="Revert" Command="{Binding RevertCommand}"
-                      IsEnabled="{Binding HasPendingEdits}" ToolTip.Tip="Discard all pending changes" />
-              <TextBlock Text="{Binding PendingText}" VerticalAlignment="Center" FontWeight="SemiBold" Margin="6,0,0,0"
-                         Foreground="{DynamicResource DbxAccent}" />
-              <Border Classes="vsep" IsVisible="{Binding CanDefineKey}" />
-              <Button Theme="{StaticResource DbxToolButton}" Classes="tint" Tag="{StaticResource IconKey}" Content="Define key…"
-                      Command="{Binding DefineKeyCommand}" IsVisible="{Binding CanDefineKey}"
-                      ToolTip.Tip="Choose the columns that identify a row, so this table can be edited" />
-              <Border Classes="badge warn" Margin="8,0,0,0" IsVisible="{Binding EditBadge, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <StackPanel Orientation="Horizontal" Spacing="4">
-                  <PathIcon Data="{StaticResource IconLock}" Width="10" Height="10" />
-                  <TextBlock Text="{Binding EditBadge}" FontSize="11.5" />
-                </StackPanel>
-              </Border>
-            </WrapPanel>
+            <Grid ColumnDefinitions="*,Auto">
+              <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRefresh}" Command="{Binding RefreshCommand}"
+                        ToolTip.Tip="Reload this page (F5)" AutomationProperties.Name="Reload this page" />
+                <ToggleButton x:Name="FilterToggle" Classes="segment" IsChecked="True" Margin="4,0,0,0" MinHeight="28" MinWidth="116"
+                              ToolTip.Tip="Show or hide the filter boxes and the WHERE row (Ctrl+F focuses the WHERE box)"
+                              AutomationProperties.Name="Show the filters" Click="OnFilterToggleClick">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Data="{StaticResource IconFilter}" Width="13" Height="13" />
+                    <TextBlock Text="{Binding FiltersLabel}" MinWidth="76" />
+                  </StackPanel>
+                </ToggleButton>
+                <Border Classes="vsep" />
+                <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconAdd}" Content="+ Row" Click="OnAddRowClick"
+                        IsEnabled="{Binding CanInsert}" ToolTip.Tip="{Binding AddRowTip}" ToolTip.ShowOnDisabled="True" />
+                <Button x:Name="DeleteButton" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconDelete}" Content="Delete row"
+                        Click="OnDeleteRowsClick" IsEnabled="{Binding CanEdit}" ToolTip.Tip="{Binding DeleteRowTip}" ToolTip.ShowOnDisabled="True" />
+              </WrapPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="8,0,0,0">
+                <Button Theme="{StaticResource DbxToolButton}" Classes="tint" Tag="{StaticResource IconKey}" Content="Define key…"
+                        Command="{Binding DefineKeyCommand}" IsVisible="{Binding CanDefineKey}"
+                        ToolTip.Tip="Choose the columns that identify a row, so this table can be edited" />
+                <Border Classes="badge warn" IsVisible="{Binding EditBadge, Converter={x:Static ObjectConverters.IsNotNull}}"
+                        ToolTip.Tip="{Binding EditBadgeTip}">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <PathIcon Data="{StaticResource IconLock}" Width="10" Height="10" />
+                    <TextBlock Text="{Binding EditBadge}" FontSize="11.5" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </Grid>
           </Border>
 
           <!-- Raw WHERE: appended to the column filters with AND -->
-          <Border DockPanel.Dock="Top" Background="{DynamicResource DbxContentBg}" BorderBrush="{DynamicResource DbxBorderSubtle}"
-                  BorderThickness="0,0,0,1" Padding="8,5">
+          <Border x:Name="WhereRow" DockPanel.Dock="Top" Background="{DynamicResource DbxContentBg}" BorderBrush="{DynamicResource DbxBorderSubtle}"
+                  BorderThickness="0,0,0,1" Padding="8,6">
             <Grid ColumnDefinitions="Auto,*,Auto">
-              <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,8,0" VerticalAlignment="Center">
-                <PathIcon Classes="dim" Data="{StaticResource IconFilter}" />
+              <StackPanel Orientation="Horizontal" Spacing="6" Margin="4,0,8,0" VerticalAlignment="Center">
                 <TextBlock Classes="dim" Text="WHERE" FontWeight="SemiBold" FontSize="12" />
               </StackPanel>
-              <TextBox Grid.Column="1" Text="{Binding RawWhere}" FontFamily="{DynamicResource DbxMonoFont}"
-                       Watermark="WHERE clause, e.g. status = 'A' AND id > 10"
-                       ToolTip.Tip="One SQL condition, appended to the filters with AND. Statement separators and write statements are refused.">
+              <TextBox x:Name="WhereBox" Grid.Column="1" Text="{Binding RawWhere}" FontFamily="{DynamicResource DbxMonoFont}"
+                       Watermark="status = 'A' AND id > 10" Padding="10,0,32,0"
+                       AutomationProperties.Name="WHERE condition"
+                       ToolTip.Tip="One SQL condition, appended to the column filters with AND. Statement separators and write statements are refused.">
                 <TextBox.KeyBindings>
                   <KeyBinding Gesture="Enter" Command="{Binding ApplyFiltersCommand}" />
                 </TextBox.KeyBindings>
               </TextBox>
-              <Button Grid.Column="2" Theme="{StaticResource DbxToolButton}" Classes="accent" Tag="{StaticResource IconPlay}" Content="Apply"
-                      Margin="6,0,0,0" MinHeight="28" Command="{Binding ApplyFiltersCommand}"
-                      ToolTip.Tip="Apply the column filters and the WHERE clause (Enter)" />
+              <!-- Over the right end of the box, a fixed size: it can come and go without the layout around it having to follow -->
+              <Button Grid.Column="1" Classes="ghost" Focusable="False" Width="22" Height="22" MinHeight="0" Padding="0" Margin="0,0,5,0"
+                      HorizontalAlignment="Right" VerticalAlignment="Center"
+                      Command="{Binding ClearWhereCommand}" ToolTip.Tip="Clear the WHERE condition"
+                      AutomationProperties.Name="Clear the WHERE condition"
+                      IsVisible="{Binding RawWhere, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <PathIcon Data="{StaticResource IconClose}" Width="9" Height="9" />
+              </Button>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="8,0,0,0" VerticalAlignment="Center">
+                <TextBlock Classes="faint small" Text="{Binding NotAppliedText}" VerticalAlignment="Center" MinWidth="92" TextAlignment="Right" />
+                <Button Classes="accent" Content="Apply filters" Command="{Binding ApplyFiltersCommand}"
+                        ToolTip.Tip="Apply the column filters and the WHERE condition (Enter)" />
+              </StackPanel>
             </Grid>
           </Border>
 
-          <views:ResultGrid x:Name="DataGridView" Columns="{Binding GridColumns}" ItemsSource="{Binding Rows}"
-                            Features="{Binding}" Editing="{Binding}" />
+          <!-- Applied filters, one chip each: the rows on screen are narrowed by these -->
+          <Border DockPanel.Dock="Top" Classes="toolbar" Padding="8,4" MinHeight="0" IsVisible="{Binding HasActiveFilters}">
+            <DockPanel>
+              <Button DockPanel.Dock="Right" Classes="ghost" Content="Clear all" Command="{Binding ClearFiltersCommand}" VerticalAlignment="Center"
+                      ToolTip.Tip="Remove every filter and the WHERE condition" />
+              <ItemsControl ItemsSource="{Binding FilterChips}" VerticalAlignment="Center">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:FilterChip">
+                    <Border Classes="badge" Margin="0,2,6,2" Padding="9,2,3,2">
+                      <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="{Binding Label}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12" MaxWidth="320"
+                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <Button Classes="ghost" Focusable="True" Width="18" Height="18" MinHeight="0" Padding="0" Command="{Binding RemoveCommand}"
+                                ToolTip.Tip="{Binding RemoveTip}" AutomationProperties.Name="{Binding RemoveTip}">
+                          <PathIcon Data="{StaticResource IconClose}" Width="8" Height="8" />
+                        </Button>
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </DockPanel>
+          </Border>
+
+          <!-- The last load failed but older rows are still shown -->
+          <Border DockPanel.Dock="Top" Classes="banner warn" IsVisible="{Binding ShowStaleRows}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <PathIcon Classes="bi" Data="{StaticResource IconWarning}" Margin="0,0,8,0" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" VerticalAlignment="Center" TextWrapping="Wrap"
+                         Text="These rows may be out of date: the last load did not complete." />
+              <Button Grid.Column="2" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRefresh}" Content="Reload"
+                      Command="{Binding ReloadCommand}" />
+            </Grid>
+          </Border>
+
+          <!-- Status strip: paging, count, timing, selection -->
+          <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxToolbarBg}" BorderBrush="{DynamicResource DbxBorderSubtle}"
+                  BorderThickness="0,1,0,0" Padding="6,2" MinHeight="34">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconChevronLeft}" Command="{Binding PrevPageCommand}"
+                        IsEnabled="{Binding !!PageIndex}" ToolTip.Tip="Previous page (Alt+Left)" AutomationProperties.Name="Previous page" />
+                <TextBlock Text="{Binding RangeText}" MinWidth="150" TextAlignment="Center" VerticalAlignment="Center" Margin="2,0"
+                           FontWeight="SemiBold" FontSize="12.5" />
+                <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconChevronRight}" Command="{Binding NextPageCommand}"
+                        IsEnabled="{Binding HasNextPage}" ToolTip.Tip="Next page (Alt+Right)" AutomationProperties.Name="Next page" />
+                <Border Classes="vsep" />
+                <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconCount}" Content="Count rows" Command="{Binding CountCommand}"
+                        IsVisible="{Binding TotalCount, Converter={x:Static ObjectConverters.IsNull}}"
+                        ToolTip.Tip="Count all the matching rows (runs only when clicked)" />
+                <PathIcon Classes="spin dim" Data="{StaticResource IconRefresh}" Width="13" Height="13" Margin="6,0,0,0" VerticalAlignment="Center"
+                          IsVisible="{Binding CountCommand.IsRunning}" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Margin="12,0,6,0">
+                <TextBlock x:Name="SelectionText" Classes="dim small" VerticalAlignment="Center" />
+                <PathIcon Classes="spin dim" Data="{StaticResource IconRefresh}" Width="12" Height="12" VerticalAlignment="Center"
+                          IsVisible="{Binding IsLoading}" />
+                <TextBlock Classes="dim small" Text="{Binding ElapsedText}" VerticalAlignment="Center"
+                           ToolTip.Tip="How long the last page took to load" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- Pending changes: what is waiting to be saved. Saving shows the SQL first. -->
+          <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxInfoBg}" BorderBrush="{DynamicResource DbxInfoBorder}"
+                  BorderThickness="0,1,0,0" Padding="12,6" IsVisible="{Binding HasPendingEdits}">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <PathIcon Data="{StaticResource IconSave}" Width="14" Height="14" Foreground="{DynamicResource DbxInfo}"
+                        Margin="0,0,10,0" VerticalAlignment="Center" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <TextBlock Text="{Binding PendingText}" FontWeight="SemiBold" Foreground="{DynamicResource DbxInfoText}" />
+                <TextBlock Text="{Binding PendingSummary}" Foreground="{DynamicResource DbxInfoText}" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                <Button Content="Revert" Command="{Binding RevertCommand}" IsEnabled="{Binding !IsSaving}"
+                        ToolTip.Tip="Discard all pending changes" />
+                <Button x:Name="SaveButton" Classes="accent" Content="{Binding SaveButtonText}" Click="OnSaveClick" IsEnabled="{Binding !IsSaving}"
+                        ToolTip.Tip="Review the SQL, then apply all pending changes in one transaction (Ctrl+S)" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <!-- The grid, with its empty, loading and failed states drawn over the (empty) body -->
+          <Grid>
+            <views:ResultGrid x:Name="DataGridView" Columns="{Binding GridColumns}" ItemsSource="{Binding Rows}"
+                              Features="{Binding}" Editing="{Binding}" Classes.reloading="{Binding IsReloading}" />
+            <StackPanel Classes="empty" Margin="0,80,0,0" IsVisible="{Binding ShowInitialLoad}">
+              <PathIcon Classes="spin" Data="{StaticResource IconRefresh}" IsVisible="{Binding ShowInitialLoad}" />
+              <TextBlock Classes="h2" Text="Loading rows…" />
+            </StackPanel>
+            <StackPanel Classes="empty" Margin="0,80,0,0" IsVisible="{Binding ShowNoMatches}">
+              <PathIcon Data="{StaticResource IconFilter}" />
+              <TextBlock Classes="h2" Text="No rows match these filters" />
+              <TextBlock Classes="dim" TextWrapping="Wrap" Text="Change or remove a filter, or the WHERE condition, to see more rows." />
+              <Button Classes="accent" Content="Clear filters" Command="{Binding ClearFiltersCommand}" />
+            </StackPanel>
+            <StackPanel Classes="empty" Margin="0,80,0,0" IsVisible="{Binding ShowEmptyTable}">
+              <PathIcon Data="{StaticResource IconTable}" />
+              <TextBlock Classes="h2" Text="This table is empty" />
+              <TextBlock Classes="dim" TextWrapping="Wrap" Text="There are no rows to show yet." />
+              <Button Classes="accent" Content="+ Row" Click="OnAddRowClick" IsVisible="{Binding CanInsert}" />
+            </StackPanel>
+            <StackPanel Classes="empty" Margin="0,80,0,0" IsVisible="{Binding ShowLoadFailed}">
+              <PathIcon Data="{StaticResource IconError}" />
+              <TextBlock Classes="h2" Text="The rows could not be loaded" />
+              <TextBlock Classes="dim" TextWrapping="Wrap" Text="{Binding ErrorMessage}" />
+              <Button Classes="accent" Content="Try again" Command="{Binding ReloadCommand}" />
+            </StackPanel>
+          </Grid>
         </DockPanel>
       </TabItem>
 
@@ -155,18 +268,42 @@
           </StackPanel>
         </TabItem.Header>
         <ScrollViewer>
-          <StackPanel Spacing="16" Margin="14" DataContext="{Binding Structure}" x:DataType="vm:StructureViewModel">
+          <StackPanel Spacing="18" Margin="16" DataContext="{Binding Structure}" x:DataType="vm:StructureViewModel">
             <StackPanel Spacing="6">
-              <TextBlock Classes="section" Text="COLUMNS" Margin="0" />
-              <Border Classes="structCard">
-                <DataGrid Classes="structure" ItemsSource="{Binding Columns}">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Classes="section" Text="{Binding ColumnsTitle}" Margin="0" />
+                <TextBlock Classes="faint small" Text="Double-click a column to show it in Data" VerticalAlignment="Center" IsVisible="{Binding HasColumns}" />
+              </StackPanel>
+              <Border Classes="surface" ClipToBounds="True">
+                <DataGrid Classes="structure" ItemsSource="{Binding Columns}" DoubleTapped="OnStructureColumnDoubleTapped">
                   <DataGrid.Columns>
-                    <DataGridTextColumn Header="#" Binding="{Binding Ordinal}" />
-                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" />
-                    <DataGridTextColumn Header="Type" Binding="{Binding DataType}" />
-                    <DataGridTextColumn Header="Null" Binding="{Binding NullText}" />
-                    <DataGridTextColumn Header="Key" Binding="{Binding Key}" />
-                    <DataGridTemplateColumn Header="References">
+                    <DataGridTextColumn Header="#" Binding="{Binding Ordinal}" Width="Auto" MinWidth="44" />
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" />
+                    <DataGridTextColumn Header="Type" Binding="{Binding DataType}" Width="1.5*" Foreground="{DynamicResource DbxTextDim}" />
+                    <DataGridTemplateColumn Header="Null" Width="Auto" MinWidth="90">
+                      <DataTemplate x:DataType="vm:StructureColumn">
+                        <TextBlock Text="{Binding NullText}" Classes.req="{Binding IsRequired}" Classes.faint="{Binding Nullable}" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="Key" Width="Auto" MinWidth="110">
+                      <DataTemplate x:DataType="vm:StructureColumn">
+                        <StackPanel Orientation="Horizontal" Spacing="4" Margin="10,0" VerticalAlignment="Center">
+                          <Border Classes="badge" IsVisible="{Binding IsPrimaryKey}">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                              <PathIcon Classes="keyIcon" Data="{StaticResource IconKey}" Width="10" Height="10" />
+                              <TextBlock Text="PK" FontSize="11" />
+                            </StackPanel>
+                          </Border>
+                          <Border Classes="badge" IsVisible="{Binding HasReference}">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                              <PathIcon Classes="linkIcon" Data="{StaticResource IconLink}" Width="10" Height="10" />
+                              <TextBlock Text="FK" FontSize="11" />
+                            </StackPanel>
+                          </Border>
+                        </StackPanel>
+                      </DataTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="References" Width="2*">
                       <DataTemplate x:DataType="vm:StructureColumn">
                         <Button Theme="{StaticResource DbxToolButton}" Classes="link" Tag="{StaticResource IconLink}"
                                 Content="{Binding References}" Command="{Binding OpenCommand}" IsVisible="{Binding HasReference}"
@@ -179,13 +316,13 @@
             </StackPanel>
 
             <StackPanel Spacing="6">
-              <TextBlock Classes="section" Text="FOREIGN KEYS" Margin="0" />
-              <Border Classes="structCard">
+              <TextBlock Classes="section" Text="{Binding ForeignKeysTitle}" Margin="0" />
+              <Border Classes="surface" ClipToBounds="True" IsVisible="{Binding HasForeignKeys}">
                 <DataGrid Classes="structure" ItemsSource="{Binding ForeignKeys}">
                   <DataGrid.Columns>
-                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" />
-                    <DataGridTextColumn Header="Columns" Binding="{Binding Columns}" />
-                    <DataGridTemplateColumn Header="References">
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="1.5*" />
+                    <DataGridTextColumn Header="Columns" Binding="{Binding Columns}" Width="1.5*" />
+                    <DataGridTemplateColumn Header="References" Width="2*">
                       <DataTemplate x:DataType="vm:StructureForeignKey">
                         <Button Theme="{StaticResource DbxToolButton}" Classes="link" Tag="{StaticResource IconLink}"
                                 Content="{Binding Target}" Command="{Binding OpenCommand}"
@@ -195,19 +332,27 @@
                   </DataGrid.Columns>
                 </DataGrid>
               </Border>
+              <TextBlock Classes="faint" Text="This table has no foreign keys." IsVisible="{Binding !HasForeignKeys}" />
             </StackPanel>
 
             <StackPanel Spacing="6">
-              <TextBlock Classes="section" Text="INDEXES" Margin="0" />
-              <Border Classes="structCard">
+              <TextBlock Classes="section" Text="{Binding IndexesTitle}" Margin="0" />
+              <Border Classes="surface" ClipToBounds="True" IsVisible="{Binding HasIndexes}">
                 <DataGrid Classes="structure" ItemsSource="{Binding Indexes}">
                   <DataGrid.Columns>
-                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" />
-                    <DataGridCheckBoxColumn Header="Unique" Binding="{Binding Unique}" />
-                    <DataGridTextColumn Header="Columns" Binding="{Binding Columns}" />
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" />
+                    <DataGridTemplateColumn Header="Unique" Width="Auto" MinWidth="100">
+                      <DataTemplate x:DataType="vm:StructureIndex">
+                        <Border Classes="badge success" HorizontalAlignment="Left" Margin="10,0" IsVisible="{Binding Unique}">
+                          <TextBlock Text="UNIQUE" FontSize="11" Margin="0" />
+                        </Border>
+                      </DataTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="Columns" Binding="{Binding Columns}" Width="2*" />
                   </DataGrid.Columns>
                 </DataGrid>
               </Border>
+              <TextBlock Classes="faint" Text="This table has no indexes." IsVisible="{Binding !HasIndexes}" />
             </StackPanel>
           </StackPanel>
         </ScrollViewer>

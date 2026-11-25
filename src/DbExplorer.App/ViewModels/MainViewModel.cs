@@ -21,6 +21,8 @@ public partial class MainViewModel : ObservableObject
         Status = status;
         _cache = cache;
         Tree.TableOpener = OpenTable;
+        Tree.ScriptOpener = () => NewScript();
+        Tree.TablePickerOpener = ShowTablePicker;
         Tabs.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmptyState));
         // The tree rebuilds (Reset first) whenever groups or connections change: open tabs repaint their database selector.
         Tree.Nodes.CollectionChanged += (_, e) =>
@@ -30,15 +32,49 @@ public partial class MainViewModel : ObservableObject
         };
         Tree.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(ConnectionTreeViewModel.SelectedConnection)) OnPropertyChanged(nameof(CurrentConnection));
+            if (e.PropertyName == nameof(ConnectionTreeViewModel.SelectedConnection))
+            {
+                { OnPropertyChanged(nameof(CurrentConnection)); OnPropertyChanged(nameof(CurrentConnectionNode)); }
+                OnPropertyChanged(nameof(HasTarget));
+                OnPropertyChanged(nameof(WelcomeHint));
+                OnPropertyChanged(nameof(WindowTitle));
+            }
         };
+        Tree.Nodes.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasConnections));
     }
+
+    /// <summary>True when at least one connection is configured.</summary>
+    public bool HasConnections => Tree.Config.Connections.Count > 0;
+
+    /// <summary>True when "Open a table" / "New SQL script" have a connection to work on (the active tab's, else the selected one).</summary>
+    public bool HasTarget => CurrentConnection is not null;
+
+    /// <summary>The welcome page line that says what the two connection-bound actions will use, or why they wait.</summary>
+    public string WelcomeHint => !HasConnections ? "Add a connection first: the table and script actions work on it."
+        : CurrentConnection is { } c ? $"Works on {c.Name}" : "Select a connection in the navigator first.";
+
+    /// <summary>Window title: the active tab and its connection, then the app name.</summary>
+    public string WindowTitle => ActiveTab is { } tab
+        ? $"{(tab.HasUnsavedWork ? "● " : "")}{tab.Title.TrimStart('•', ' ')} – dbExplorer"
+        : "dbExplorer";
+
+    /// <summary>True while the keyboard shortcuts card is showing (F1).</summary>
+    [ObservableProperty] private bool _isShortcutsVisible;
+
+    [RelayCommand]
+    public void ShowShortcuts() => IsShortcutsVisible = true;
+
+    [RelayCommand]
+    public void HideShortcuts() => IsShortcutsVisible = false;
 
     /// <summary>True while no tab is open: the editor area shows the welcome panel instead.</summary>
     public bool IsEmptyState => Tabs.Count == 0;
 
     /// <summary>The connection the status bar names: the one of the active tab, else the one selected in the navigator.</summary>
     public ConnectionConfig? CurrentConnection => ActiveTab?.Connection ?? Tree.SelectedConnection;
+
+    /// <summary>The navigator node of <see cref="CurrentConnection"/> (its state and tooltip): what the status bar shows.</summary>
+    public ConnectionNodeViewModel? CurrentConnectionNode => CurrentConnection is { } c ? Tree.NodeOf(c.Id) : null;
 
     public ConnectionTreeViewModel Tree { get; }
 
@@ -152,7 +188,10 @@ public partial class MainViewModel : ObservableObject
         // The status bar names the connection of the active tab, which changes when the tab is switched to another group member.
         if (oldValue is not null) oldValue.PropertyChanged -= OnActiveTabPropertyChanged;
         if (newValue is not null) newValue.PropertyChanged += OnActiveTabPropertyChanged;
-        OnPropertyChanged(nameof(CurrentConnection));
+        { OnPropertyChanged(nameof(CurrentConnection)); OnPropertyChanged(nameof(CurrentConnectionNode)); }
+        OnPropertyChanged(nameof(HasTarget));
+        OnPropertyChanged(nameof(WelcomeHint));
+        OnPropertyChanged(nameof(WindowTitle));
         // A restored table tab connects and loads when it is first selected (never before).
         if (!_restoringTabs && newValue is TableTabViewModel { IsDeferred: true } deferred) _ = deferred.EnsureLoadedAsync();
         ScheduleSessionSave();
@@ -160,7 +199,8 @@ public partial class MainViewModel : ObservableObject
 
     private void OnActiveTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(TabViewModel.Connection)) OnPropertyChanged(nameof(CurrentConnection));
+        if (e.PropertyName == nameof(TabViewModel.Connection)) { OnPropertyChanged(nameof(CurrentConnection)); OnPropertyChanged(nameof(CurrentConnectionNode)); }
+        if (e.PropertyName is nameof(TabViewModel.Title) or nameof(TabViewModel.HasUnsavedWork)) OnPropertyChanged(nameof(WindowTitle));
     }
 
     /// <summary>
@@ -587,34 +627,57 @@ public partial class MainViewModel : ObservableObject
     /// <summary>The overlay currently shown, or null. A fresh view model per opening: nothing is remembered.</summary>
     [ObservableProperty] private QuickOpenViewModel? _quickOpen;
 
-    /// <summary>Ctrl+T: tables and views of the connection of the active tab (or, with no tab, the one selected in the tree).</summary>
+    /// <summary>
+    /// Ctrl+T: tables and views of the connection of the active tab (or, with no tab, the one selected in the tree); a connection
+    /// that is not connected is connected first. With nothing to work on, a list of the connections to pick from.
+    /// </summary>
     [RelayCommand]
-    public void ShowTablePicker()
+    public void ShowTablePicker() => _ = ShowTablePickerAsync();
+
+    /// <summary>The work of <see cref="ShowTablePicker"/>; completes synchronously when the connection is already open.</summary>
+    public async Task ShowTablePickerAsync()
     {
         try
         {
             ConnectionConfig? target = ActiveTab?.Connection ?? Tree.SelectedConnection;
             if (target is null)
             {
-                Status.Info("Select a connection in the tree or open a table first, then press Ctrl+T.");
+                ShowConnectionPicker();
                 return;
             }
 
-            var session = Tree.FindSession(target.Id);
-            if (session is null)
-            {
-                Status.Info($"{target.Name} is not connected. Connect to it first (double-click it in the tree).");
-                return;
-            }
-
-            var picker = QuickOpenViewModel.ForTables(session, OpenTable, Status, _lastTableQuery);
-            picker.CloseRequested += () => _lastTableQuery = picker.LastQuery;   // kept on Esc too: the next Ctrl+T starts from it
-            Show(picker);
+            var session = Tree.FindSession(target.Id) ?? await Tree.EnsureConnectedAsync(target);
+            if (session is null) return;   // the tree already said why
+            ShowTablePicker(session);
         }
         catch (Exception e)
         {
             Status.Error($"Cannot open the table picker: {ErrorText.Describe(e)}");
         }
+    }
+
+    private void ShowTablePicker(Session session)
+    {
+        var picker = QuickOpenViewModel.ForTables(session, OpenTable, Status, _lastTableQuery);
+        picker.CloseRequested += () => _lastTableQuery = picker.LastQuery;   // kept on Esc too: the next Ctrl+T starts from it
+        Show(picker);
+    }
+
+    /// <summary>The list of connections (Ctrl+T with nothing selected): choosing one connects it and goes on to its tables.</summary>
+    private void ShowConnectionPicker()
+    {
+        if (Tree.Config.Connections.Count == 0)
+        {
+            Status.Info("No connection yet: add one with the + button of the navigator, then press Ctrl+T.");
+            return;
+        }
+        var picker = QuickOpenViewModel.ForConnections(Tree.Config.Connections, c => Tree.FindSession(c.Id) is not null,
+            Tree.EnsureConnectedAsync, session =>
+            {
+                ShowTablePicker(session);
+                return Task.CompletedTask;
+            }, Status);
+        Show(picker);
     }
 
     /// <summary>Ctrl+Shift+P: tables of every connection that has a metadata cache. Never connects by itself.</summary>
@@ -769,6 +832,45 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             _closingTab = false;
+        }
+    }
+
+    // ---- tab context menu ----
+
+    /// <summary>Closes every tab but <paramref name="keep"/>, one by one (a tab with unsaved work asks; Cancel stops the sequence).</summary>
+    [RelayCommand]
+    private async Task CloseOtherTabsAsync(TabViewModel? keep)
+    {
+        if (keep is null) return;
+        foreach (var tab in Tabs.Where(t => !ReferenceEquals(t, keep)).ToList())
+        {
+            if (!Tabs.Contains(tab)) continue;
+            await CloseTabAsync(tab);
+            if (Tabs.Contains(tab)) return;   // the user chose Cancel
+        }
+    }
+
+    /// <summary>Closes the tabs to the right of <paramref name="from"/>.</summary>
+    [RelayCommand]
+    private async Task CloseTabsToTheRightAsync(TabViewModel? from)
+    {
+        var index = from is null ? -1 : Tabs.IndexOf(from);
+        if (index < 0) return;
+        foreach (var tab in Tabs.Skip(index + 1).ToList())
+        {
+            await CloseTabAsync(tab);
+            if (Tabs.Contains(tab)) return;
+        }
+    }
+
+    /// <summary>Closes every tab.</summary>
+    [RelayCommand]
+    private async Task CloseAllTabsAsync()
+    {
+        foreach (var tab in Tabs.ToList())
+        {
+            await CloseTabAsync(tab);
+            if (Tabs.Contains(tab)) return;
         }
     }
 

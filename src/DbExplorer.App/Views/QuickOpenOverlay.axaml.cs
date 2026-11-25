@@ -71,7 +71,7 @@ public partial class QuickOpenOverlay : UserControl
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(QuickOpenViewModel.Results) or nameof(QuickOpenViewModel.SelectedIndex)) Sync();
+        if (e.PropertyName is nameof(QuickOpenViewModel.Results) or nameof(QuickOpenViewModel.SelectedIndex) or nameof(QuickOpenViewModel.Query)) Sync();
     }
 
     /// <summary>List contents and selection are pushed from the view model in one place, so the list's own selection reset on a new items source cannot leak back.</summary>
@@ -80,6 +80,8 @@ public partial class QuickOpenOverlay : UserControl
         if (_vm is null) return;
         if (!ReferenceEquals(_list.ItemsSource, _vm.Results)) _list.ItemsSource = _vm.Results;
         if (_list.SelectedIndex != _vm.SelectedIndex) _list.SelectedIndex = _vm.SelectedIndex;
+        HighlightText.SetQuery(_list, _vm.Query);
+        if (_vm.SelectedIndex >= 0) _list.ScrollIntoView(_vm.SelectedIndex);
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
@@ -89,6 +91,8 @@ public partial class QuickOpenOverlay : UserControl
         {
             case Key.Down: _vm.MoveDown(); break;
             case Key.Up: _vm.MoveUp(); break;
+            case Key.PageDown: _vm.MoveBy(8); break;
+            case Key.PageUp: _vm.MoveBy(-8); break;
             case Key.Escape: _vm.Cancel(); break;
             case Key.Enter: _ = ConfirmSafe(null); break;
             default: return;

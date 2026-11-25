@@ -28,7 +28,7 @@ public class SettingsMenuUpgradeTests : ShellTestBase, IDisposable
         var window = new MainWindow { DataContext = main };
         window.Show();
         Dispatcher.UIThread.RunJobs();
-        var gear = window.GetVisualDescendants().OfType<Button>().First(b => b.Flyout is MenuFlyout);
+        var gear = window.GetVisualDescendants().OfType<Button>().First(b => b.Flyout is MenuFlyout && Avalonia.Automation.AutomationProperties.GetName(b) == "Settings");
         return (main, window, gear);
     }
 
@@ -42,11 +42,12 @@ public class SettingsMenuUpgradeTests : ShellTestBase, IDisposable
 
         var items = ((MenuFlyout)gear.Flyout!).Items.Cast<Control>().ToList();
 
-        Assert.Equal("Upgrade database...", (items[0] as MenuItem)?.Header);
-        Assert.Equal("Options...", (items[1] as MenuItem)?.Header);
-        Assert.IsType<Separator>(items[2]);
-        Assert.Equal("Check for updates automatically", (items[3] as MenuItem)?.Header);
-        Assert.Equal(4, items.Count);
+        Assert.Equal("Upgrade database…", (items[0] as MenuItem)?.Header);
+        Assert.Equal("Options…", (items[1] as MenuItem)?.Header);
+        Assert.Equal("Keyboard shortcuts", (items[2] as MenuItem)?.Header);
+        Assert.IsType<Separator>(items[3]);
+        Assert.Equal("Check for updates automatically", (items[4] as MenuItem)?.Header);
+        Assert.Equal(5, items.Count);
         window.Close();
     }
 
@@ -58,8 +59,8 @@ public class SettingsMenuUpgradeTests : ShellTestBase, IDisposable
         gear.Flyout!.ShowAt(gear);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.False(Item(gear, "Upgrade database...").IsEffectivelyEnabled);
-        Assert.True(Item(gear, "Options...").IsEffectivelyEnabled);
+        Assert.False(Item(gear, "Upgrade database…").IsEffectivelyEnabled);
+        Assert.True(Item(gear, "Options…").IsEffectivelyEnabled);
         window.Close();
     }
 
@@ -73,7 +74,7 @@ public class SettingsMenuUpgradeTests : ShellTestBase, IDisposable
         Dispatcher.UIThread.RunJobs();
 
         Assert.True(main.UpgradeAvailable);
-        Assert.True(Item(gear, "Upgrade database...").IsEffectivelyEnabled);
+        Assert.True(Item(gear, "Upgrade database…").IsEffectivelyEnabled);
         window.Close();
     }
 
@@ -84,7 +85,7 @@ public class SettingsMenuUpgradeTests : ShellTestBase, IDisposable
         gear.Flyout!.ShowAt(gear);
         Dispatcher.UIThread.RunJobs();
 
-        Item(gear, "Upgrade database...").Command!.Execute(null);
+        Item(gear, "Upgrade database…").Command!.Execute(null);
         for (var i = 0; i < 100 && _upgrade.Upgrades.Count == 0; i++)
         {
             Dispatcher.UIThread.RunJobs();
@@ -102,7 +103,7 @@ public class SettingsMenuUpgradeTests : ShellTestBase, IDisposable
         gear.Flyout!.ShowAt(gear);
         Dispatcher.UIThread.RunJobs();
 
-        Item(gear, "Options...").Command!.Execute(null);
+        Item(gear, "Options…").Command!.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
         Assert.Single(_upgrade.Options);

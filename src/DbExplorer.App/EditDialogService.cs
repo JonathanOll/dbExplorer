@@ -9,8 +9,8 @@ public sealed class EditDialogService(Window owner) : IEditDialogs
 {
     public async Task<SaveChoice> AskSaveDiscardAsync(string title, string message)
     {
-        var save = DialogShell.Button("Save…", isDefault: true, primary: true);
-        var discard = DialogShell.Button("Discard");
+        var save = DialogShell.Button("Review and save…", isDefault: true, primary: true);
+        var discard = DialogShell.Button("Discard changes");
         var cancel = DialogShell.Button("Cancel", isCancel: true);
         var window = DialogShell.Create(title, "IconSave", DialogShell.Message(message), [save, discard, cancel]);
         save.Click += (_, _) => window.Close(SaveChoice.Save);

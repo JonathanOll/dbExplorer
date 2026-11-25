@@ -202,7 +202,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Contains("big", Member(run, "NoBig").Error);
         Assert.Equal(MemberState.Failed, Member(run, "Down").State);
         Assert.False(string.IsNullOrWhiteSpace(Member(run, "Down").Error));
-        Assert.True(run.PerMemberResults.Single(r => r.Header == "! Down").HasError);
+        Assert.True(run.PerMemberResults.Single(r => r.Header == "Down").HasError);
         Assert.Equal(2, run.AllRows.Count);   // only A feeds All
         Assert.All(run.AllRows, r => Assert.Equal("A", r[0]));
         Assert.Contains("NoBig failed and is left out", run.Notice);

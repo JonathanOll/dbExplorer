@@ -423,7 +423,7 @@ public class TableTabViewModelTests : IDisposable
         tab.ColumnFilters["label"] = "row 1";
         await tab.ApplyFiltersAsync();
         Assert.DoesNotContain(_t.Log.Items, sql => sql.Contains("COUNT(", StringComparison.OrdinalIgnoreCase));
-        Assert.Null(tab.TotalCount);
+        Assert.Equal(_t.Scalar("SELECT COUNT(*) FROM big WHERE label LIKE '%row 1%'"), tab.TotalCount);   // a last page is its own count: no query
 
         var count = await tab.CountAsync();
 
@@ -447,7 +447,7 @@ public class TableTabViewModelTests : IDisposable
         var tab = await _t.OpenTab("big");
         await tab.CountAsync();
 
-        tab.ColumnFilters["id"] = "<=10";
+        tab.ColumnFilters["id"] = "<=300";   // still more than one page: the total is unknown until counted
         await tab.ApplyFiltersAsync();
 
         Assert.Null(tab.TotalCount);

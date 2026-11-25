@@ -12,6 +12,17 @@ public record QuickOpenItem(string Label, string? Detail, Func<Task> Open)
 
     /// <summary>Resource key of the vector icon drawn before the label (Styles/Icons.axaml).</summary>
     public string Icon { get; init; } = "IconTable";
+
+    /// <summary>What the row shows as its main text when it differs from <see cref="Label"/> (the label is what is searched).</summary>
+    public string? Title { get; init; }
+
+    /// <summary>Faint chip at the right of the row (the connection of a table found in every connection).</summary>
+    public string? Context { get; init; }
+
+    public string DisplayLabel => Title ?? Label;
+
+    public bool HasContext => !string.IsNullOrEmpty(Context);
+    public bool HasDetail => !string.IsNullOrEmpty(Detail);
 }
 
 /// <summary>
@@ -29,6 +40,20 @@ public sealed partial class QuickOpenViewModel : ObservableObject
     [ObservableProperty] private string _query = "";
     [ObservableProperty] private IReadOnlyList<QuickOpenItem> _results = [];
     [ObservableProperty] private int _selectedIndex = -1;
+
+    /// <summary>How many items match the query (the list shows the best <see cref="MaxResults"/>).</summary>
+    [ObservableProperty] private int _matchCount;
+
+    /// <summary>Footer count: "12 results", "1 result" or "50 of 1,284".</summary>
+    public string CountText => MatchCount > Results.Count ? $"{Results.Count:N0} of {MatchCount:N0}" : MatchCount == 1 ? "1 result" : $"{MatchCount:N0} results";
+
+    /// <summary>Shown instead of the list when it is empty.</summary>
+    public string EmptyText => _items.Length == 0 ? EmptyListText : $"No match for ‘{Query}’";
+
+    /// <summary>What an empty list says when there is nothing to search at all.</summary>
+    public string EmptyListText { get; init; } = "Nothing to search here yet.";
+
+    public bool IsEmpty => Results.Count == 0;
 
     /// <param name="initialQuery">Text the box starts with (the remembered query of the last opening); results are ranked for it.</param>
     public QuickOpenViewModel(string title, IReadOnlyList<QuickOpenItem> items, StatusModel? status = null, string? notice = null,
@@ -101,6 +126,8 @@ public sealed partial class QuickOpenViewModel : ObservableObject
                     () => ConnectThenOpen(cfg, tableRef, connect, openTable, status))
                 {
                     Group = cfg.Name,
+                    Title = tableRef.ToString(),
+                    Context = cfg.Name,
                     Icon = table.IsView ? "IconView" : "IconTable",
                 });
             }
@@ -113,6 +140,25 @@ public sealed partial class QuickOpenViewModel : ObservableObject
             _ => $"{withoutCache} connections have no cache yet — open them once",
         };
         return new QuickOpenViewModel("Go to table in any connection", items, status, notice);
+    }
+
+    /// <summary>Every connection, to connect to it (Ctrl+T with nothing selected): connected ones are marked in the detail column.</summary>
+    public static QuickOpenViewModel ForConnections(
+        IEnumerable<ConnectionConfig> configs, Func<ConnectionConfig, bool> isConnected,
+        Func<ConnectionConfig, Task<Session?>> connect, Func<Session, Task> afterConnect, StatusModel? status = null)
+    {
+        var items = configs
+            .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(c => new QuickOpenItem(c.Name, isConnected(c) ? "connected" : c.Kind.ToString(), async () =>
+            {
+                if (await connect(c) is { } session) await afterConnect(session);
+            })
+            {
+                Icon = "IconDatabase",
+                Group = c.Folder,
+            })
+            .ToList();
+        return new QuickOpenViewModel("Go to connection", items, status) { EmptyListText = "No connections yet. Add one from the navigator." };
     }
 
     /// <summary>Column names of a table view; confirming a result calls <paramref name="jumpTo"/> with its index.</summary>
@@ -165,6 +211,13 @@ public sealed partial class QuickOpenViewModel : ObservableObject
 
     public void MoveUp() => Move(-1);
 
+    /// <summary>PageUp / PageDown: moves the selection by <paramref name="delta"/> rows and stops at the ends (no wrap).</summary>
+    public void MoveBy(int delta)
+    {
+        if (Results.Count == 0) return;
+        SelectedIndex = Math.Clamp(SelectedIndex + delta, 0, Results.Count - 1);
+    }
+
     private void Move(int delta)
     {
         if (Results.Count == 0) return;
@@ -216,10 +269,12 @@ public sealed partial class QuickOpenViewModel : ObservableObject
         Span<int> topScore = stackalloc int[MaxResults];
         Span<int> topIndex = stackalloc int[MaxResults];
         var count = 0;
+        var matched = 0;
 
         for (var i = 0; i < _items.Length; i++)
         {
             if (FuzzyMatcher.ScoreTolerant(query, _items[i].Label) is not { } score) continue;
+            matched++;
             if (count == MaxResults && !Better(score, i, topScore[MaxResults - 1], topIndex[MaxResults - 1])) continue;
 
             var pos = count < MaxResults ? count++ : MaxResults - 1;
@@ -237,6 +292,10 @@ public sealed partial class QuickOpenViewModel : ObservableObject
         var results = new QuickOpenItem[count];
         for (var i = 0; i < count; i++) results[i] = _items[topIndex[i]];
         Results = results;
+        MatchCount = matched;
+        OnPropertyChanged(nameof(CountText));
+        OnPropertyChanged(nameof(EmptyText));
+        OnPropertyChanged(nameof(IsEmpty));
         SelectedIndex = count == 0 ? -1 : 0;
     }
 

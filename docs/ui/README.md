@@ -1,97 +1,181 @@
 # dbExplorer UI: design tokens and conventions
 
-The look is DBeaver-inspired but light: one tinted navigator, a darker document tab strip, a clean content area, thin borders
-and a visible splitter, so the regions of the window are told apart at a glance. Everything is defined in three files under
+The look is calm and neutral: **one chrome tone** (window, navigator, panel headers, tab strip, status bar) around a lighter
+**content area** (editor, grid, toolbars, inputs). Regions are separated by 1 px hairlines and spacing, not by five greys.
+Greys are cool with a faint blue tint; a single accent (indigo blue) marks selection, focus, the primary button and the active tab.
+Shapes are soft (radius 6 for controls, 10 for cards and flyouts, pill badges). Everything is defined in three files under
 `src/DbExplorer.App/Styles/`, loaded at startup from `App.axaml`:
 
 | File | Content |
 | --- | --- |
-| `Theme.axaml` | colour tokens (light and dark `ThemeDictionaries`), sizes, fonts, and the re-pointing of the Fluent control brushes to the tokens |
+| `Theme.axaml` | colour tokens (light and dark `ThemeDictionaries`), sizes, fonts, radii, and the re-pointing of the Fluent control brushes to the tokens |
 | `Icons.axaml` | about 40 vector icons as `StreamGeometry` (24x24, Material-style). No icon font, no bitmaps |
-| `Controls.axaml` | control themes (tool button, document tabs, secondary tabs) and style classes (banners, badges, key caps, bands) |
+| `Controls.axaml` | control themes (tool button, document tabs, sub tabs), style classes (buttons, inputs, bands, banners, badges, key caps, cards, empty state, spinner) |
 
-Screenshots of every screen, before and after, light and dark: [`before/`](before) and [`after/`](after).
-Regenerate them with `dotnet run --project tools/UiShots -- <folder>` (in-process, headless, synthetic data in a temp folder,
+Screenshots of every screen, light and dark: [`before/`](before) (original), [`after/`](after).
+Regenerate with `dotnet run --project tools/UiShots -- <folder>` (in-process, headless, synthetic data in a temp folder,
 no real window and no input). See "Screenshots" below.
 
 ## Rules
 
 1. **No colour in a view.** Use a `Dbx*` brush with `{DynamicResource ...}` (dynamic, so a live Windows light/dark switch
    repaints). Geometries, sizes and fonts may be `StaticResource`. In code, get a brush with `GetResourceObservable` or a style
-   class, never a hex value (the only literals left are the translucent edit-state overlays of grid cells).
-2. **Icons are vectors from `Icons.axaml`**: `<PathIcon Data="{StaticResource IconTable}" />`, tinted with `Foreground`.
-   A toolbar button is `Theme="{StaticResource DbxToolButton}"` with `Tag="{StaticResource IconX}"` (icon) and optional
-   `Content` (text). Every icon-only button has a tooltip that includes its shortcut.
-3. **Disabled means dimmed + a tooltip that says why** (`ToolTip.ShowOnDisabled="True"`).
-4. **Status is coloured and has an icon**: banners use `Border.banner` + `error` / `warn` / `info` and a `PathIcon.bi`.
-5. **Dialogs**: header band (`DbxPanelHeaderBg`), body on `DbxContentBg`, footer band (`DbxWindowBg`) with the buttons on the
-   right; the primary button has `Classes="accent"`. Default / cancel buttons are never changed by styling.
-6. **Keep startup lean**: no heavy templates, effects, large fonts or images. The AvaloniaEdit theme stays inside
-   `ScriptTabView` (lazy). A drop shadow only on the quick-open card.
+   class, never a hex value (grid cell states: use `DbxCellEdited` / `DbxCellNew` / `DbxCellDeleted` / `DbxCellError`).
+2. **Icons are monochrome vectors from `Icons.axaml`**: `<PathIcon Data="{StaticResource IconTable}" />`, tinted with `Foreground`
+   (`DbxIcon`, or inherit the text colour). Colour only carries meaning: run green, stop and error red, warning amber, info and
+   accent blue, success green. Engine icons (`EngineIcon`) are neutral: the per-connection colour chip is the only colour identity
+   of a connection. Table and view differ by shape (`IconTable` / `IconView`), not by hue.
+3. **Buttons**: one primary per dialog or toolbar (`Classes="accent"` or `primary`), the rest secondary (default), `subtle` or
+   `ghost`; toolbars use `Theme="{StaticResource DbxToolButton}"` with `Tag="{StaticResource IconX}"` (icon) and optional
+   `Content`. Every icon-only button has a tooltip that includes its shortcut. Destructive confirmation = `Classes="danger"`.
+   Default / cancel buttons are never changed by styling.
+4. **Disabled means dimmed + a tooltip that says why** (`ToolTip.ShowOnDisabled="True"`).
+5. **Status is coloured and has an icon**: banners use `Border.banner` + `error` / `warn` / `info` / `success` and a `PathIcon.bi`.
+   Inline field validation: the input gets `Classes="error"` and a `TextBlock.fielderror` line under it.
+6. **Dialogs**: header band (`DbxPanelHeaderBg`), body on `DbxContentBg`, footer band (`DbxWindowBg`) with the buttons on the
+   right; the primary button has `Classes="accent"`.
+7. **Keyboard focus is always visible**: Button, ToggleButton, CheckBox, RadioButton, ListBoxItem, TreeViewItem get a 2 px accent
+   ring (`FocusAdorner`, keyboard only); TextBox / ComboBox get an accent border plus a soft glow; tabs an inset ring. Do not set
+   `Focusable="False"` or your own focus visuals on a control a user can tab to.
+8. **Keep startup lean**: no heavy templates, effects, large fonts or images. Transitions are 120 ms on Background / BorderBrush
+   only. The AvaloniaEdit theme stays inside `ScriptTabView` (lazy). A drop shadow only on the quick-open card.
+
+## Sizes and shapes
+
+UI font 13 px (Segoe UI, the system font), small 11.5, grid 12.5 px in Consolas, h1 20, h2 15. Tree row pitch 28, grid row 28,
+toolbar 40, document tab strip 38, sub tab strip 36, text box / combo 32, button 30.
+
+| Token | Value | Use |
+| --- | --- | --- |
+| `DbxRadius` (`ControlCornerRadius`) | 6 | buttons, inputs, menu items, tree and list rows, tooltips |
+| `DbxRadiusSm` | 4 | key caps, small chips |
+| `DbxCardRadius` (`OverlayCornerRadius`) | 10 | cards, dialogs, flyouts, menus, combo popups, quick-open card |
+| `DbxPillRadius` | 99 | badges |
+| `DbxRowHeight`, `DbxGridRowHeight` | 28 | tree pitch, data grid rows |
+| `DbxToolbarHeight` / `DbxTabHeight` / `DbxSubTabHeight` / `DbxControlHeight` | 40 / 38 / 36 / 32 | |
+| `DbxFontSize` / `DbxSmallFontSize` / `DbxGridFontSize` / `DbxH1FontSize` / `DbxH2FontSize` | 13 / 11.5 / 12.5 / 20 / 15 | |
+| `DbxMonoFont`, `DbxCardShadow`, `DbxFocusGlow`, `DbxFocusGlowError`, `DbxFocusInset` | | font and box shadows (focus glow of inputs, inset ring of tabs) |
 
 ## Tokens
 
-Sizes: UI font 13 px (Segoe UI, the system font), small 11.5, grid 12.5 px in Consolas, tree and grid rows 24 px, toolbar 34 px,
-corner radius 3 (cards 8). Accent: `#3B6EA5` light, `#4F8FD0` dark.
-
 | Token | Light | Dark | Use |
 | --- | --- | --- | --- |
-| `DbxWindowBg` | `#E6EBF1` | `#1A1D21` | window, status bar, dialog footers |
-| `DbxNavBg` | `#EEF2F7` | `#21252B` | navigator (tinted) |
-| `DbxPanelHeaderBg` | `#DDE4ED` | `#2B3038` | panel title strips, dialog headers, status bar |
-| `DbxTabStripBg` | `#D3DBE6` | `#14161A` | document tab strip (darker than content) |
-| `DbxContentBg` | `#FFFFFF` | `#272B31` | editor / grid area, active tab |
-| `DbxToolbarBg` | `#F5F7FA` | `#2E333A` | toolbars, secondary tab strip, cards |
-| `DbxInputBg` | `#FFFFFF` | `#1E2126` | text boxes, list frames |
-| `DbxBorder` / `DbxBorderSubtle` | `#BCC6D3` / `#DAE0E8` | `#444B55` / `#343A43` | region borders / inner lines |
-| `DbxSplitter` | `#C9D1DC` | `#3C434D` | grid splitters (accent on hover) |
-| `DbxText` / `DbxTextDim` / `DbxTextFaint` | `#1B2430` / `#566272` / `#7F8B9B` | `#E3E8EE` / `#A0AAB8` / `#76828F` | text levels |
-| `DbxAccent` / `DbxAccentStrong` | `#3B6EA5` / `#2D5887` | `#4F8FD0` / `#74A9E2` | accent strip, links, focus |
-| `DbxAccentButtonBg` / `DbxOnAccent` | `#3B6EA5` / `#FFFFFF` | `#3A78BB` / `#FFFFFF` | primary buttons |
-| `DbxAccentSoft` | `#D2E2F4` | `#2D4A6B` | selected navigator row, hovered card |
-| `DbxHover` / `DbxPressed` | `#E0E6EE` / `#CFD8E3` | `#323841` / `#3C434E` | hover / pressed |
-| `DbxGridHeaderBg` / `DbxGridFilterBg` | `#E2E8F0` / `#F6F8FB` | `#2F353D` / `#23272D` | name band over lighter filter band |
-| `DbxGridLine` / `DbxGridZebra` | `#E7EBF1` / `#F4F7FB` | `#333941` / `#2C3137` | row lines, alternate rows |
-| `DbxRowHover` / `DbxRowSelected` / `DbxRowSelectedInactive` | `#EDF2F8` / `#CCDFF4` / `#DCE6F1` | `#30363E` / `#2E4C72` / `#303F52` | grid rows |
-| `DbxError` + `Bg` / `Border` / `Text` | `#C62828` `#FDECEA` `#F0B4AF` `#8A1C1C` | `#F2766E` `#43231F` `#7C3B37` `#FFB8B2` | error banner and icon |
-| `DbxWarn` + `Bg` / `Border` / `Text` | `#B26A00` `#FFF3D6` `#EBCE87` `#664000` | `#E8B04C` `#40351A` `#7A6530` `#F5D78F` | warning banner, read-only badge |
-| `DbxInfo` + `Bg` / `Border` / `Text` | `#2467A8` `#E4EFFB` `#B3D1EF` `#163F69` | `#7DB4EC` `#1F3249` `#3B5F88` `#B9D7F6` | info banner |
-| `DbxSuccess`, `DbxRun`, `DbxStop` | `#2A8C4C`, `#2A8C4C`, `#C62828` | `#4CC27A`, `#4CC27A`, `#F2766E` | connected dot, run, cancel |
-| `DbxEnginePostgres` / `SqlServer` / `Sqlite` | `#336FA8` / `#A02A30` / `#14907F` | `#5B9BD5` / `#E26D6D` / `#3FC1B0` | engine icons |
-| `DbxIconFolder` / `Table` / `View` / `Key` | `#D69E2E` `#4C739E` `#8A64B8` `#C7971A` | `#E2B24F` `#7FA3CC` `#B49BE0` `#E0BD4A` | icon tints |
-| `DbxLink` | `#2B63A8` | `#6FAAE8` | foreign-key values, links |
-| `DbxColumnFlash` / `DbxColumnFlashHeader` | `#FFE27A` / `#FFC933` | `#6E5B12` / `#9A7F10` | `Ctrl+L`: the column just jumped to (cells / header) |
-| `DbxScrim` | `#66101820` | `#A0000000` | quick-open backdrop |
+| `DbxWindowBg` | `#F3F5F8` | `#181A1F` | window, status bar, dialog footers (chrome) |
+| `DbxNavBg` / `DbxPanelHeaderBg` / `DbxTabStripBg` | = `DbxWindowBg` | = `DbxWindowBg` | navigator, panel headers, document tab strip: same chrome family, kept as separate names |
+| `DbxContentBg` | `#FFFFFF` | `#1F2228` | editor / grid area, active tab, dialog body |
+| `DbxToolbarBg` | `#FFFFFF` | `#1F2228` | toolbars, sub tab strip (= content on purpose; a hairline separates) |
+| `DbxInputBg` | `#FFFFFF` | `#1A1D22` | text boxes, combo boxes |
+| `DbxSurface` | `#FFFFFF` | `#262A32` | raised: cards, tooltips, menus, flyouts, combo popups |
+| `DbxBorder` / `DbxBorderSubtle` / `DbxBorderStrong` | `#D3D8E0` / `#E5E8EE` / `#8992A1` | `#343841` / `#2A2E35` / `#6D7685` | control borders / hairlines between regions / check box and radio outlines (3:1) |
+| `DbxSplitter` | `#F3F5F8` | `#181A1F` | splitter (chrome, accent on hover) |
+| `DbxText` / `DbxTextDim` / `DbxTextFaint` | `#1B222C` / `#556070` / `#5E6877` | `#E6E9EE` / `#A4ACB9` / `#949DAB` | text levels. Dim and faint are at least 4.5:1 on window, content, input, toolbar and surface in both themes |
+| `DbxAccent` / `DbxAccentStrong` | `#3E63DD` / `#3354C5` | `#7C97F5` / `#9BB0F8` | accent strip, links, selection marks / pressed |
+| `DbxAccentButtonBg` / `DbxAccentButtonHover` / `DbxOnAccent` | `#3E63DD` / `#3556CC` / `#FFFFFF` | `#4565E0` / `#4C6BE3` / `#FFFFFF` | primary button |
+| `DbxAccentSoft` / `DbxAccentSoftHover` | `#E4EAFD` / `#D8E1FB` | `#29335E` / `#313D70` | selected tree / list row, selected choice, hovered card |
+| `DbxFocusRing` | `#3E63DD` | `#8CA3F7` | keyboard focus ring (4.8:1 or more on the backgrounds) |
+| `DbxHover` / `DbxPressed` / `DbxButtonBg` | `#E9ECF1` / `#DEE2E9` / `#FCFCFD` | `#2B2F37` / `#343942` / `#2A2E36` | hover / pressed / secondary button fill |
+| `DbxLink` | `#3556C4` | `#8AA3F7` | foreign-key values, links |
+| `DbxGridHeaderBg` / `DbxGridFilterBg` | `#F5F7FA` / `#FBFCFD` | `#252930` / `#1D2025` | name band over the lighter filter band |
+| `DbxGridLine` / `DbxGridZebra` | `#EDEFF3` / `#FAFBFD` | `#2B2F36` / `#22252C` | row lines, alternate rows |
+| `DbxRowHover` / `DbxRowSelected` / `DbxRowSelectedInactive` | `#F1F4FA` / `#DCE5FD` / `#E8EDF8` | `#262A33` / `#2C3A6E` / `#2A3050` | grid rows |
+| `DbxCellEdited` / `DbxCellNew` / `DbxCellDeleted` / `DbxCellError` | `#55F2B600` / `#4429A329` / `#44D32F2F` / `#C8372D` | `#55F2B600` / `#5538C26A` / `#66E5534B` / `#F2766E` | grid cell states: edited amber, new row green, deleted row red (with strike-through), error border. Translucent, so they read over zebra and selection; `DbxCellError` is opaque (border) |
+| `DbxEditorSelection` / `DbxEditorCurrentLine` / `DbxEditorGutterText` / `DbxEditorGutterBorder` | `#C9D7FB` / `#F2F5FD` / `#8892A2` / `#E5E8EE` | `#34437F` / `#262B3A` / `#707A8A` / `#2A2E35` | SQL editor (the AvaloniaEdit theme in `ScriptTabView` should read these, not the grid tokens) |
+| `DbxError` + `Bg` / `Border` / `Text` | `#C8372D` `#FDEDEB` `#F3C2BD` `#8F2A22` | `#F2766E` `#3A1F1E` `#6E3631` `#FFA39B` | error banner, badge, icon, `fielderror` |
+| `DbxWarn` + `Bg` / `Border` / `Text` | `#B45F06` `#FFF5DC` `#EFD595` `#6B4200` | `#E8B04C` `#3A2E14` `#6E5A2A` `#F2C46D` | warning banner, read-only badge |
+| `DbxInfo` + `Bg` / `Border` / `Text` | `#3E63DD` `#EAEFFD` `#C5D2F8` `#243B8F` | `#8CA3F7` `#222B52` `#3B4A8A` `#B3C2FB` | info banner |
+| `DbxSuccess` + `Bg` / `Border` / `Text` | `#1A8044` `#E8F6EC` `#BCE0C9` `#165F36` | `#4CC27A` `#17301F` `#2A5C3A` `#85DDA5` | success banner and badge, connected dot |
+| `DbxRun`, `DbxStop` | `#1A8044`, `#C8372D` | `#4CC27A`, `#F2766E` | run, cancel icons |
+| `DbxDanger` / `DbxDangerHover` | `#C8372D` / `#B32F26` | `#C9382F` / `#CC3C33` | `Button.danger` fill (white text, 5:1) |
+| `DbxIcon` | `#5F6B7B` | `#9AA3B2` | default icon colour |
+| `DbxIconFolder` / `Table` / `View` / `Key` | `#A98B57` `#5E7391` `#7F70AE` `#B08718` | `#BBA371` `#8CA0BD` `#A196CC` `#D1AE4A` | muted icon tints (tables and views are told apart by shape) |
+| `DbxThumb` / `DbxThumbHover` / `DbxThumbPressed` | `#C2C8D2` / `#98A1AF` / `#76808F` | `#4A505B` / `#6B7380` / `#8A92A0` | scroll bar thumb (not used by views) |
+| `DbxScrim` | `#4D0F1626` | `#99000000` | quick-open backdrop |
 
-Grid cell states (translucent so they read on both themes): edited cell amber `#66F2B600`, new row green `#4429A329`,
-deleted row red `#55B3261E` with strike-through, NULL dim italic.
+The `DbxEnginePostgres` / `SqlServer` / `Sqlite` tokens are gone: engines are not colour coded.
+
+## Vocabulary (classes and themes)
+
+Themes (`Theme="{StaticResource ...}"`): `DbxToolButton`, `DbxDocTabControl` + `DbxDocTabItem`, `DbxSubTabControl` + `DbxSubTabItem`.
+
+| Class | On | What it does |
+| --- | --- | --- |
+| *(none)* | `Button` | secondary: soft fill, thin border, rounded 6, min height 30 |
+| `accent` (alias `primary`) | `Button`, `DbxToolButton` | primary: filled accent, white text |
+| `danger` | `Button`, `DbxToolButton` | destructive confirmation: filled red, white text |
+| `subtle` | `Button` | quiet filled, no border |
+| `ghost` | `Button` | transparent, no border, rounded hover (plain text button in a toolbar) |
+| `link` | `Button` | link colour text |
+| `card` | `Button` | whole clickable card (welcome actions), hover = accent soft |
+| `run` `stop` `link` `tint` `close` | `DbxToolButton` | coloured icon (green / red / link / accent) or 10 px close glyph |
+| `segment` | `ToggleButton` | option chip, checked = accent soft fill + accent border. Put several in a horizontal `StackPanel` (Spacing 6) |
+| `choice` | `ListBoxItem` | selectable card (engine picker): selected = accent soft fill + accent border. Use a horizontal `ListBox` |
+| `error` | `TextBox`, `ComboBox` | error border and error focus glow; add `TextBlock.fielderror` under it |
+| `bare` | `TextBox` | no frame, no glow (search box inside a card; `search` is also accepted) |
+| `fielderror` | `TextBlock` | 11.5 px error text for an inline validation line |
+| `h1` `h2` `title` `section` `dim` `faint` `small` | `TextBlock` | 20 semi-bold / 15 semi-bold / semi-bold / 11.5 caps-style dim label / dim / faint / 11.5 |
+| `panelHeader` | `Border` | panel title strip: chrome, hairline below, 40 high |
+| `toolbar` | `Border` | toolbar band: content colour, hairline below, 40 high, padding 8,4 |
+| `vsep` | `Border` | 1 px vertical separator between toolbar groups |
+| `banner` + `error` `warn` `info` `success` | `Border` | status band; its icon is a `PathIcon` with `Classes="bi"` |
+| `badge` (+ `warn` `error` `info`/`ok` `success`) | `Border` | pill chip |
+| `kbd` | `Border` > `TextBlock` | key cap; also fine inside a tooltip (`ToolTip.Tip` = horizontal `StackPanel` of a text and a `Border.kbd`) |
+| `surface` | `Border` | raised panel: surface colour, hairline, radius 8, no padding |
+| `card` | `Border` | `surface` + padding 16 + radius 10: standard container for a group of content |
+| `empty` | `StackPanel` | empty state: centered, max width 380; children: `PathIcon` (36 px, faint), `TextBlock.h2` title, `TextBlock.dim` hint, optional `Button.accent` |
+| `spin` | `PathIcon` | rotates while its own `IsVisible` is true (bind `IsVisible` on the icon itself, not on a parent) |
+| `thin` | `ProgressBar` | 3 px bar |
+| `danger` | `MenuItem` | error-coloured text and icon (Delete). Gesture text is already dim, right-aligned |
+| `dim` | `PathIcon` | `DbxIcon` colour |
+
+Stock controls that are restyled without a class: `TextBox`, `ComboBox` (+ popup), `CheckBox`, `RadioButton`, `ToggleButton`,
+`ListBoxItem`, `TreeViewItem` (rounded rows with 2 px side margin), `MenuItem` / `ContextMenu` / `MenuFlyout`, `ToolTip`,
+`ScrollBar` (slim, no arrows, thumb grows on hover), `ProgressBar`, `GridSplitter`, `DataGrid` (header, rows, selection,
+current-cell frame: 2 px accent, inside the cell).
 
 ## Components
 
-- **Navigator**: `Border.panelHeader` (title + `DbxToolButton` icon buttons), `TreeView` with 24 px rows. Row = colour chip,
-  engine icon (`EngineIcon`), name (bold when connected), green dot, lock (read-only), `failed` badge. Folders show a
-  connection count.
-- **Document tabs**: `DbxDocTabControl` / `DbxDocTabItem`; `TabStripPanel` shrinks tabs instead of wrapping. Active tab = content
-  colour + 3 px accent strip. Header = colour chip, type icon (`TabViewModel.IconKey`), title, dirty dot
-  (`HasUnsavedWork`), lock, close button (only on the hovered or selected tab).
-- **Secondary tabs** (Data / Structure, script results): `DbxSubTabControl` / `DbxSubTabItem`, underline style.
-- **Table tab**: banners, then the tab strip, then one toolbar (reload, paging, count | add, delete, save, revert | define key,
-  read-only badge), the WHERE row, the grid. The grid header is a darker name band over a lighter filter band.
-- **Script tab**: toolbar (run, run all, cancel | run on group, script on group, only for a connection in a group | row limit |
-  open, save | connection badge), editor (per-theme syntax colours), splitter, result tabs with a result line (`N rows · X ms`),
-  error banners. Chords: `Ctrl+Enter` / `F5` run here, `Ctrl+Shift+Enter` / `Ctrl+Shift+F5` run on the group (`ScriptTabKeys`).
-- **Group run panel** (below the editor, replaces the result tabs while a group run is shown): a toolbar strip with one `badge` per
-  database (state icon: `IconSchedule` waiting, `IconRefresh` running, `IconCheck` done, `IconError` failed, `IconStop` cancelled;
-  name, rows and time or error, a close button that cancels that database) and "Cancel all"; a `banner warn` with the notices; then
-  secondary tabs: "All" (a "Differences only" check box, a read-only `ResultGrid` with a leading `Database` / `Present in` column,
-  a result line) and one tab per database (the same content as a statement result tab).
+- **Navigator**: header "Connections" (normal case) with one "+" menu (connection, folder, group, DBeaver import), Refresh and
+  Collapse; a filter box under it (clear button, `Esc` clears, `Down` enters the tree, `Ctrl+F` focuses it). `TreeView` with 28 px
+  rows and rounded accent-soft selection. A connection row is the shared `ConnectionRow` (colour chip chosen by the user, a neutral
+  engine icon with a state dot: green connected, ring disconnected, red failed; a trailing lock, spinner or failure icon; a
+  tooltip with host, database and state). Folders and schemas show counts. The Groups section comes last. Empty state ("No
+  connections yet") and "No match" state. Context menus are state-aware (Connect / Retry / Disconnect) with icons and gestures;
+  `Delete` is `MenuItem.danger`. Drag a connection onto a folder or a group (the target is highlighted).
+- **Document tabs**: `DbxDocTabControl` / `DbxDocTabItem` (main window: `MainDocTabControl`, with a "+" new script button and a tab
+  context menu: close, close others, close to the right, close all, reopen). Chrome strip with a hairline; tabs have rounded top
+  corners; the active tab takes the content colour and a short accent bar on top. Header = colour chip, type icon
+  (`TabViewModel.IconKey`), title, dirty dot (`HasUnsavedWork`), lock, close button.
+- **Secondary tabs** (Data / Structure, script results): `DbxSubTabControl` / `DbxSubTabItem`, clean underline with a rounded
+  accent bar under the active tab and a soft hover pill.
+- **Table tab**: banners, the Data / Structure tabs, then an actions-only toolbar (reload, Filters toggle with a count | add row,
+  delete (becomes "Delete 3 rows") | define key and the read-only badge docked right), the WHERE row (clear button, "Apply filters",
+  "Not applied yet"), filter chips with "Clear all", the grid, a **pending-changes bar** (counts, "Revert", "Review and save…")
+  and a **status strip** (paging `Alt+Left` / `Alt+Right`, "Rows 1–200 of N", "Count rows", elapsed time, "N rows selected").
+  Overlays for loading, empty, no match and failed loads; a warning strip when the rows shown are from the previous query.
+  The grid header is a name band (type-aware, sort in accent, context menu) over a lighter filter band with typed hints. Edited
+  cells are bold with a "Was: …" tooltip; empty cells of a new row say `DEFAULT`. `Ctrl+C` / `Ctrl+Shift+C` copy, `Delete`, `Insert`,
+  `Alt+Enter` opens the value viewer (full text, JSON indented, hex for binary).
+- **Script tab**: one-row toolbar: Run (accent) and Run all, "Run on group" menu, row-limit dropdown with presets, Statistics
+  toggle, icon-only Open and Save, progress + elapsed time + Stop only while running, connection badge (+ read-only badge) and a
+  shortcuts flyout. Editor with find (`Ctrl+F`), `Ctrl+/` comments, gutter marks per statement that ran. Results: a run summary
+  line, result tabs titled `1 · SELECT … FROM orders`, a result line (`N rows · X ms`, "Showing first 1,000 rows" with
+  "Raise limit"), error banners with "Go to statement" and "Copy" (amber with a lock when the read-only guard blocks a statement).
+  Chords: `Ctrl+Enter` / `F5` run here, `Ctrl+Shift+Enter` / `Ctrl+Shift+F5` run on the group, `Esc` stops a run, `F6` switches pane,
+  `Ctrl+1…9` pick a result tab (`ScriptTabKeys`).
+- **Group run panel** (below the editor, replaces the result tabs while a group run is shown): a header with a summary and a
+  Close button; one clickable state chip per database (spinner while running, check, error, stop); info and warning banners
+  split by severity; an "All rows | Differences" segmented control with a "N differ" / "Identical" chip, and one tab per database.
 - **Database selector** (`GroupSwitcher`, in table and script tabs): group icon, a group picker (only when the connection is in
-  several groups), previous / next chevrons and a combo of the group's databases (engine icon, name, lock for read-only). Shown
-  only when the tab's connection is in a group with other members: in the table tab as a toolbar strip above the banners, in the
-  script tab in place of the connection badge. Ctrl+Alt+PageDown / PageUp switch to the next / previous member.
-- **Status bar**: severity icon + message, busy spinner + cancel, active connection (engine icon, name, engine, read-only
-  badge), shortcut hints.
-- **Quick open**: shadowed card, big search box, icon + label + dim detail rows, keyboard-hint footer.
+  several groups), previous / next chevrons and a combo of the group's databases. Shown only when the tab's connection is in a
+  group with other members. Ctrl+Alt+PageDown / PageUp switch to the next / previous member.
+- **Status bar**: severity icon + message (ellipsis; info and success fade after 8 s; warnings and errors stay with a dismiss
+  button; click for the last 30 messages), busy spinner + Cancel only when the operation can be cancelled, the active connection
+  with its state dot and a tooltip, a shortcuts button (`F1`, one list shared with the welcome page: `ShortcutCatalog`) and Settings.
+- **Quick open**: shadowed card, search box, table name (matched letters in bold) + schema, a connection badge, an empty state, a
+  result counter ("50 of 1,284"), keyboard-hint footer. `Ctrl+T` connects first when needed.
+- **Dialogs**: shared `DialogHeader` / `DialogFooter` (`DialogParts.cs`): icon tile, title, subtitle; footer with verb buttons
+  ("Add connection", "Create group", "Save"). Inline field errors (`TextBox.error` + `TextBlock.fielderror`). Destructive
+  confirmations use `ConfirmRequest` with `DialogTone.Danger`: a red verb button, a red icon, Cancel is the default and focused.
 
 ## Screenshots
 
@@ -111,7 +195,7 @@ section of the navigator), `group-editor`, `group-editor-warning` (one member + 
 `group-schema-diff` (schema-difference report with an unreachable member), `group-switch-table` and `group-switch-script`
 (the database selector in a table and a script tab), `group-run` and `group-run-differences` (a read-only run of one statement on
 three databases: status panel and All / Differences). The `group-*` scenes use a demo config with three
-groups; the Group icon is `IconGroup` / `IconGroupAdd` in `Icons.axaml`. The navigator is 304 px wide by default (it holds one
-more toolbar button than the "before" images). The "before" images were made from the same tool
-at the previous UI (commit `024c5ff`, with the one grid fix of commit `a5d3399`, without which a second table tab showed no grid).
-If writing a PNG straight into the repository folder fails on your machine, render into another folder and copy.
+groups; the Group icon is `IconGroup` / `IconGroupAdd` in `Icons.axaml`. The navigator is 304 px wide by default.
+The "before" images were made from the same tool at the original UI (commit `024c5ff`, with the one grid fix of commit `a5d3399`,
+without which a second table tab showed no grid). If writing a PNG straight into the repository folder fails on your machine,
+render into another folder and copy.

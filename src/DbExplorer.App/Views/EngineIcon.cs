@@ -5,8 +5,9 @@ using DbExplorer.Core.Model;
 namespace DbExplorer.App.Views;
 
 /// <summary>
-/// The database icon of a connection, tinted per engine (PostgreSQL blue, SQL Server red, SQLite teal). The tint is bound to
-/// the theme brush, so it follows a light/dark switch while the app runs.
+/// The database icon of a connection. Neutral on purpose: it is tinted with the theme's icon brush (<c>DbxIcon</c>) whatever the
+/// engine, because the colour identity of a connection is its colour chip, not its engine. <see cref="Kind"/> is kept so views
+/// and tooltips can still bind it. The brush is bound to the theme resource, so it follows a light/dark switch while the app runs.
 /// </summary>
 public sealed class EngineIcon : PathIcon
 {
@@ -14,22 +15,15 @@ public sealed class EngineIcon : PathIcon
 
     protected override Type StyleKeyOverride => typeof(PathIcon);
 
+    public EngineIcon()
+    {
+        Bind(DataProperty, this.GetResourceObservable("IconDatabase"));
+        Bind(ForegroundProperty, this.GetResourceObservable("DbxIcon"));
+    }
+
     public DbKind? Kind
     {
         get => GetValue(KindProperty);
         set => SetValue(KindProperty, value);
-    }
-
-    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
-    {
-        base.OnPropertyChanged(change);
-        if (change.Property != KindProperty) return;
-        Bind(DataProperty, this.GetResourceObservable("IconDatabase"));
-        Bind(ForegroundProperty, this.GetResourceObservable(Kind switch
-        {
-            DbKind.Postgres => "DbxEnginePostgres",
-            DbKind.SqlServer => "DbxEngineSqlServer",
-            _ => "DbxEngineSqlite",
-        }));
     }
 }

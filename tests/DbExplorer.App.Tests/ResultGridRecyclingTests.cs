@@ -42,7 +42,7 @@ public class ResultGridRecyclingTests : IDisposable
             var values = GridCellColumn.ValuesOf(row.DataContext)!;
             foreach (var cell in row.GetVisualDescendants().OfType<GridCell>())
             {
-                var expected = CellFormatter.Format(values[cell.Index]).Text;
+                var expected = values[cell.Index] is null && row.DataContext is RowViewModel { IsNew: true } ? "DEFAULT" : CellFormatter.Format(values[cell.Index]).Text;
                 if (!ReferenceEquals(cell.Row, row.DataContext) || cell.Text != expected)
                     bad.Add($"row {row.Index} col {cell.Index}: shows '{cell.Text}' (acts on {Describe(cell.Row)}), expected '{expected}'");
             }
@@ -108,7 +108,7 @@ public class ResultGridRecyclingTests : IDisposable
         var newRow = inner.GetVisualDescendants().OfType<DataGridRow>().Single(r => r.Index == 200);
         var texts = newRow.GetVisualDescendants().OfType<GridCell>().Select(c => c.Text).ToList();
         Assert.NotEmpty(texts);   // (the first editable cell is already in edit mode: it is a text box, not a GridCell)
-        Assert.All(texts, t => Assert.Equal("NULL", t));
+        Assert.All(texts, t => Assert.Equal("DEFAULT", t));   // an insert leaves untouched cells out: the column default applies
         Assert.All(newRow.GetVisualDescendants().OfType<GridCell>(), c => Assert.True(c.Row is RowViewModel { IsNew: true }));
         Assert.Empty(Mismatches(inner));
         window.Close();

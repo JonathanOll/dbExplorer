@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DbExplorer.App.ViewModels"
+             xmlns:views="using:DbExplorer.App.Views"
+             x:Class="DbExplorer.App.Views.ConnectionRow"
+             x:DataType="vm:ConnectionNodeViewModel">
+  <!-- One connection in the navigator (also used by the members of a group): colour chip, database icon with a state dot, name,
+       then a trailing column for the lock, the spinner and the failure mark. The state is also in the tooltip and the automation name,
+       so it never relies on colour alone. -->
+  <Grid ColumnDefinitions="Auto,Auto,*,Auto" Background="Transparent" MinWidth="150"
+        ToolTip.Tip="{Binding Tooltip}" AutomationProperties.Name="{Binding Title}" AutomationProperties.HelpText="{Binding StateText}">
+    <Border Width="3" Height="14" CornerRadius="2" Background="{Binding ChipColor}" VerticalAlignment="Center" Margin="0,0,7,0" />
+    <Panel Grid.Column="1" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,7,0">
+      <views:EngineIcon Kind="{Binding Config.Kind}" Width="16" Height="16" />
+      <Ellipse Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-2,-2"
+               Fill="{DynamicResource DbxSuccess}" Stroke="{DynamicResource DbxNavBg}" StrokeThickness="1.5"
+               IsVisible="{Binding IsConnected}" />
+      <Ellipse Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-2,-2"
+               Fill="{DynamicResource DbxError}" Stroke="{DynamicResource DbxNavBg}" StrokeThickness="1.5"
+               IsVisible="{Binding HasError}" />
+    </Panel>
+    <TextBlock Grid.Column="2" Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="8,0,2,0" HorizontalAlignment="Right">
+      <PathIcon Classes="spin" Data="{StaticResource IconRefresh}" Width="13" Height="13" Foreground="{DynamicResource DbxAccent}"
+                IsVisible="{Binding IsConnecting}" />
+      <PathIcon Data="{StaticResource IconLock}" Width="12" Height="12" Foreground="{DynamicResource DbxWarn}" IsVisible="{Binding IsReadOnly}" />
+      <PathIcon Data="{StaticResource IconError}" Width="13" Height="13" Foreground="{DynamicResource DbxError}" IsVisible="{Binding HasError}" />
+    </StackPanel>
+  </Grid>
+</UserControl>

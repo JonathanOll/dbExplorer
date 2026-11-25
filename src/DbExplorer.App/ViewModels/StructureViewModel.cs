@@ -10,7 +10,8 @@ public sealed class StructureViewModel
     public static StructureViewModel Empty { get; } = new(null, _ => Task.CompletedTask);
 
     /// <param name="openTable">Opens a table in a new tab (used by the foreign-key links).</param>
-    public StructureViewModel(TableInfo? table, Func<TableRef, Task> openTable)
+    /// <param name="focusColumn">Shows a column in the Data sub-tab (double-click a column row); without it nothing happens.</param>
+    public StructureViewModel(TableInfo? table, Func<TableRef, Task> openTable, Action<string>? focusColumn = null)
     {
         if (table is null)
         {
@@ -23,7 +24,7 @@ public sealed class StructureViewModel
         Columns = table.Columns.OrderBy(c => c.Ordinal).Select(c =>
         {
             var fk = table.ForeignKeys.FirstOrDefault(f => f.Columns.Contains(c.Name, StringComparer.OrdinalIgnoreCase));
-            return new StructureColumn(c, fk, openTable);
+            return new StructureColumn(c, fk, openTable, focusColumn);
         }).ToList();
         ForeignKeys = table.ForeignKeys.Select(f => new StructureForeignKey(f, openTable)).ToList();
         Indexes = table.Indexes.Select(i => new StructureIndex(i.Name, i.Unique, string.Join(", ", i.Columns))).ToList();
@@ -35,6 +36,19 @@ public sealed class StructureViewModel
 
     public IReadOnlyList<StructureIndex> Indexes { get; }
 
+    public bool HasColumns => Columns.Count > 0;
+
+    public bool HasForeignKeys => ForeignKeys.Count > 0;
+
+    public bool HasIndexes => Indexes.Count > 0;
+
+    // Section titles carry their count: "COLUMNS (12)".
+    public string ColumnsTitle => $"COLUMNS ({Columns.Count})";
+
+    public string ForeignKeysTitle => $"FOREIGN KEYS ({ForeignKeys.Count})";
+
+    public string IndexesTitle => $"INDEXES ({Indexes.Count})";
+
     internal static string Describe(ForeignKeyInfo fk) => $"{fk.RefTable} ({string.Join(", ", fk.RefColumns)})";
 }
 
@@ -43,8 +57,11 @@ public sealed class StructureColumn
     private readonly ForeignKeyInfo? _foreignKey;
     private readonly Func<TableRef, Task> _openTable;
 
-    internal StructureColumn(ColumnInfo column, ForeignKeyInfo? foreignKey, Func<TableRef, Task> openTable)
+    private readonly Action<string>? _focusColumn;
+
+    internal StructureColumn(ColumnInfo column, ForeignKeyInfo? foreignKey, Func<TableRef, Task> openTable, Action<string>? focusColumn = null)
     {
+        _focusColumn = focusColumn;
         Column = column;
         _foreignKey = foreignKey;
         _openTable = openTable;
@@ -66,6 +83,12 @@ public sealed class StructureColumn
     public bool Nullable => Column.Nullable;
     public string NullText => Column.Nullable ? "NULL" : "NOT NULL";
     public bool IsPrimaryKey => Column.IsPrimaryKey;
+
+    /// <summary>The column cannot be NULL: shown emphasised, a nullable column is shown faint.</summary>
+    public bool IsRequired => !Column.Nullable;
+
+    /// <summary>Shows this column in the Data sub-tab (scrolls to it and lights it).</summary>
+    public void Jump() => _focusColumn?.Invoke(Column.Name);
 
     /// <summary>"PK", "FK", "PK, FK" or empty.</summary>
     public string Key { get; }
