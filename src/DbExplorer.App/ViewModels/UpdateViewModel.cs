@@ -224,7 +224,7 @@ public partial class UpdateViewModel : ObservableObject
 
     private static string Describe(DownloadResult result) => result.Failure switch
     {
-        DownloadFailure.GhMissing => "The GitHub CLI (gh) was not found.",
+        DownloadFailure.GhMissing => "GitHub could not be reached, and the GitHub CLI (gh) is not installed as a fallback.",
         DownloadFailure.HashMismatch => "The downloaded file does not match its checksum; it was discarded and nothing was installed.",
         DownloadFailure.FileMissing => "The downloaded file is missing" + Suffix(result.Detail),
         DownloadFailure.Cancelled => "The download was cancelled.",
