@@ -4,7 +4,8 @@
 Smoke test of install.ps1: runs the real script against throw-away locations (nothing of the user's real install is touched).
 
 .DESCRIPTION
-Needs network and the GitHub CLI (it installs the real latest release several times). Every location is a seam of
+Needs network (plain HTTPS to the GitHub API: the main scenarios run with gh NOT on PATH) and, for the -UseGh / fallback
+scenarios, the GitHub CLI (it installs the real latest release several times). Every location is a seam of
 install.ps1 pointing into a temp sandbox: install dir, setup dir, Start Menu, desktop, user data, and a registry key
 HKCU:\Software\dbExplorer-test-<guid>. Everything is deleted at the end, also on failure, and the test then checks that
 the real Start Menu entry, "Apps & features" key, default install dir and temp folders did not change.
@@ -72,6 +73,8 @@ function Invoke-Child {
 function Invoke-Installer {
     param([string[]]$Extra = @(), [hashtable]$Env = @{}, [switch]$NoSeams)
     $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $install) + $Extra
+    # The fake gh only exists to be called: those scenarios ask for gh explicitly (plain HTTPS is the default).
+    if ($Env.ContainsKey('FAKE_GH_MODE') -and $Extra -notcontains '-UseGh') { $a += '-UseGh' }
     if (-not $NoSeams) { $a += $seamArgs }
     Invoke-Child -Arguments $a -Env $Env
 }
@@ -164,6 +167,11 @@ try {
     $ps51 = (Get-Command powershell -CommandType Application | Select-Object -First 1).Source
     $e51 = & $ps51 -NoProfile -Command "`$e=`$null;`$t=`$null;[void][System.Management.Automation.Language.Parser]::ParseFile('$install',[ref]`$t,[ref]`$e);`$e.Count"
     Assert-That ("$e51".Trim() -eq '0') 'install.ps1 parses with Windows PowerShell 5.1 (0 errors)'
+    $ps7 = Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($ps7) {
+        $e7 = & $ps7.Source -NoProfile -Command "`$e=`$null;`$t=`$null;[void][System.Management.Automation.Language.Parser]::ParseFile('$install',[ref]`$t,[ref]`$e);`$e.Count"
+        Assert-That ("$e7".Trim() -eq '0') 'install.ps1 parses with PowerShell 7 (0 errors)'
+    }
     $help = & $ps51 -NoProfile -ExecutionPolicy Bypass -Command "Get-Help '$install' -Full | Out-String"
     $helpText = $help -join "`n"   # section titles are localised: match the content
     Assert-That ($helpText -match 'Installs, updates or uninstalls' -and $helpText -match 'RemoveUserData' -and $helpText -match 'Installs v1\.0\.4, adds a desktop shortcut') 'Get-Help renders synopsis, parameters and examples'
@@ -196,13 +204,20 @@ try {
     Assert-That ($r.Code -ne 0 -and $r.Out -match "Invalid -Version 'banana'" -and $r.Out -match 'Fix:') "bad -Version: exit $($r.Code), cause + fix"
     Assert-That (-not (Test-Path -LiteralPath $loc.App)) 'bad -Version creates nothing'
     $sys = "$env:SystemRoot\System32;$env:SystemRoot"
-    $r = Invoke-Installer -Env @{ PATH = $sys }
-    Assert-That ($r.Code -ne 0 -and $r.Out -match 'GitHub CLI \(gh\) is not installed' -and $r.Out -match 'winget install --id GitHub\.cli') "gh missing: exit $($r.Code), clear error with the winget hint"
-    Assert-That (-not (Test-Path -LiteralPath $loc.App)) 'gh missing creates nothing'
-    $r = Invoke-Installer -Extra @('-Version', '99.0.0')
-    Assert-That ($r.Code -ne 0 -and $r.Out -match 'v99\.0\.0 was not found') "unknown release: exit $($r.Code), 'not found' message"
-    $r = Invoke-Installer -Extra @('-Repository', 'JonathanOll/dbexplorer-does-not-exist-xyz')
-    Assert-That ($r.Code -ne 0 -and $r.Out -match 'ERROR:' -and $r.Out -match 'gh auth login') "unreachable repository: exit $($r.Code), points to gh auth login"
+    $r = Invoke-Installer -Extra @('-UseGh') -Env @{ PATH = $sys }
+    Assert-That ($r.Code -ne 0 -and $r.Out -match 'GitHub CLI \(gh\) is not installed' -and $r.Out -match 'winget install --id GitHub\.cli') "-UseGh without gh: exit $($r.Code), clear error with the winget hint"
+    Assert-That (-not (Test-Path -LiteralPath $loc.App)) '-UseGh without gh creates nothing'
+    $r = Invoke-Installer -Extra @('-Version', '99.0.0') -Env @{ PATH = $sys }
+    Assert-That ($r.Code -ne 0 -and $r.Out -match 'v99\.0\.0 was not found' -and $r.Out -match 'Fix:') "unknown release over HTTPS, no gh: exit $($r.Code), 'not found' message"
+    $r = Invoke-Installer -Extra @('-Version', '99.0.0', '-UseGh')
+    Assert-That ($r.Code -ne 0 -and $r.Out -match 'v99\.0\.0 was not found') "unknown release through gh: exit $($r.Code), 'not found' message"
+    $r = Invoke-Installer -Extra @('-Repository', 'JonathanOll/dbexplorer-does-not-exist-xyz') -Env @{ PATH = $sys }
+    Assert-That ($r.Code -ne 0 -and $r.Out -match 'ERROR:' -and $r.Out -match 'GITHUB_TOKEN') "unreachable repository over HTTPS: exit $($r.Code), points to GITHUB_TOKEN"
+    $r = Invoke-Installer -Extra @('-Repository', 'JonathanOll/dbexplorer-does-not-exist-xyz', '-UseGh')
+    Assert-That ($r.Code -ne 0 -and $r.Out -match 'ERROR:' -and $r.Out -match 'gh auth login') "unreachable repository through gh: exit $($r.Code), points to gh auth login"
+    $r = Invoke-Installer -Env @{ PATH = $sys; GITHUB_TOKEN = 'ghp_invalid_token_for_the_test' }
+    Assert-That ($r.Code -ne 0 -and $r.Out -match 'rejected the token' -and $r.Out -match 'GITHUB_TOKEN') "bad token, no gh: exit $($r.Code), says so with a fix"
+    Assert-That (-not (Test-Path -LiteralPath $loc.App)) 'bad token creates nothing'
     $r = Invoke-Installer -Extra @('-Repository', 'not a repo')
     Assert-That ($r.Code -ne 0 -and $r.Out -match 'Invalid -Repository') 'bad -Repository is refused'
     $r = Invoke-Installer -Extra @('-RemoveUserData')
@@ -225,8 +240,9 @@ try {
     Assert-That ($r.Code -eq 0 -and $r.Out -match 'What ?if') "-WhatIf reports and exits 0 (exit $($r.Code))"
     Assert-That (-not (Test-Path -LiteralPath $loc.App) -and -not (Test-Path -LiteralPath $regKey) -and -not (Test-Path -LiteralPath $loc.Setup)) '-WhatIf changes nothing'
 
-    Write-Scenario 'Fresh install of the latest release (real gh download)'
-    $r = Invoke-Installer -Extra @('-DesktopShortcut')
+    Write-Scenario 'Fresh install of the latest release over plain HTTPS, gh NOT on PATH'
+    $r = Invoke-Installer -Extra @('-DesktopShortcut') -Env @{ PATH = $sys }
+    Assert-That ($r.Out -match 'sha256 verified') 'the download was verified against the GitHub digest'
     Write-Host ($r.Out -split "`n" | Select-Object -First 14 | ForEach-Object { "    | $_" }) -Separator "`n" -ForegroundColor DarkGray
     $exe = Join-Path $loc.App 'DbExplorer.exe'
     Assert-That ($r.Code -eq 0) "exit 0 (got $($r.Code))"
@@ -320,7 +336,7 @@ try {
     Assert-That ($r.Code -eq 0 -and -not (Test-Path -LiteralPath $loc.Data)) '-Force deletes the user data folder (test folder only)'
 
     Write-Scenario 'Piped forms: script block with parameters (real install), then Invoke-Expression'
-    $sbArgs = "-InstallDir '$($loc.App)' -SetupDir '$($loc.Setup)' -StartMenuDir '$($loc.Start)' -DesktopDir '$($loc.Desk)' -RegistryKey '$regKey' -UserDataDir '$($loc.Data)'"
+    $sbArgs = "-UseGh -InstallDir '$($loc.App)' -SetupDir '$($loc.Setup)' -StartMenuDir '$($loc.Start)' -DesktopDir '$($loc.Desk)' -RegistryKey '$regKey' -UserDataDir '$($loc.Data)'"
     $cmd = "& ([scriptblock]::Create([IO.File]::ReadAllText('$install'))) -Version '$latestTag' $sbArgs"
     $r = Invoke-Child -Arguments @('-NoProfile', '-Command', $cmd) -Env $cachedEnv
     Assert-That ($r.Code -eq 0 -and (Test-Path -LiteralPath $exe)) "script block form installs with parameters (exit $($r.Code))"
@@ -329,9 +345,15 @@ try {
     $r = Invoke-Child -Arguments (@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $copy, '-Uninstall', '-Quiet', '-Force') + $seamArgs) -Env @{}
     Assert-That ($r.Code -eq 0 -and -not (Test-Path -LiteralPath $loc.App) -and -not (Test-Path -LiteralPath $regKey)) 'uninstall through the setup copy written from the script block works'
     Assert-That (Wait-Until { -not (Test-Path -LiteralPath $loc.Setup) }) 'setup folder gone'
-    # `| iex` cannot take seams: run it where it fails before touching anything (fake gh, wrong digest) to prove it parses, runs and reports an exit code.
-    $r = Invoke-Child -Arguments @('-NoProfile', '-Command', "[IO.File]::ReadAllText('$install') | Out-String | iex") -Env ($shimEnv + @{ FAKE_GH_MODE = 'badhash' })
-    Assert-That ($r.Code -ne 0 -and $r.Out -match 'SHA-256 mismatch') "Invoke-Expression form runs and fails with a non-zero exit (exit $($r.Code))"
+    # `| iex` cannot take seams: run it where it fails before touching anything. A bad token makes the HTTPS path fail (401),
+    # then the fake gh (wrong digest) is the fallback: proves it parses, runs, falls back and reports an exit code.
+    $r = Invoke-Child -Arguments @('-NoProfile', '-Command', "[IO.File]::ReadAllText('$install') | Out-String | iex") -Env ($shimEnv + @{ FAKE_GH_MODE = 'badhash'; GITHUB_TOKEN = 'ghp_invalid_token_for_the_test' })
+    Assert-That ($r.Code -ne 0 -and $r.Out -match 'SHA-256 mismatch' -and $r.Out -match 'trying gh') "Invoke-Expression form runs, falls back to gh and fails with a non-zero exit (exit $($r.Code))"
+
+    Write-Scenario 'Piped script block over HTTPS with parameters, gh NOT on PATH (-Version of the latest, sandbox seams)'
+    $sbArgs2 = "-InstallDir '$($loc.App)' -SetupDir '$($loc.Setup)' -StartMenuDir '$($loc.Start)' -DesktopDir '$($loc.Desk)' -RegistryKey '$regKey' -UserDataDir '$($loc.Data)'"
+    $r = Invoke-Child -Arguments @('-NoProfile', '-Command', "& ([scriptblock]::Create([IO.File]::ReadAllText('$install'))) -Version '$latestTag' -WhatIf $sbArgs2") -Env @{ PATH = $sys }
+    Assert-That ($r.Code -eq 0 -and $r.Out -match 'What ?if' -and -not (Test-Path -LiteralPath $loc.App)) "HTTPS script block form with -WhatIf (exit $($r.Code))"
 }
 finally {
     Write-Scenario 'Cleanup and leak check'
