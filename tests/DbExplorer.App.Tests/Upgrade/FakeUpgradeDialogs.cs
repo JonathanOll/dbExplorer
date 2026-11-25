@@ -11,8 +11,9 @@ internal sealed class FakeUpgradeDialogs : IUpgradeDialogs
     /// <summary>What the user does in the Options window: edits the vm, then presses OK (true) or Cancel (false).</summary>
     public Func<OptionsViewModel, bool> OptionsScript { get; set; } = _ => false;
 
-    public Task<bool> ShowOptionsAsync(OptionsViewModel viewModel)
+    public Task<bool> ShowOptionsAsync(SettingsViewModel settings)
     {
+        var viewModel = settings.Upgrade!;
         Options.Add(viewModel);
         return Task.FromResult(OptionsScript(viewModel));
     }

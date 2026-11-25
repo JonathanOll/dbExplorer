@@ -33,19 +33,39 @@ public partial class MainViewModel
         OpenUpgradeCommand.NotifyCanExecuteChanged();
     }
 
+    private void ApplyDbUpdatePath(string? path)
+    {
+        if (path == Tree.Config.DbUpdatePath) return;
+        Tree.SetDbUpdatePath(path);
+        RefreshUpgradeAvailability();
+    }
+
+    /// <summary>What the settings pages read and write: the live settings service plus the config flags of the menus.</summary>
+    private SettingsContext SettingsContextFor(OptionsViewModel upgrade) => new(Settings.SettingsService.Instance)
+    {
+        Upgrade = upgrade,
+        ApplyDbUpdatePath = ApplyDbUpdatePath,
+        AutoUpdateCheck = new(() => Update.AutoCheckEnabled, v => Update.AutoCheckEnabled = v),
+        ShowFolders = new(() => Tree.ShowFolders, v => { if (v != Tree.ShowFolders) Tree.ToggleFoldersCommand.Execute(null); }),
+        ShowGroups = new(() => Tree.ShowGroups, v => { if (v != Tree.ShowGroups) Tree.ToggleGroupsCommand.Execute(null); }),
+        ShowScripts = new(() => Tree.ShowScripts, v => { if (v != Tree.ShowScripts) Tree.ToggleScriptsCommand.Execute(null); }),
+        CopyText = text => CopyToClipboard?.Invoke(text) ?? Task.CompletedTask,
+    };
+
+    /// <summary>Opens the Settings dialog (Tools > Settings, Ctrl+,). <paramref name="page"/> picks the page to start on.</summary>
     [RelayCommand]
-    private async Task OpenOptionsAsync()
+    private async Task OpenOptionsAsync(string? page = null)
     {
         try
         {
             if (_upgradeDialogs is not { } dialogs) return;
-            var vm = new OptionsViewModel(
+            var upgrade = new OptionsViewModel(
                 Tree.Config.DbUpdatePath,
                 DbUpdateCatalog.Validate,
                 path => $"{DbUpdateCatalog.Scan(path).Folders.Count} version folders found");
-            if (!await dialogs.ShowOptionsAsync(vm) || vm.Result is not { } result) return;
-            Tree.SetDbUpdatePath(result.DbUpdatePath);
-            RefreshUpgradeAvailability();
+            using var vm = new SettingsViewModel(SettingsContextFor(upgrade), page);
+            if (!await dialogs.ShowOptionsAsync(vm) || upgrade.Result is not { } result) return;
+            ApplyDbUpdatePath(result.DbUpdatePath);
         }
         catch (Exception ex)
         {

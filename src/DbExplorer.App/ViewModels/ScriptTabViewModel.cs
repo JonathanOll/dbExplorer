@@ -65,7 +65,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     private Session? _session;
     private System.Text.Encoding? _encoding;   // encoding of the file on disk; null = a new file (UTF-8, no BOM)
     private string? _savedText;      // text on disk (or "" for a new script); null = unknown, so always dirty
-    private int _rowLimit = DefaultRowLimit;
+    private int _rowLimit = Settings.SettingsService.Instance.Current.Results.DefaultRowLimit;   // the Settings > Results default
     private CancellationTokenSource? _runCts;
     private CancellationTokenSource? _persistCts;
     private volatile bool _closed;
@@ -230,7 +230,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel
     /// <summary>The row limit as the toolbar button says it: "1,000 rows".</summary>
     public string RowLimitText => StatementResultViewModel.RowsText(RowLimit);
 
-    public bool IsDefaultRowLimit => RowLimit == DefaultRowLimit;
+    public bool IsDefaultRowLimit => RowLimit == Settings.SettingsService.Instance.Current.Results.DefaultRowLimit;
 
     /// <summary>Limits offered by the row limit menu.</summary>
     public static IReadOnlyList<int> RowLimitPresets { get; } = [100, 500, 1_000, 5_000, 10_000, 100_000];

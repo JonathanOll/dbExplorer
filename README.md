@@ -64,7 +64,7 @@ Light and dark follow Windows. More screens, and the design tokens: [`docs/ui/RE
   a tab between them with one key press, run the same read-only query on all of them at once and see where the results
   differ, or compare their schemas. Details, shortcuts and limits: [Linked database groups](#linked-database-groups).
 - **N2F database upgrade**: play the dbupdate scripts of one sprint of the n2f repo on the current database or on a whole
-  group, with a preview, warnings (index creation, long-running statements) and a confirmation. Gear menu: **Options...**
+  group, with a preview, warnings (index creation, long-running statements) and a confirmation. Gear menu: **Settings...**
   and **Upgrade database...**. Details: [N2F database upgrade](#n2f-database-upgrade).
 - **Safety**: nothing is written without an explicit save; passwords are stored encrypted with Windows DPAPI (current
   user); SQL Server connections expose `encrypt` and `trustServerCertificate`.
@@ -244,12 +244,34 @@ The plan tab, one chip per statement when a run has several (with its share of t
 Plans are per run and not run on a group. The `Time` colouring needs an actual plan. The SQL Server parser reads the
 standard showplan XML by local names (any schema version) and skips what it does not know.
 
+## Settings
+
+Tools > **Settings...** (`Ctrl+,`, also the gear button). A left list of pages, a search box that filters the settings by
+label, and no OK / Cancel: every change applies at once and is saved in `config.json` (section `Settings`; an older file
+without it means the defaults). **Reset to defaults** works per page. When the config could not be read at start-up the
+status bar says the setting is not saved (it still applies for the run).
+
+| Page | What it sets |
+| --- | --- |
+| General | Navigator: folders, Groups section, Scripts section (same flags as the View menu) |
+| Appearance | Theme (System / Light / Dark, live), UI scale 90 to 150 %, accent colour (blue, teal, green, orange, pink, purple, both themes, button text keeps 4.5:1), row density (Comfortable 28 / Compact 24 / Spacious 32 px) |
+| Editor | Font family (installed code fonts) and size 10 to 24, line numbers, word wrap, show whitespace, current line highlight, tab size 2 / 4 / 8. Open editors follow at once |
+| Results | Grid font size, alternate row shading, default row limit of new scripts, NULL text (`NULL`, `(null)`, empty), thousands separator, date format (ISO or locale), longest cell text. Display only: filters, sorting, copy and edits keep the plain values |
+| Shortcuts | Every shortcut (from the same list as F1) with a filter box and **Copy as markdown**. Read only |
+| Updates | Automatic update check |
+| Database upgrade | The dbupdate folder (see [N2F database upgrade](#n2f-database-upgrade)) |
+
+The saved theme, accent and scale are applied before the first paint from the config that is already loaded (no extra file
+read); default settings change nothing at start-up. The UI scale is a layout transform around each window's content, so
+menus, drop-down lists and tooltips (separate windows) keep their size.
+
 ## Keyboard shortcuts
 
 | Shortcut | Where | Action |
 | --- | --- | --- |
 | `Ctrl+T` | anywhere | Quick open a table/view of the active connection |
 | `Ctrl+Shift+P` | anywhere | Quick open a table/view across all connections (metadata cache) |
+| `Ctrl+,` | anywhere | Open the Settings dialog (Tools > Settings...) |
 | `Ctrl+Shift+T` | anywhere | Reopen the last closed tab (like a browser; press again to go further back; up to 50 are remembered; a table keeps its filters, a script its text) |
 | `Ctrl+L` | table tab | Fuzzy-search a column and scroll to it |
 | `Ctrl+L` | script tab | Show the estimated execution plan of the selection / the statement under the cursor (nothing runs) |
@@ -366,10 +388,10 @@ Plays the SQL scripts of one sprint of the n2f `dbupdate` folder (`Web/Common/n2
 or on every database of one of its groups, after a preview with warnings and an explicit confirmation. It is a **separate,
 explicit write path**: [Run on group](#linked-database-groups) is unchanged and stays read-only. SQL Server only.
 
-**Setting.** Gear menu of the navigator toolbar, **Options...**: the path of the dbupdate folder (Browse or type it; a valid
+**Setting.** Tools > **Settings...** (`Ctrl+,`), page **Database upgrade** (also in the gear menu): the path of the dbupdate folder (Browse or type it; a valid
 folder shows how many version folders it holds). Stored in `config.json` as `DbUpdatePath`; empty (the default, and what an
-older file means) switches the feature off. The folder is validated when OK is pressed, after Browse and when the box loses
-focus, and the gear menu's **Upgrade database...** is only enabled when the saved path still validates (checked each time the
+older file means) switches the feature off. The folder is validated after Browse, on Enter, when the box loses focus and on Close (it is kept at once when valid; Esc leaves without keeping a half-typed one);
+the gear menu's **Upgrade database...** is only enabled when the saved path still validates (checked each time the
 menu opens). The path must exist and contain at least one `v...` folder. Nothing is read at launch and nothing is scanned
 until you open **Upgrade database...** (that scan is a directory listing; scripts are read when you press Load).
 
@@ -524,7 +546,7 @@ install folder (the folder must be writable; [`install.ps1`](#installation) crea
 before this feature and local builds never self-update), or when `DbExplorer.exe` is not what is running.
 `%APPDATA%\dbExplorer` (config, sessions, scripts, cache) is outside the install folder and is never touched.
 
-To turn it off: untick **Check for updates automatically** in the navigator's settings (gear) button (saved in `config.json`
+To turn it off: untick **Check for updates automatically** in Settings > Updates (or the gear button / Help menu) (saved in `config.json`
 as `AutoUpdateCheck`; a config without it means on), or start with `--no-update-check` / `DBEXPLORER_NO_UPDATE_CHECK=1`
 for one run. The check is also skipped when the config could not be read at startup.
 

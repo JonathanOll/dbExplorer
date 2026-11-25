@@ -24,5 +24,8 @@ public record AppConfig(
     /// <summary>Folder with the n2f dbupdate scripts; null switches the upgrade feature off. Missing in old files: null.</summary>
     public string? DbUpdatePath { get; set; }
 
+    /// <summary>Settings dialog values (appearance, editor, results...). Missing in old files: the defaults.</summary>
+    public AppSettings Settings { get; set; } = new();
+
     public static AppConfig Empty() => new(new(), new(), new());
 }

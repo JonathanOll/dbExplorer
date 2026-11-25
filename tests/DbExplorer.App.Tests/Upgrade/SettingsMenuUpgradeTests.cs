@@ -8,7 +8,7 @@ using DbExplorer.Core.Model;
 
 namespace DbExplorer.App.Tests.Upgrade;
 
-/// <summary>The gear menu of the real window: Upgrade database..., Options... and the update toggle.</summary>
+/// <summary>The gear menu of the real window: Upgrade database..., Settings... and the update toggle.</summary>
 public class SettingsMenuUpgradeTests : ShellTestBase, IDisposable
 {
     private readonly TempDbUpdateTree _tree = TempDbUpdateTree.Standard();
@@ -43,7 +43,7 @@ public class SettingsMenuUpgradeTests : ShellTestBase, IDisposable
         var items = ((MenuFlyout)gear.Flyout!).Items.Cast<Control>().ToList();
 
         Assert.Equal("Upgrade database…", (items[0] as MenuItem)?.Header);
-        Assert.Equal("Options…", (items[1] as MenuItem)?.Header);
+        Assert.Equal("Settings…", (items[1] as MenuItem)?.Header);
         Assert.Equal("Keyboard shortcuts", (items[2] as MenuItem)?.Header);
         Assert.IsType<Separator>(items[3]);
         Assert.Equal("Check for updates automatically", (items[4] as MenuItem)?.Header);
@@ -60,7 +60,7 @@ public class SettingsMenuUpgradeTests : ShellTestBase, IDisposable
         Dispatcher.UIThread.RunJobs();
 
         Assert.False(Item(gear, "Upgrade database…").IsEffectivelyEnabled);
-        Assert.True(Item(gear, "Options…").IsEffectivelyEnabled);
+        Assert.True(Item(gear, "Settings…").IsEffectivelyEnabled);
         window.Close();
     }
 
@@ -92,18 +92,18 @@ public class SettingsMenuUpgradeTests : ShellTestBase, IDisposable
             Thread.Sleep(20);
         }
 
-        Assert.Single(_upgrade.Upgrades);
+        Assert.True(_upgrade.Upgrades.Count == 1, "status: " + main.Status.Message);
         window.Close();
     }
 
     [AvaloniaFact]
-    public void OptionsEntry_ClickOpensTheOptionsDialogOnce()
+    public void SettingsEntry_ClickOpensTheSettingsDialogOnce()
     {
         var (_, window, gear) = Open(null);
         gear.Flyout!.ShowAt(gear);
         Dispatcher.UIThread.RunJobs();
 
-        Item(gear, "Options…").Command!.Execute(null);
+        Item(gear, "Settings…").Command!.Execute(null);
         Dispatcher.UIThread.RunJobs();
 
         Assert.Single(_upgrade.Options);
