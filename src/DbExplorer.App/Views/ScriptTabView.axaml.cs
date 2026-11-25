@@ -43,6 +43,7 @@ public partial class ScriptTabView : UserControl
         Editor.TextArea.TextView.BackgroundRenderers.Add(_marks);
         Editor.TextArea.LeftMargins.Add(_marks.Margin);   // the bars of the statements that ran, after the line numbers
         SearchPanel.Install(Editor);   // Ctrl+F, F3 / Shift+F3, case and whole-word options
+        InitCompletion();
         ActualThemeVariantChanged += (_, _) => ApplyEditorTheme();
         AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
         DataContextChanged += (_, _) => Attach(DataContext as ScriptTabViewModel);
@@ -448,6 +449,11 @@ public partial class ScriptTabView : UserControl
                 return;
             case ScriptKeyAction.SwitchPane:
                 SwitchPane();
+                e.Handled = true;
+                return;
+            case ScriptKeyAction.Complete:
+                if (!Editor.IsKeyboardFocusWithin) return;
+                ShowCompletion();
                 e.Handled = true;
                 return;
             default:

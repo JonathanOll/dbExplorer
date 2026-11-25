@@ -1,0 +1,63 @@
+<!-- The look of the autocomplete popup (AvaloniaEdit CompletionWindow). Added to the application styles the first time the list
+     opens (ScriptTabView.Completion.cs), so nothing of it costs startup time. The popup is not part of the script tab's visual
+     tree, so the tab's own styles do not reach it. Colours: Dbx* tokens only. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:cc="using:AvaloniaEdit.CodeCompletion">
+  <Style Selector="cc|CompletionList">
+    <Setter Property="MinWidth" Value="300" />
+    <Setter Property="MaxWidth" Value="560" />
+    <Setter Property="MaxHeight" Value="296" />
+    <Setter Property="FontSize" Value="{DynamicResource DbxFontSize}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{DynamicResource DbxSurface}" BorderBrush="{DynamicResource DbxBorder}" BorderThickness="1"
+                CornerRadius="{DynamicResource DbxCardRadius}" Padding="4" ClipToBounds="True">
+          <cc:CompletionListBox Name="PART_ListBox" Background="Transparent" BorderThickness="0" Padding="0"
+                                Foreground="{DynamicResource DbxText}">
+            <cc:CompletionListBox.ItemTemplate>
+              <DataTemplate x:DataType="cc:ICompletionData">
+                <ContentPresenter Content="{Binding Content}" />
+              </DataTemplate>
+            </cc:CompletionListBox.ItemTemplate>
+          </cc:CompletionListBox>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="cc|CompletionListBox">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <ScrollViewer Name="PART_ScrollViewer" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+          <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />
+        </ScrollViewer>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="cc|CompletionListBox ListBoxItem">
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="Padding" Value="8,0" />
+    <Setter Property="Margin" Value="0" />
+  </Style>
+  <Style Selector="Grid.cmpRow"><Setter Property="MinHeight" Value="28" /></Style>
+  <Style Selector="Grid.cmpRow > PathIcon.cmpIcon">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+    <Setter Property="Margin" Value="0,0,10,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource DbxIcon}" />
+  </Style>
+  <Style Selector="Grid.cmpRow > TextBlock.cmpLabel">
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+  </Style>
+  <Style Selector="Grid.cmpRow > TextBlock.cmpDetail">
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+    <Setter Property="Margin" Value="20,0,0,0" />
+    <Setter Property="FontSize" Value="{DynamicResource DbxSmallFontSize}" />
+    <Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    <Setter Property="MaxWidth" Value="220" />
+  </Style>
+</Styles>

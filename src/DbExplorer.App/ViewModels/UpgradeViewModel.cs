@@ -281,6 +281,22 @@ public sealed partial class UpgradeMemberViewModel : ObservableObject
         _ => "not run",
     };
 
+    /// <summary>A failed database goes back to waiting for a retry: nothing of its first attempt stays on the card.</summary>
+    internal void ResetForRetry()
+    {
+        _userCancelled = false;
+        ScriptIndex = 0;
+        ScriptCount = 0;
+        ScriptName = null;
+        Error = null;
+        ScriptsDone = 0;
+        Duration = null;
+        Note = null;
+        ScriptLines = [];
+        IsDetailsOpen = false;
+        State = MemberState.Pending;
+    }
+
     /// <summary>The run was abandoned before this database reported its end.</summary>
     internal void Abandon()
     {
@@ -403,6 +419,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
         ConfirmRunCommand.NotifyCanExecuteChanged();
         CancelAllCommand.NotifyCanExecuteChanged();
         RequestStopCommand.NotifyCanExecuteChanged();
+        RequestRetryCommand.NotifyCanExecuteChanged();
         CopyLogCommand.NotifyCanExecuteChanged();
         if (value != UpgradePhase.Running)
         {
@@ -413,7 +430,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
                  {
                      nameof(ChooseDone), nameof(ConfirmDone), nameof(InChoose), nameof(InConfirm), nameof(InRun), nameof(ShowRunReason),
                      nameof(RunDisabledReason), nameof(OutcomeIsSuccess), nameof(OutcomeIsWarn), nameof(OutcomeIsError), nameof(ShowOverall),
-                     nameof(CanGoBack), nameof(ShowCopyLog), nameof(RunDone), nameof(ShowStopButton), nameof(RunButtonText), nameof(IsDangerRun),
+                     nameof(CanGoBack), nameof(ShowCopyLog), nameof(ShowRetry), nameof(RetryButtonText), nameof(RunDone), nameof(ShowStopButton), nameof(RunButtonText), nameof(IsDangerRun),
                  })
             OnPropertyChanged(name);
     }
@@ -523,11 +540,13 @@ public sealed partial class UpgradeViewModel : ObservableObject
     private UpgradeTarget? EffectiveTarget => _confirmedTarget ?? SelectedTarget;
 
     /// <summary>A group run is confirmed by typing the sprint number (or folder code).</summary>
-    public bool NeedsTypedConfirmation => EffectiveTarget?.Group is not null;
+    public bool NeedsTypedConfirmation => EffectiveTarget?.Group is not null || (_isRetry && RetryWarnings.Count > 0);
 
     public string ConfirmPrompt => $"Type {ConfirmToken} to confirm";
 
-    public string ConfirmHeading => $"Upgrade {SelectedCount} {(SelectedCount == 1 ? "script" : "scripts")} on:";
+    public string ConfirmHeading => _isRetry
+        ? $"Retrying {_retryPlan.Count} failed {(_retryPlan.Count == 1 ? "database" : "databases")}"
+        : $"Upgrade {SelectedCount} {(SelectedCount == 1 ? "script" : "scripts")} on:";
 
     /// <summary>The databases of the target, as listed in the confirmation.</summary>
     [ObservableProperty] private IReadOnlyList<string> _confirmDatabases = [];
@@ -715,6 +734,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
     {
         get
         {
+            if (_isRetry) return $"Retry {_retryPlan.Count} failed {(_retryPlan.Count == 1 ? "database" : "databases")}";
             var scripts = $"{SelectedCount} {(SelectedCount == 1 ? "script" : "scripts")}";
             var count = (_confirmedTarget ?? SelectedTarget)?.Members.DistinctBy(c => c.Id).Count() ?? 0;
             return count == 0 ? $"Run {scripts}" : $"Run {scripts} on {count} {(count == 1 ? "database" : "databases")}";
@@ -722,7 +742,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
     }
 
     /// <summary>The run touches several databases or Production scripts: the run button is the red one.</summary>
-    public bool IsDangerRun => NeedsTypedConfirmation || ProductionSelectedCount > 0;
+    public bool IsDangerRun => _isRetry || NeedsTypedConfirmation || ProductionSelectedCount > 0;
 
     /// <summary>Back is offered in the confirmation (it sits left of the primary button).</summary>
     public bool CanGoBack => Phase == UpgradePhase.Confirm;
@@ -802,15 +822,127 @@ public sealed partial class UpgradeViewModel : ObservableObject
 
     private bool CanBack() => Phase == UpgradePhase.Confirm;
 
-    /// <summary>Confirm -> Preview, ticks kept.</summary>
+    /// <summary>Confirm -> Preview, ticks kept; the confirmation of a retry goes back to the finished run instead.</summary>
     [RelayCommand(CanExecute = nameof(CanBack))]
     private void Back()
     {
         if (Phase != UpgradePhase.Confirm) return;
-        _confirmedTarget = null;
         ConfirmInput = "";
+        if (_isRetry)
+        {
+            LeaveRetry();
+            Message = _finishedMessage;
+            Phase = UpgradePhase.Finished;
+            return;
+        }
+        _confirmedTarget = null;
         OnPropertyChanged(nameof(NeedsTypedConfirmation));
         Phase = UpgradePhase.Preview;
+    }
+
+    // ---- retry the failed databases ----
+
+    private sealed record RetryItem(ConnectionConfig Config, IReadOnlyList<UpgradeScript> Scripts);
+
+    private sealed record RunBatch(IReadOnlyList<ConnectionConfig> Configs, IReadOnlyList<UpgradeScript> Scripts);
+
+    private bool _isRetry;
+    private IReadOnlyList<RetryItem> _retryPlan = [];
+    private string? _finishedMessage;
+    private UpgradeTarget? _runTarget;                      // the target of the first run (a retry is a subset of it)
+    private List<UpgradeScript> _runScripts = [];           // the ticked scripts of the first run: a retry never changes them
+    private readonly Dictionary<Guid, ConnectionConfig> _runConfigs = [];
+    private readonly Dictionary<Guid, UpgradeResult> _results = [];
+    private readonly Dictionary<Guid, HashSet<string>> _completed = [];   // scripts that ran to the end, per database, over all attempts
+    private readonly HashSet<Guid> _stoppedMembers = [];    // cancelled one by one: their batch must not start them later
+
+    /// <summary>The confirmation is for a retry of the failed databases, not for a first run.</summary>
+    public bool IsRetry => _isRetry;
+
+    /// <summary>What a retry does per database (<c>Globex: skips 2 scripts that already ran</c>), for the confirmation.</summary>
+    [NotifyPropertyChangedFor(nameof(HasRetryLines))]
+    [ObservableProperty] private IReadOnlyList<string> _retryLines = [];
+
+    /// <summary>What a retry cannot be sure about (a script that ran in part, a result that was not recorded).</summary>
+    [NotifyPropertyChangedFor(nameof(HasRetryWarnings))]
+    [ObservableProperty] private IReadOnlyList<string> _retryWarnings = [];
+
+    public bool HasRetryLines => RetryLines.Count > 0;
+    public bool HasRetryWarnings => RetryWarnings.Count > 0;
+
+    private int FailedCount => Members.Count(m => m.IsFailed);
+
+    /// <summary>"Retry failed" shows only when the run ended and at least one database failed.</summary>
+    public bool ShowRetry => Phase == UpgradePhase.Finished && FailedCount > 0 && _runTarget is not null;
+
+    public string RetryButtonText => $"Retry {FailedCount} failed {(FailedCount == 1 ? "database" : "databases")}…";
+
+    private bool CanRetry() => ShowRetry;
+
+    /// <summary>
+    /// Finished -> Confirm for the failed databases only, with the scripts that did not run to the end on each (scripts already
+    /// applied there are skipped; a script that ran in part, or a database whose result was not recorded, is warned about and then
+    /// needs the typed confirmation). Nothing runs until the user confirms again.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanRetry))]
+    private void RequestRetry()
+    {
+        if (!ShowRetry || _runTarget is not { } runTarget) return;
+
+        var plan = new List<RetryItem>();
+        var lines = new List<string>();
+        var warnings = new List<string>();
+        foreach (var member in Members.Where(m => m.IsFailed))
+        {
+            if (!_runConfigs.TryGetValue(member.Id, out var config)) continue;
+            IReadOnlyList<UpgradeScript> remaining;
+            if (_completed.TryGetValue(member.Id, out var done))
+            {
+                remaining = [.. _runScripts.Where(x => !done.Contains(x.Name))];
+                if (done.Count > 0)
+                    lines.Add($"{member.Name}: skips {done.Count} {(done.Count == 1 ? "script" : "scripts")} that already ran; {remaining.Count} left to run.");
+                foreach (var partial in _results.GetValueOrDefault(member.Id)?.Scripts.Where(x => x.State == ScriptOutcomeState.Failed && x.BatchesRun > 0) ?? [])
+                    warnings.Add($"{member.Name}: {partial.Name} ran {partial.BatchesRun} {(partial.BatchesRun == 1 ? "batch" : "batches")} before it failed. It will run again from the start.");
+            }
+            else
+            {
+                remaining = _runScripts;   // no record of what ran there: the whole selection is kept
+                warnings.Add($"Scripts that already ran on {member.Name} will run again: what it completed was not recorded.");
+            }
+            if (remaining.Count > 0) plan.Add(new RetryItem(config, remaining));
+        }
+        if (plan.Count == 0) return;
+
+        _finishedMessage = Message;
+        _isRetry = true;
+        _retryPlan = plan;
+        RetryLines = lines;
+        RetryWarnings = warnings;
+        var names = GroupRunViewModel.UniqueNames(plan.Select(i => i.Config.Name));
+        _confirmedTarget = new UpgradeTarget(runTarget.Label, [.. plan.Select(i => i.Config)], runTarget.Group);
+        ConfirmInput = "";
+        ConfirmDatabases = names;
+        Message = null;
+        OnPropertyChanged(nameof(IsRetry));
+        OnPropertyChanged(nameof(NeedsTypedConfirmation));
+        OnPropertyChanged(nameof(ConfirmHeading));
+        OnPropertyChanged(nameof(RunButtonText));
+        OnPropertyChanged(nameof(IsDangerRun));
+        Phase = UpgradePhase.Confirm;
+    }
+
+    private void LeaveRetry()
+    {
+        _isRetry = false;
+        _retryPlan = [];
+        _confirmedTarget = null;
+        RetryLines = [];
+        RetryWarnings = [];
+        OnPropertyChanged(nameof(IsRetry));
+        OnPropertyChanged(nameof(NeedsTypedConfirmation));
+        OnPropertyChanged(nameof(ConfirmHeading));
+        OnPropertyChanged(nameof(RunButtonText));
+        OnPropertyChanged(nameof(IsDangerRun));
     }
 
     // ---- run ----
@@ -833,19 +965,54 @@ public sealed partial class UpgradeViewModel : ObservableObject
     {
         if (!CanConfirmRun() || _confirmedTarget is not { } target) return;
 
-        var configs = target.Members.DistinctBy(c => c.Id).ToList();   // the runner plays a database listed twice once
-        var scripts = Rows.Where(r => r.IsSelected && r.Item.Text is not null)
-            .Select(r => new UpgradeScript(r.DisplayName, r.Item.Text!)).ToList();
+        var retry = _isRetry;
+        // A first run is one batch; a retry is one batch per distinct list of scripts left to run (databases that failed at the same
+        // script share one), played one after the other. The same runner rules apply to each.
+        List<RunBatch> batches;
+        if (retry)
+        {
+            batches = [.. _retryPlan.GroupBy(i => string.Join("\n", i.Scripts.Select(x => x.Name)))
+                .Select(g => new RunBatch([.. g.Select(i => i.Config)], g.First().Scripts))];
+        }
+        else
+        {
+            var distinct = target.Members.DistinctBy(c => c.Id).ToList();   // the runner plays a database listed twice once
+            var ticked = Rows.Where(r => r.IsSelected && r.Item.Text is not null)
+                .Select(r => new UpgradeScript(r.DisplayName, r.Item.Text!)).ToList();
+            batches = [new RunBatch(distinct, ticked)];
+        }
+        var configs = batches.SelectMany(x => x.Configs).ToList();
         // The runner repeats this check; making it here too means a refusal contacts nobody at all.
         if (UpgradeRules.Refusal(configs, _requireSqlServer) is { } refusal)
         {
-            ReturnToPreview(refusal);
+            if (retry)
+            {
+                LeaveRetry();
+                Message = refusal;
+                Phase = UpgradePhase.Finished;
+            }
+            else ReturnToPreview(refusal);
             return;
         }
 
-        var names = GroupRunViewModel.UniqueNames(configs.Select(c => c.Name));
-        Members.Clear();
-        for (var i = 0; i < configs.Count; i++) Members.Add(new UpgradeMemberViewModel(configs[i], names[i], CancelMember));
+        if (retry)
+        {
+            foreach (var config in configs) Members.First(m => m.Id == config.Id).ResetForRetry();
+            LeaveRetry();
+        }
+        else
+        {
+            var names = GroupRunViewModel.UniqueNames(configs.Select(c => c.Name));
+            Members.Clear();
+            for (var i = 0; i < configs.Count; i++) Members.Add(new UpgradeMemberViewModel(configs[i], names[i], CancelMember));
+            _runTarget = target;
+            _runScripts = [.. batches[0].Scripts];
+            _runConfigs.Clear();
+            foreach (var config in configs) _runConfigs[config.Id] = config;
+            _results.Clear();
+            _completed.Clear();
+        }
+        _stoppedMembers.Clear();
         Log = "";
         Message = null;
         var generation = ++_generation;
@@ -858,41 +1025,63 @@ public sealed partial class UpgradeViewModel : ObservableObject
         Phase = UpgradePhase.Running;
         _ = TickAsync(++_tickGeneration);
 
-        // One resolve per database, started here on the UI thread.
-        var sessions = new Dictionary<Guid, Task<Session?>>();
-        foreach (var config in configs) sessions.TryAdd(config.Id, StartResolve(config.Id, ct));
-        // One runner per run (concurrent runs on one instance are unsafe); it owns the connections the delegate hands out.
-        var runner = _runner = _createRunner((config, token) => OpenMemberAsync(sessions, config, token));
         // Created here, on the UI thread, so it posts back to it; it never throws and ignores reports of an ended run.
         var progress = new SafeProgress<UpgradeProgress>(p =>
         {
             if (generation == _generation && !_ignoreProgress) ApplyProgress(p);
         });
 
-        var label = $"{_plan?.Label} on {target.Label}";
+        var label = $"{_plan?.Label} on {(_runTarget ?? target).Label}" + (retry ? " (failed databases retried)" : "");
         Task<IReadOnlyList<UpgradeResult>>? work = null;
+        var abandoned = false;
         try
         {
-            work = Task.Run(() => runner.RunAsync(configs, scripts, new UpgradeRunOptions(), progress, ct), CancellationToken.None);
-            IReadOnlyList<UpgradeResult>? results;
-            try
+            foreach (var batch in batches)
             {
-                results = await work.WaitAsync(ct);   // Cancel all returns control at once
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                // Cancelled databases end at once: wait a moment so the outcome of those that finished is shown. A database whose
-                // provider cannot interrupt its statement does not hold the dialog: the run is abandoned (the runner still
-                // disposes its connections when it ends).
-                var winner = await Task.WhenAny(work, Task.Delay(CancelGrace));
-                results = winner == work && work.IsCompletedSuccessfully ? work.Result : null;
+                if (ct.IsCancellationRequested) break;
+                var runnable = batch.Configs.Where(c => !_stoppedMembers.Contains(c.Id)).ToList();   // cancelled one by one while waiting
+                if (runnable.Count == 0) continue;
+
+                // One resolve per database, started here on the UI thread.
+                var sessions = new Dictionary<Guid, Task<Session?>>();
+                foreach (var config in runnable) sessions.TryAdd(config.Id, StartResolve(config.Id, ct));
+                // One runner per batch (concurrent runs on one instance are unsafe); it owns the connections the delegate hands out.
+                var runner = _runner = _createRunner((config, token) => OpenMemberAsync(sessions, config, token));
+                var batchWork = work = Task.Run(() => runner.RunAsync(runnable, batch.Scripts, new UpgradeRunOptions(), progress, ct), CancellationToken.None);
+                IReadOnlyList<UpgradeResult>? results;
+                try
+                {
+                    results = await batchWork.WaitAsync(ct);   // Cancel all returns control at once
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    // Cancelled databases end at once: wait a moment so the outcome of those that finished is shown. A database whose
+                    // provider cannot interrupt its statement does not hold the dialog: the run is abandoned (the runner still
+                    // disposes its connections when it ends).
+                    var winner = await Task.WhenAny(batchWork, Task.Delay(CancelGrace));
+                    results = winner == batchWork && batchWork.IsCompletedSuccessfully ? batchWork.Result : null;
+                }
+
+                if (generation != _generation) return;
+                if (results is null)
+                {
+                    abandoned = true;
+                    break;
+                }
+                foreach (var result in results)
+                {
+                    _results[result.Connection.Id] = result;
+                    if (!_completed.TryGetValue(result.Connection.Id, out var done)) _completed[result.Connection.Id] = done = [];
+                    foreach (var script in result.Scripts.Where(x => x.State == ScriptOutcomeState.Done)) done.Add(script.Name);
+                    Members.FirstOrDefault(m => m.Id == result.Connection.Id)?.Complete(result);
+                }
             }
 
             if (generation != _generation) return;
             _ignoreProgress = true;
-            if (results is null)
+            foreach (var member in Members) member.Abandon();   // a database whose batch never started (the run was stopped)
+            if (abandoned)
             {
-                foreach (var member in Members) member.Abandon();
                 Log = AbandonedLog(label);
                 Message = "Upgrade cancelled: some databases were still stopping and may be partly upgraded.";
                 Outcome = UpgradeOutcome.Cancelled;
@@ -901,9 +1090,9 @@ public sealed partial class UpgradeViewModel : ObservableObject
                 return;
             }
 
-            foreach (var result in results)
-                Members.FirstOrDefault(m => m.Id == result.Connection.Id)?.Complete(result);
-            Log = UpgradeLog.Format(label, results);
+            var recorded = Members.Select(m => _results.GetValueOrDefault(m.Id)).OfType<UpgradeResult>().ToList();
+            Log = UpgradeLog.Format(label, recorded)
+                  + string.Concat(Members.Where(m => !_results.ContainsKey(m.Id)).Select(m => $"\n== {m.Name}: {m.StatusText}"));
             Message = Summary();
             Outcome = OutcomeOfMembers();
             EndClock();
@@ -912,7 +1101,15 @@ public sealed partial class UpgradeViewModel : ObservableObject
         catch (UpgradeRefusedException refused)
         {
             _ignoreProgress = true;
-            ReturnToPreview(refused.Message);
+            if (retry)
+            {
+                foreach (var member in Members) member.Abandon();
+                Message = refused.Message;
+                Outcome = UpgradeOutcome.Failed;
+                EndClock();
+                Phase = UpgradePhase.Finished;
+            }
+            else ReturnToPreview(refused.Message);
         }
         catch (Exception e)
         {
@@ -1011,6 +1208,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
     private void CancelMember(Guid id)
     {
         if (Phase != UpgradePhase.Running || _ignoreProgress) return;
+        _stoppedMembers.Add(id);
         _runner?.CancelMember(id);
         Members.FirstOrDefault(m => m.Id == id)?.MarkCancelled();
         RefreshOverall();

@@ -76,6 +76,9 @@
                   MinWidth="100" HorizontalContentAlignment="Center" />
           <Button Content="Stop all…" Command="{Binding RequestStopCommand}" IsVisible="{Binding ShowStopButton}"
                   MinWidth="88" HorizontalContentAlignment="Center" ToolTip.Tip="Stop the run on every database" />
+          <Button Content="{Binding RetryButtonText}" Command="{Binding RequestRetryCommand}" IsVisible="{Binding ShowRetry}"
+                  MinWidth="88" HorizontalContentAlignment="Center"
+                  ToolTip.Tip="Run again, on the failed databases only, the scripts that did not finish there. You confirm first." />
           <Button Content="Copy log" Command="{Binding CopyLogCommand}" IsVisible="{Binding ShowCopyLog}"
                   MinWidth="88" HorizontalContentAlignment="Center" ToolTip.Tip="Copy the log of the run to the clipboard" />
           <Button Content="Save log…" Click="OnSaveLogClick" IsVisible="{Binding ShowCopyLog}"
@@ -336,9 +339,28 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <ItemsControl ItemsSource="{Binding RetryLines}" IsVisible="{Binding HasRetryLines}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                      <TextBlock Classes="dim small" Text="{Binding}" TextWrapping="Wrap" Margin="0,1" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
                 <Border Height="1" Background="{DynamicResource DbxBorderSubtle}" />
                 <TextBlock Classes="dim" Text="{Binding PlanLabel}" />
               </StackPanel>
+            </Border>
+            <Border Classes="banner warn" CornerRadius="6" BorderThickness="1" Padding="12,10" IsVisible="{Binding HasRetryWarnings}">
+              <Grid ColumnDefinitions="Auto,*">
+                <PathIcon Classes="bi" Data="{StaticResource IconWarning}" VerticalAlignment="Top" Margin="0,2,8,0" />
+                <ItemsControl Grid.Column="1" ItemsSource="{Binding RetryWarnings}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                      <TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,1" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Grid>
             </Border>
             <Border Classes="banner warn" CornerRadius="6" BorderThickness="1" Padding="12,10" IsVisible="{Binding !!ProductionSelectedCount}">
               <Grid ColumnDefinitions="Auto,*">
@@ -366,7 +388,7 @@
                 <PathIcon Data="{StaticResource IconCheck}" Width="14" Height="14" Foreground="{DynamicResource DbxSuccess}"
                           VerticalAlignment="Center" IsVisible="{Binding ConfirmMatches}" />
               </StackPanel>
-              <TextBlock Classes="dim small" Text="This run touches several databases: typing the number confirms you mean it." />
+              <TextBlock Classes="dim small" Text="Typing the number confirms you mean it." />
             </StackPanel>
           </StackPanel>
         </ScrollViewer>

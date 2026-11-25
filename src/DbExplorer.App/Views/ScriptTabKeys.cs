@@ -21,6 +21,9 @@ public enum ScriptKeyAction
 
     /// <summary>F6: moves the focus between the editor and the results.</summary>
     SwitchPane,
+
+    /// <summary>Ctrl+Space: opens the completion list at the caret.</summary>
+    Complete,
 }
 
 /// <summary>One line of the shortcuts flyout.</summary>
@@ -44,6 +47,7 @@ public static class ScriptTabKeys
         (Key.Escape, KeyModifiers.None) => ScriptKeyAction.CancelIfBusy,
         (Key.OemQuestion or Key.Divide, KeyModifiers.Control) => ScriptKeyAction.ToggleComment,
         (Key.F6, KeyModifiers.None) => ScriptKeyAction.SwitchPane,
+        (Key.Space, KeyModifiers.Control) => ScriptKeyAction.Complete,
         _ => ScriptKeyAction.None,
     };
 
@@ -59,6 +63,7 @@ public static class ScriptTabKeys
         new("Open a script file", "Ctrl+O"),
         new("Find in the script", "Ctrl+F"),
         new("Comment or uncomment the selected lines", "Ctrl+/"),
+        new("Complete tables, columns and keywords (also while typing)", "Ctrl+Space"),
         new("Open result tab 1 to 9", "Ctrl+1 to 9"),
         new("Move between the editor and the results", "F6"),
         new("Next or previous database of the group", "Ctrl+Alt+PageDown / PageUp"),
