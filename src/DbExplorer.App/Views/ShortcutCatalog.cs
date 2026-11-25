@@ -25,6 +25,7 @@ public static class ShortcutCatalog
             new("Ctrl+T", "Go to a table of the selected connection"),
             new("Ctrl+Shift+P", "Go to a table in any connection"),
             new("Ctrl+F", "Filter the navigator (while it has the focus)"),
+            new("Ctrl+B", "Hide or show the navigator"),
             new("Enter", "Connect, or open the selected table"),
             new("F2", "Edit or rename the selected node"),
             new("Delete", "Delete the selected node"),
@@ -54,6 +55,9 @@ public static class ShortcutCatalog
         new("Linked databases", [
             new("Ctrl+Alt+PageDown", "Next database of the group"),
             new("Ctrl+Alt+PageUp", "Previous database of the group"),
+        ]),
+        new("Search box", [
+            new("Tab", "Switch between this connection and all connections"),
         ]),
         new("Help", [
             new("F1", "This list"),

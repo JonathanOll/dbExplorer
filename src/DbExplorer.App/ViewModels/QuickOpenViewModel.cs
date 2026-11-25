@@ -33,7 +33,8 @@ public sealed partial class QuickOpenViewModel : ObservableObject
 {
     public const int MaxResults = 50;
 
-    private readonly QuickOpenItem[] _items;
+    private QuickOpenItem[] _items;
+    private QuickOpenViewModel? _otherScope;
     private readonly StatusModel? _status;
     private bool _suppressRank;
 
@@ -51,7 +52,34 @@ public sealed partial class QuickOpenViewModel : ObservableObject
     public string EmptyText => _items.Length == 0 ? EmptyListText : $"No match for ‘{Query}’";
 
     /// <summary>What an empty list says when there is nothing to search at all.</summary>
-    public string EmptyListText { get; init; } = "Nothing to search here yet.";
+    public string EmptyListText { get; set; } = "Nothing to search here yet.";
+
+    /// <summary>Builds the other scope of this search (this connection / all connections); null when there is only one.</summary>
+    public Func<QuickOpenViewModel?>? OtherScope { get; set; }
+
+    /// <summary>Footer hint of the Tab key, e.g. "Search all connections"; null without another scope.</summary>
+    public string? ScopeHint { get; set; }
+
+    public bool HasScopes => OtherScope is not null || _otherScope is not null;
+
+    /// <summary>
+    /// Tab: swaps the searched items with those of the other scope (built on first use) without closing; the typed query is
+    /// kept and re-ranked. Doing it again swaps back.
+    /// </summary>
+    public void SwitchScope()
+    {
+        var other = _otherScope ??= OtherScope?.Invoke();
+        if (other is null) return;
+        (_items, other._items) = (other._items, _items);
+        (Title, other.Title) = (other.Title, Title);
+        (Notice, other.Notice) = (other.Notice, Notice);
+        (EmptyListText, other.EmptyListText) = (other.EmptyListText, EmptyListText);
+        (ScopeHint, other.ScopeHint) = (other.ScopeHint, ScopeHint);
+        OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(Notice));
+        OnPropertyChanged(nameof(ScopeHint));
+        Rank();
+    }
 
     public bool IsEmpty => Results.Count == 0;
 
@@ -69,7 +97,7 @@ public sealed partial class QuickOpenViewModel : ObservableObject
     }
 
     /// <summary>Short caption shown above the text box (what is being searched).</summary>
-    public string Title { get; }
+    public string Title { get; private set; }
 
     /// <summary>
     /// The last text typed, kept when the overlay is cancelled (Esc clears the box but not this), so the next opening can start
@@ -78,7 +106,7 @@ public sealed partial class QuickOpenViewModel : ObservableObject
     public string LastQuery { get; private set; }
 
     /// <summary>Optional hint under the list, e.g. connections without a cache.</summary>
-    public string? Notice { get; }
+    public string? Notice { get; private set; }
 
     /// <summary>Raised when the overlay must go away (confirmed or cancelled).</summary>
     public event Action? CloseRequested;

@@ -228,6 +228,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
                     .Where(c => string.Equals(c.Folder, name, StringComparison.OrdinalIgnoreCase))
                     .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
                     .Select(c => _connectionNodes[c.Id]));
+            folder.WatchChildren();
             Nodes.Add(folder);
         }
 

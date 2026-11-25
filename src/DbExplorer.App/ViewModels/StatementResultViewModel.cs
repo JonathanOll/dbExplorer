@@ -1,12 +1,28 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using CommunityToolkit.Mvvm.ComponentModel;
 using DbExplorer.Core.Scripting;
 
 namespace DbExplorer.App.ViewModels;
 
 /// <summary>One result set of a statement, shaped for a read-only <c>ResultGrid</c> (no filters, no edit state).</summary>
-public sealed class ResultSetViewModel(IReadOnlyList<ResultColumn> columns, IReadOnlyList<object?[]> rows, bool truncated, int index = 1)
+public sealed partial class ResultSetViewModel(IReadOnlyList<ResultColumn> columns, IReadOnlyList<object?[]> rows, bool truncated, int index = 1)
+    : ObservableObject
 {
+    /// <summary>How many rows are selected in the grid (kept by the view); 0 when none.</summary>
+    [NotifyPropertyChangedFor(nameof(HasSelection), nameof(SelectionText), nameof(CopyTip))]
+    [ObservableProperty] private int _selectedCount;
+
+    public bool HasSelection => SelectedCount > 0;
+
+    /// <summary>"3 selected": the counter next to the result actions.</summary>
+    public string SelectionText => $"{SelectedCount:N0} selected";
+
+    /// <summary>What Copy does now: the selected rows, or the whole result.</summary>
+    public string CopyTip => HasSelection
+        ? $"Copy the {SelectedCount:N0} selected rows with the column names, tab separated"
+        : "Copy all rows with the column names, tab separated (pastes into a spreadsheet)";
+
     public IReadOnlyList<ResultColumn> Columns { get; } = columns;
 
     public IReadOnlyList<object?[]> Rows { get; } = rows;
@@ -145,6 +161,9 @@ public sealed partial class StatementResultViewModel : IResultTab
 
     /// <summary>More than one result set: each gets a header and its own slice.</summary>
     public bool HasSeveralSets => Sets.Count > 1;
+
+    /// <summary>The only result set, whose Copy and Export sit in the result line; null when there are none or several (each has its own).</summary>
+    public ResultSetViewModel? SingleSet => Sets.Count == 1 ? Sets[0] : null;
 
     public bool IsTruncated { get; }
 

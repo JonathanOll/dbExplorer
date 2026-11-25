@@ -253,4 +253,26 @@ public class ScriptViewTests : IDisposable
         Assert.Equal(80, grid.RowDefinitions[0].MinHeight);
         window.Close();
     }
+
+    [AvaloniaFact]
+    public async Task TheResultLine_ShowsCopyAndExport_AndCountsTheSelectedRows()
+    {
+        var (window, view, tab) = await Open("SELECT id FROM big");
+        await tab.RunScriptAsync();
+        Pump();
+        var set = tab.Results[0].Sets[0];
+        Assert.Contains(view.GetVisualDescendants().OfType<Button>(), b => b.Content as string == "Copy" && b.IsVisible);
+        Assert.Contains(view.GetVisualDescendants().OfType<DropDownButton>(), b => b.Content as string == "Export" && b.IsVisible);
+        Assert.False(set.HasSelection);
+
+        var grid = view.GetVisualDescendants().OfType<ResultGrid>().Single();
+        grid.Grid.SelectedItems.Add(set.Rows[0]);
+        grid.Grid.SelectedItems.Add(set.Rows[1]);
+        Pump();
+
+        Assert.Equal(2, set.SelectedCount);
+        Assert.Equal("2 selected", set.SelectionText);
+        Assert.Contains("2 selected rows", set.CopyTip);
+        window.Close();
+    }
 }

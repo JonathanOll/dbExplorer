@@ -58,6 +58,16 @@ public partial class MainViewModel : ObservableObject
         ? $"{(tab.HasUnsavedWork ? "● " : "")}{tab.Title.TrimStart('•', ' ')} – dbExplorer"
         : "dbExplorer";
 
+    /// <summary>False while the navigator is hidden (Ctrl+B).</summary>
+    [ObservableProperty] private bool _isNavigatorVisible = true;
+
+    [RelayCommand]
+    public void ToggleNavigator() => IsNavigatorVisible = !IsNavigatorVisible;
+
+    /// <summary>The "config problem" banner can be dismissed for this run (the problem itself stays: changes are still not saved).</summary>
+    [RelayCommand]
+    public void DismissBanner() => Banner = null;
+
     /// <summary>True while the keyboard shortcuts card is showing (F1).</summary>
     [ObservableProperty] private bool _isShortcutsVisible;
 
@@ -659,8 +669,19 @@ public partial class MainViewModel : ObservableObject
     private void ShowTablePicker(Session session)
     {
         var picker = QuickOpenViewModel.ForTables(session, OpenTable, Status, _lastTableQuery);
+        picker.ScopeHint = "Search all connections";
+        picker.OtherScope = () => BuildAllTablesPicker() is { } all ? Hinted(all, "Search this connection only") : null;
         picker.CloseRequested += () => _lastTableQuery = picker.LastQuery;   // kept on Esc too: the next Ctrl+T starts from it
         Show(picker);
+    }
+
+    private QuickOpenViewModel? BuildAllTablesPicker() =>
+        _cache is { } cache ? QuickOpenViewModel.ForAllConnections(cache, Tree.Config.Connections.ToList(), Tree.EnsureConnectedAsync, OpenTable, Status) : null;
+
+    private static QuickOpenViewModel Hinted(QuickOpenViewModel vm, string hint)
+    {
+        vm.ScopeHint = hint;
+        return vm;
     }
 
     /// <summary>The list of connections (Ctrl+T with nothing selected): choosing one connects it and goes on to its tables.</summary>
@@ -695,6 +716,11 @@ public partial class MainViewModel : ObservableObject
             var configs = Tree.Config.Connections.ToList(); // snapshot on the UI thread; the pool thread must not read the live list
             var vm = await Task.Run(() =>
                 QuickOpenViewModel.ForAllConnections(cache, configs, Tree.EnsureConnectedAsync, OpenTable, Status));
+            if ((ActiveTab?.Connection ?? Tree.SelectedConnection) is { } current && Tree.FindSession(current.Id) is { } session)
+            {
+                vm.ScopeHint = "Search this connection only";
+                vm.OtherScope = () => Hinted(QuickOpenViewModel.ForTables(session, OpenTable, Status), "Search all connections");
+            }
             Show(vm);
         }
         catch (Exception e)
@@ -878,6 +904,9 @@ public partial class MainViewModel : ObservableObject
 
     private abstract record ClosedTab(Guid ConnectionId);
 
+    /// <summary>One line of the welcome page's recent tabs.</summary>
+    public sealed record RecentTab(object Entry, string Title, string Icon);
+
     private sealed record ClosedTable(Guid ConnectionId, TableRef Table, IReadOnlyDictionary<string, string> Filters, string? RawWhere)
         : ClosedTab(ConnectionId);
 
@@ -908,6 +937,48 @@ public partial class MainViewModel : ObservableObject
         if (entry is null) return;
         _closedTabs.Add(entry);
         if (_closedTabs.Count > MaxClosedTabs) _closedTabs.RemoveRange(0, _closedTabs.Count - MaxClosedTabs);
+        RefreshRecent();
+    }
+
+    /// <summary>How many closed tabs the welcome page lists.</summary>
+    public const int MaxRecentShown = 5;
+
+    /// <summary>The tabs closed last, newest first (welcome page "Recent"); choosing one reopens it.</summary>
+    public ObservableCollection<RecentTab> RecentTabs { get; } = new();
+
+    public bool HasRecentTabs => RecentTabs.Count > 0;
+
+    private void RefreshRecent()
+    {
+        RecentTabs.Clear();
+        foreach (var entry in Enumerable.Reverse(_closedTabs).Take(MaxRecentShown))
+        {
+            var name = Tree.Config.Connections.FirstOrDefault(c => c.Id == entry.ConnectionId)?.Name;
+            if (name is null) continue;
+            RecentTabs.Add(entry switch
+            {
+                ClosedTable t => new RecentTab(entry, $"{name} · {t.Table}", "IconTable"),
+                ClosedScript s => new RecentTab(entry, $"{name} · {ScriptLabel(s)}", "IconScript"),
+                _ => new RecentTab(entry, name, "IconTable"),
+            });
+        }
+        OnPropertyChanged(nameof(HasRecentTabs));
+    }
+
+    private static string ScriptLabel(ClosedScript s)
+    {
+        if (s.FilePath is { } path) return Path.GetFileName(path);
+        var line = s.Text.Split((char)10).Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0) ?? "script";
+        return line.Length > 40 ? line[..40] + "…" : line;
+    }
+
+    /// <summary>Reopens one of <see cref="RecentTabs"/> (it becomes the most recently closed, then Ctrl+Shift+T logic runs).</summary>
+    [RelayCommand]
+    private async Task ReopenRecentAsync(RecentTab? recent)
+    {
+        if (recent?.Entry is not ClosedTab entry || !_closedTabs.Remove(entry)) return;
+        _closedTabs.Add(entry);
+        await ReopenClosedTabAsync();
     }
 
     /// <summary>
@@ -958,6 +1029,7 @@ public partial class MainViewModel : ObservableObject
         finally
         {
             _reopening = false;
+            RefreshRecent();
         }
     }
 

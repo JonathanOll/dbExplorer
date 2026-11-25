@@ -7,7 +7,7 @@ namespace DbExplorer.App;
 /// place it), <see cref="Width"/>/<see cref="Height"/> are device-independent units, all of the NORMAL (restored)
 /// window; <see cref="Maximized"/> says whether it was maximised when the app closed.
 /// </summary>
-public sealed record WindowPlacement(int? X, int? Y, double Width, double Height, bool Maximized);
+public sealed record WindowPlacement(int? X, int? Y, double Width, double Height, bool Maximized, double? NavWidth = null);
 
 /// <summary>The working area of one monitor in physical pixels, with its DPI scale factor.</summary>
 public readonly record struct ScreenArea(int X, int Y, int Width, int Height, double Scaling);
@@ -35,6 +35,7 @@ public static class WindowStateStore
             int? x = null, y = null;
             double width = 0, height = 0;
             var maximized = false;
+            double? navWidth = null;
             while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
             {
                 var name = reader.GetString();
@@ -46,6 +47,7 @@ public static class WindowStateStore
                     case "width": width = reader.GetDouble(); break;
                     case "height": height = reader.GetDouble(); break;
                     case "maximized": maximized = reader.GetBoolean(); break;
+                    case "navWidth": navWidth = reader.TokenType == JsonTokenType.Number ? reader.GetDouble() : null; break;
                     default: reader.Skip(); break;
                 }
             }
@@ -53,7 +55,8 @@ public static class WindowStateStore
 
             if (!(width > 0 && width < MaxExtent && height > 0 && height < MaxExtent)) return null;   // also rejects NaN
             if ((x is null) != (y is null)) x = y = null;
-            return new WindowPlacement(x, y, width, height, maximized);
+            if (navWidth is { } nav && !(nav >= 100 && nav <= 2000)) navWidth = null;   // also rejects NaN
+            return new WindowPlacement(x, y, width, height, maximized, navWidth);
         }
         catch (Exception)
         {
@@ -81,6 +84,7 @@ public static class WindowStateStore
                 writer.WriteNumber("width", Math.Round(placement.Width, 1));
                 writer.WriteNumber("height", Math.Round(placement.Height, 1));
                 writer.WriteBoolean("maximized", placement.Maximized);
+                if (placement.NavWidth is { } nav) writer.WriteNumber("navWidth", Math.Round(nav, 1));
                 writer.WriteEndObject();
             }
 
