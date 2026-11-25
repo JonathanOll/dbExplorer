@@ -1,0 +1,316 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DbExplorer.App.ViewModels"
+             xmlns:views="using:DbExplorer.App.Views"
+             x:Class="DbExplorer.App.Views.PlanCompareView"
+             x:DataType="vm:PlanCompareViewModel">
+  <UserControl.Styles>
+    <!-- the same cards as the plan canvas -->
+    <Style Selector="Border.plannode">
+      <Setter Property="Background" Value="{DynamicResource DbxSurface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Border.plannode:pointerover"><Setter Property="BorderBrush" Value="{DynamicResource DbxBorderStrong}" /></Style>
+    <Style Selector="Border.plannode.path"><Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" /></Style>
+    <Style Selector="Border.plannode.selected">
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" />
+      <Setter Property="Background" Value="{DynamicResource DbxAccentSoft}" />
+    </Style>
+    <Style Selector="Border.tile">
+      <Setter Property="Width" Value="32" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Background" Value="{DynamicResource DbxHover}" />
+    </Style>
+    <Style Selector="Border.tile > PathIcon">
+      <Setter Property="Width" Value="18" />
+      <Setter Property="Height" Value="18" />
+      <Setter Property="Foreground" Value="{DynamicResource DbxIcon}" />
+    </Style>
+    <Style Selector="views|HeatBar">
+      <Setter Property="Track" Value="{DynamicResource DbxBorder}" />
+      <Setter Property="Fill" Value="{DynamicResource DbxTextFaint}" />
+    </Style>
+    <Style Selector="views|HeatBar.low"><Setter Property="Fill" Value="{DynamicResource DbxAccent}" /></Style>
+    <Style Selector="views|HeatBar.mid"><Setter Property="Fill" Value="{DynamicResource DbxWarn}" /></Style>
+    <Style Selector="views|HeatBar.high"><Setter Property="Fill" Value="{DynamicResource DbxError}" /></Style>
+    <Style Selector="TextBlock.cost"><Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+    <Style Selector="TextBlock.cost.mid"><Setter Property="Foreground" Value="{DynamicResource DbxWarnText}" /></Style>
+    <Style Selector="TextBlock.cost.high"><Setter Property="Foreground" Value="{DynamicResource DbxErrorText}" /></Style>
+    <Style Selector="PathIcon.warn"><Setter Property="Foreground" Value="{DynamicResource DbxWarn}" /></Style>
+
+    <!-- dashed outline of an operator that exists on one side only -->
+    <Style Selector="Rectangle.only">
+      <Setter Property="StrokeThickness" Value="1.5" />
+      <Setter Property="StrokeDashArray" Value="4,3" />
+      <Setter Property="RadiusX" Value="8" />
+      <Setter Property="RadiusY" Value="8" />
+      <Setter Property="IsHitTestVisible" Value="False" />
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Rectangle.only.added"><Setter Property="IsVisible" Value="True" /><Setter Property="Stroke" Value="{DynamicResource DbxAccent}" /></Style>
+    <Style Selector="Rectangle.only.removed"><Setter Property="IsVisible" Value="True" /><Setter Property="Stroke" Value="{DynamicResource DbxError}" /></Style>
+
+    <!-- small delta badge on a card -->
+    <Style Selector="Border.delta">
+      <Setter Property="CornerRadius" Value="99" />
+      <Setter Property="Padding" Value="6,1" />
+      <Setter Property="Background" Value="{DynamicResource DbxSurface}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxTextDim}" />
+    </Style>
+    <Style Selector="Border.delta.better">
+      <Setter Property="Background" Value="{DynamicResource DbxSuccessBg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxSuccessBorder}" />
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxSuccessText}" />
+    </Style>
+    <Style Selector="Border.delta.worse">
+      <Setter Property="Background" Value="{DynamicResource DbxErrorBg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxErrorBorder}" />
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxErrorText}" />
+    </Style>
+    <Style Selector="Border.delta.added">
+      <Setter Property="Background" Value="{DynamicResource DbxInfoBg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxInfoBorder}" />
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxInfoText}" />
+    </Style>
+    <Style Selector="Border.delta.removed">
+      <Setter Property="Background" Value="{DynamicResource DbxErrorBg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DbxErrorBorder}" />
+      <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxErrorText}" />
+    </Style>
+    <Style Selector="Border.delta TextBlock"><Setter Property="FontSize" Value="11" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+    <Style Selector="Border.delta PathIcon"><Setter Property="Width" Value="10" /><Setter Property="Height" Value="10" /></Style>
+
+    <Style Selector="TextBlock.better"><Setter Property="Foreground" Value="{DynamicResource DbxSuccessText}" /></Style>
+    <Style Selector="TextBlock.worse"><Setter Property="Foreground" Value="{DynamicResource DbxErrorText}" /></Style>
+    <Style Selector="PathIcon.better"><Setter Property="Foreground" Value="{DynamicResource DbxSuccess}" /></Style>
+    <Style Selector="PathIcon.worse"><Setter Property="Foreground" Value="{DynamicResource DbxError}" /></Style>
+  </UserControl.Styles>
+
+  <UserControl.Resources>
+    <!-- one operator of a compared plan: the plan card, a dashed outline when it exists on one side only, a tag and a delta badge -->
+    <DataTemplate x:Key="CompareCard" x:DataType="vm:PlanNodeViewModel">
+      <Grid Width="{Binding Width}" Height="{Binding Height}" ToolTip.Tip="{Binding ToolTipText}" AutomationProperties.Name="{Binding AutomationName}">
+        <Border Classes="plannode" Classes.selected="{Binding IsSelected}" Classes.path="{Binding IsOnPath}" PointerPressed="OnNodePressed">
+          <Grid RowDefinitions="*,Auto">
+            <Grid ColumnDefinitions="Auto,*,Auto" Margin="8,7,8,2">
+              <Border Classes="tile" VerticalAlignment="Top">
+                <PathIcon Data="{Binding IconKey, Converter={x:Static views:Icons.ByKey}}" />
+              </Border>
+              <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Spacing="0">
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12.5" TextTrimming="CharacterEllipsis" />
+                <TextBlock Classes="dim" Text="{Binding Subtitle}" FontSize="11" TextTrimming="CharacterEllipsis" IsVisible="{Binding Subtitle, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <TextBlock Classes="dim" Text="{Binding RowsText}" FontSize="11" TextTrimming="CharacterEllipsis" IsVisible="{Binding RowsText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              </StackPanel>
+              <PathIcon Grid.Column="2" Classes="warn" Data="{StaticResource IconWarning}" Width="13" Height="13" VerticalAlignment="Top" Margin="4,0,0,0" IsVisible="{Binding HasWarning}" />
+            </Grid>
+            <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="8,0,8,7" IsVisible="{Binding HasCost}">
+              <views:HeatBar Classes.low="{Binding IsLow}" Classes.mid="{Binding IsMid}" Classes.high="{Binding IsHigh}" Value="{Binding Heat}" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Classes="cost" Classes.mid="{Binding IsMid}" Classes.high="{Binding IsHigh}" Text="{Binding CostText}"
+                         FontSize="11" Margin="8,0,0,0" MinWidth="26" TextAlignment="Right" />
+            </Grid>
+            <TextBlock Grid.Row="1" Classes="dim" FontSize="11" Margin="8,0,8,7" Text="{Binding TimeText}" IsVisible="{Binding !HasCost}" />
+          </Grid>
+        </Border>
+        <Rectangle Classes="only" Classes.added="{Binding Compare.IsAdded}" Classes.removed="{Binding Compare.IsRemoved}" Margin="-3" />
+        <!-- tag: Added / Removed / Replaced, top left, over the card's edge -->
+        <Border Classes="delta" Classes.added="{Binding Compare.IsAdded}" Classes.removed="{Binding Compare.IsRemoved}"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8,-9,0,0" IsVisible="{Binding Compare.HasTag}" IsHitTestVisible="False">
+          <TextBlock Text="{Binding Compare.Tag}" />
+        </Border>
+        <!-- delta badge: -64% cost, +12 ms, top right -->
+        <Border Classes="delta" Classes.better="{Binding Compare.IsBetter}" Classes.worse="{Binding Compare.IsWorse}"
+                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,-9,8,0" IsVisible="{Binding Compare.HasBadge}" IsHitTestVisible="False">
+          <StackPanel Orientation="Horizontal" Spacing="3">
+            <PathIcon Data="{Binding Compare.IconKey, Converter={x:Static views:Icons.ByKey}}" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding Compare.Badge}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
+      </Grid>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <DockPanel>
+    <!-- Toolbar: back | layout | zoom -->
+    <Border DockPanel.Dock="Top" Classes="toolbar">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button Classes="ghost" MinHeight="28" Padding="8,0" Command="{Binding CloseCommand}" AutomationProperties.Name="Back to the plan"
+                  ToolTip.Tip="Leave the comparison and go back to the plan">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconChevronLeft}" Width="12" Height="12" />
+              <TextBlock Text="Back to plan" />
+            </StackPanel>
+          </Button>
+          <Border Classes="vsep" />
+          <TextBlock Text="Comparing plans" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <Border Classes="badge success" IsVisible="{Binding IsBetter}"><StackPanel Orientation="Horizontal" Spacing="4">
+            <PathIcon Data="{StaticResource IconCheck}" Width="11" Height="11" /><TextBlock Text="{Binding OverallWord}" FontSize="11.5" FontWeight="SemiBold" /></StackPanel></Border>
+          <Border Classes="badge error" IsVisible="{Binding IsWorse}"><StackPanel Orientation="Horizontal" Spacing="4">
+            <PathIcon Data="{StaticResource IconWarning}" Width="11" Height="11" /><TextBlock Text="{Binding OverallWord}" FontSize="11.5" FontWeight="SemiBold" /></StackPanel></Border>
+          <Border Classes="badge" IsVisible="{Binding IsNeutral}"><StackPanel Orientation="Horizontal" Spacing="4">
+            <PathIcon Data="{StaticResource IconInfo}" Width="11" Height="11" /><TextBlock Text="{Binding OverallWord}" FontSize="11.5" FontWeight="SemiBold" /></StackPanel></Border>
+        </StackPanel>
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+          <ToggleButton x:Name="SideBySideButton" Classes="segment" Content="Side by side" IsChecked="{Binding IsSideBySide, Mode=OneWay}" Click="OnSideBySideClick"
+                        ToolTip.Tip="Baseline on the left, new plan on the right" />
+          <ToggleButton x:Name="StackedButton" Classes="segment" Content="Stacked" IsChecked="{Binding Stacked, Mode=OneWay}" Click="OnStackedClick"
+                        ToolTip.Tip="Baseline above, new plan below: each gets the full width" />
+          <Border Classes="vsep" />
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRemove}" Click="OnZoomOutClick" AutomationProperties.Name="Zoom out" ToolTip.Tip="Zoom out" />
+          <TextBlock Classes="dim num" Text="{Binding ZoomText}" MinWidth="38" TextAlignment="Center" VerticalAlignment="Center" />
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconAdd}" Click="OnZoomInClick" AutomationProperties.Name="Zoom in" ToolTip.Tip="Zoom in" />
+          <Button Classes="ghost" MinHeight="28" Padding="8,0" Content="Fit" Click="OnFitClick" AutomationProperties.Name="Fit both plans to the window"
+                  ToolTip.Tip="Fit the whole plans in the window" />
+          <Border Classes="vsep" />
+          <ToggleButton Classes="segment" Content="Details" IsChecked="{Binding ShowDifferences, Mode=TwoWay}"
+                        ToolTip.Tip="Show or hide the list of differences of the selected operator" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- The verdict in words, the figures as chips -->
+    <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1" Padding="12,8,12,6">
+      <StackPanel Spacing="6">
+        <Grid ColumnDefinitions="Auto,*,Auto">
+          <PathIcon Classes="better" Data="{StaticResource IconCheck}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" IsVisible="{Binding IsBetter}" />
+          <PathIcon Classes="worse" Data="{StaticResource IconWarning}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" IsVisible="{Binding IsWorse}" />
+          <PathIcon Classes="dim" Data="{StaticResource IconInfo}" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center" IsVisible="{Binding IsNeutral}" />
+          <SelectableTextBlock Grid.Column="1" x:Name="SummaryText" Text="{Binding Summary}" FontWeight="SemiBold" TextWrapping="Wrap" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="2" Classes="dim small" Text="{Binding Legend}" Margin="16,0,0,0" VerticalAlignment="Center" />
+        </Grid>
+        <ItemsControl ItemsSource="{Binding Chips}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:PlanCompareChip">
+              <Border Classes="badge" Classes.success="{Binding IsBetter}" Classes.error="{Binding IsWorse}" Classes.info="{Binding IsChanged}"
+                      Margin="0,0,6,4" Padding="9,3" ToolTip.Tip="{Binding ToolTipText}" AutomationProperties.Name="{Binding AutomationName}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="{Binding Name}" FontSize="11.5" />
+                  <TextBlock Text="{Binding Values}" FontSize="11.5" FontWeight="SemiBold" />
+                  <PathIcon Data="{Binding IconKey, Converter={x:Static views:Icons.ByKey}}" Width="10" Height="10" VerticalAlignment="Center" IsVisible="{Binding !IsSame}" />
+                  <TextBlock Text="{Binding Change}" FontSize="11.5" FontWeight="SemiBold" IsVisible="{Binding !IsSame}" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </Border>
+
+    <Grid x:Name="Body">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" MinWidth="240" />
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="420" MinWidth="280" MaxWidth="720" />
+      </Grid.ColumnDefinitions>
+
+      <!-- The two plans: baseline and new, side by side or stacked (the arrangement is set in code-behind) -->
+      <Grid x:Name="Panes" Background="{DynamicResource DbxContentBg}">
+        <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="0" /></Grid.RowDefinitions>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+
+        <DockPanel x:Name="BaselinePane" Grid.Row="0" Grid.Column="0">
+          <Border DockPanel.Dock="Top" Padding="12,6" Background="{DynamicResource DbxPanelHeaderBg}" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Border Classes="badge"><TextBlock Text="BASELINE" FontSize="10.5" FontWeight="SemiBold" /></Border>
+              <TextBlock Text="{Binding BaselineLabel}" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <TextBlock Classes="dim num" Text="{Binding BaselineDetail}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </Border>
+          <ScrollViewer x:Name="BaselineScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Baseline plan">
+            <LayoutTransformControl x:Name="BaselineZoomer" HorizontalAlignment="Left" VerticalAlignment="Top">
+              <Grid Width="{Binding Baseline.CanvasWidth}" Height="{Binding Baseline.CanvasHeight}">
+                <views:PlanEdges Statement="{Binding Baseline}" />
+                <ItemsControl ItemsSource="{Binding Baseline.Nodes}" ItemTemplate="{StaticResource CompareCard}">
+                  <ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                  <ItemsControl.Styles>
+                    <Style Selector="ContentPresenter" x:DataType="vm:PlanNodeViewModel">
+                      <Setter Property="Canvas.Left" Value="{Binding X}" />
+                      <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                    </Style>
+                  </ItemsControl.Styles>
+                </ItemsControl>
+              </Grid>
+            </LayoutTransformControl>
+          </ScrollViewer>
+        </DockPanel>
+
+        <DockPanel x:Name="CandidatePane" Grid.Row="0" Grid.Column="1">
+          <Border DockPanel.Dock="Top" Padding="12,6" Background="{DynamicResource DbxPanelHeaderBg}" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Border Classes="badge info"><TextBlock Text="NEW" FontSize="10.5" FontWeight="SemiBold" /></Border>
+              <TextBlock Text="{Binding CandidateLabel}" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <TextBlock Classes="dim num" Text="{Binding CandidateDetail}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </Border>
+          <ScrollViewer x:Name="CandidateScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="New plan">
+            <LayoutTransformControl x:Name="CandidateZoomer" HorizontalAlignment="Left" VerticalAlignment="Top">
+              <Grid Width="{Binding Candidate.CanvasWidth}" Height="{Binding Candidate.CanvasHeight}">
+                <views:PlanEdges Statement="{Binding Candidate}" />
+                <ItemsControl ItemsSource="{Binding Candidate.Nodes}" ItemTemplate="{StaticResource CompareCard}">
+                  <ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                  <ItemsControl.Styles>
+                    <Style Selector="ContentPresenter" x:DataType="vm:PlanNodeViewModel">
+                      <Setter Property="Canvas.Left" Value="{Binding X}" />
+                      <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                    </Style>
+                  </ItemsControl.Styles>
+                </ItemsControl>
+              </Grid>
+            </LayoutTransformControl>
+          </ScrollViewer>
+        </DockPanel>
+      </Grid>
+
+      <GridSplitter Grid.Column="1" ResizeDirection="Columns" Width="6" Background="Transparent" IsVisible="{Binding ShowDifferences}" AutomationProperties.Name="Resize the differences panel" />
+
+      <!-- What differs between the selected operator and its counterpart -->
+      <Border Grid.Column="2" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="1,0,0,0" IsVisible="{Binding ShowDifferences}">
+        <DockPanel>
+          <Border DockPanel.Dock="Top" Padding="12,8,12,8" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1">
+            <StackPanel Spacing="2">
+              <TextBlock Classes="section" Text="DIFFERENCES" />
+              <TextBlock Text="{Binding DifferencesTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding DifferencesTitle}" />
+              <TextBlock Classes="dim" Text="{Binding DifferencesSubtitle}" FontSize="12" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="104,*,*,80" Margin="12,6,12,2" IsVisible="{Binding HasSelection}">
+            <TextBlock Classes="dim small" Text="" />
+            <TextBlock Grid.Column="1" Classes="dim small" Text="Before" />
+            <TextBlock Grid.Column="2" Classes="dim small" Text="After" />
+            <TextBlock Grid.Column="3" Classes="dim small" Text="Change" />
+          </Grid>
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Differences}" Margin="0,0,0,12">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:PlanDifferenceRow">
+                  <Grid>
+                    <TextBlock Classes="section" Text="{Binding Name}" IsVisible="{Binding IsHeader}" Margin="12,10,12,2" />
+                    <Grid ColumnDefinitions="104,*,*,80" Margin="12,3,12,3" IsVisible="{Binding IsEntry}">
+                      <TextBlock Classes="dim" Text="{Binding Name}" TextWrapping="Wrap" FontSize="12" Margin="0,0,8,0" />
+                      <SelectableTextBlock Grid.Column="1" Text="{Binding Before}" TextWrapping="Wrap" FontSize="12" Margin="0,0,8,0" />
+                      <SelectableTextBlock Grid.Column="2" Text="{Binding After}" TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold" Margin="0,0,8,0" />
+                      <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="3" VerticalAlignment="Top" IsVisible="{Binding HasChange}">
+                        <PathIcon Classes="better" Data="{StaticResource IconCheck}" Width="10" Height="10" Margin="0,3,0,0" IsVisible="{Binding IsBetter}" />
+                        <PathIcon Classes="worse" Data="{StaticResource IconWarning}" Width="10" Height="10" Margin="0,3,0,0" IsVisible="{Binding IsWorse}" />
+                        <TextBlock Classes.better="{Binding IsBetter}" Classes.worse="{Binding IsWorse}" Text="{Binding Change}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Grid>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Grid>
+  </DockPanel>
+</UserControl>

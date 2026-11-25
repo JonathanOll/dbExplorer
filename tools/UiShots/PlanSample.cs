@@ -20,27 +20,35 @@ internal static class PlanSample
         </RelOp>
         """;
 
-    public static string Xml()
+    /// <summary>The plan before an index (the scan of Orders) or, with <paramref name="indexed"/>, after IX_Orders_Status: the scan is a seek and everything above is cheaper.</summary>
+    public static string Xml(bool indexed = false)
     {
-        var scanOrders = Op(4, "Clustered Index Scan", "Clustered Index Scan", 1200, 3.3, 84_000, 640,
+        var scanOrders = indexed
+            ? Op(4, "Index Seek", "Index Seek", 1200, 0.5, 84_000, 90,
+                """
+                <IndexScan Ordered="false" ForcedIndex="false"><Object Database="[Shop]" Schema="[dbo]" Table="[Orders]" Index="[IX_Orders_Status]" Alias="[o]" IndexKind="NonClustered"/>
+                  <SeekPredicates><SeekPredicateNew><SeekKeys><Prefix ScanType="GT"><RangeColumns><ColumnReference Column="total"/></RangeColumns><RangeExpressions><ScalarOperator ScalarString="(100)"/></RangeExpressions></Prefix></SeekKeys></SeekPredicateNew></SeekPredicates></IndexScan>
+                """)
+            : null;
+        scanOrders ??= Op(4, "Clustered Index Scan", "Clustered Index Scan", 1200, 3.3, 84_000, 640,
             """
             <IndexScan Ordered="false" ForcedIndex="false"><Object Database="[Shop]" Schema="[dbo]" Table="[Orders]" Index="[PK_Orders]" Alias="[o]" IndexKind="Clustered"/>
               <Predicate><ScalarOperator ScalarString="[Shop].[dbo].[Orders].[Status] as [o].[Status]&lt;&gt;'open' AND [o].[Total]&gt;(100)"><Compare/></ScalarOperator></Predicate></IndexScan>
             """);
-        var seekCustomers = Op(5, "Index Seek", "Index Seek", 1, 0.6, 84_000, 310,
+        var seekCustomers = Op(5, "Index Seek", "Index Seek", 1, 0.6, 84_000, indexed ? 295 : 310,
             """
             <IndexScan><Object Database="[Shop]" Schema="[dbo]" Table="[Customers]" Index="[PK_Customers]" Alias="[c]" IndexKind="Clustered"/>
               <SeekPredicates><SeekPredicateNew><SeekKeys><Prefix ScanType="EQ"><RangeColumns><ColumnReference Column="id"/></RangeColumns><RangeExpressions><ScalarOperator ScalarString="[o].[customer_id]"/></RangeExpressions></Prefix></SeekKeys></SeekPredicateNew></SeekPredicates></IndexScan>
             """, executions: 84_000, rebinds: 1199);
-        var join = Op(3, "Nested Loops", "Inner Join", 1200, 4.5, 84_000, 1_180,
+        var join = Op(3, "Nested Loops", "Inner Join", 1200, indexed ? 1.7 : 4.5, 84_000, indexed ? 600 : 1_180,
             $"<NestedLoops Optimized=\"false\">{scanOrders}{seekCustomers}</NestedLoops>");
-        var compute = Op(2, "Compute Scalar", "Compute Scalar", 1200, 4.52, 84_000, 1_210,
+        var compute = Op(2, "Compute Scalar", "Compute Scalar", 1200, indexed ? 1.72 : 4.52, 84_000, indexed ? 630 : 1_210,
             $"<ComputeScalar><DefinedValues><DefinedValue><ColumnReference Column=\"Expr1004\"/><ScalarOperator ScalarString=\"[o].[Total]*(1.0)\"/></DefinedValue></DefinedValues>{join}</ComputeScalar>");
-        var aggregate = Op(1, "Hash Match", "Aggregate", 300, 5.1, 6_200, 1_520,
+        var aggregate = Op(1, "Hash Match", "Aggregate", 300, indexed ? 2.3 : 5.1, 6_200, indexed ? 940 : 1_520,
             $"<Hash><DefinedValues/><HashKeysBuild><ColumnReference Column=\"id\"/></HashKeysBuild>{compute}</Hash>");
-        var sort = Op(0, "Sort", "TopN Sort", 8, 5.12, 8, 1_560,
+        var sort = Op(0, "Sort", "TopN Sort", 8, indexed ? 2.32 : 5.12, 8, indexed ? 980 : 1_560,
             $"<TopSort Rows=\"8\" Distinct=\"false\"><OrderBy><OrderByColumn Ascending=\"false\"><ColumnReference Column=\"total\"/></OrderByColumn></OrderBy>{aggregate}</TopSort>",
-            extra: "<Warnings><SpillToTempDb SpillLevel=\"1\" SpilledThreadCount=\"1\"/></Warnings>");
+            extra: indexed ? "" : "<Warnings><SpillToTempDb SpillLevel=\"1\" SpilledThreadCount=\"1\"/></Warnings>");
 
         var sb = new StringBuilder();
         sb.Append("""
@@ -56,6 +64,9 @@ internal static class PlanSample
             """);
         sb.Append(sort);
         sb.Append("</QueryPlan></StmtSimple></Statements></Batch></BatchSequence></ShowPlanXML>");
-        return sb.ToString();
+        var xml = sb.ToString();
+        if (!indexed) return xml;
+        xml = System.Text.RegularExpressions.Regex.Replace(xml, @"<MissingIndexes>.*?</MissingIndexes>", "", System.Text.RegularExpressions.RegexOptions.Singleline);
+        return xml.Replace("StatementSubTreeCost=\"5.12\"", "StatementSubTreeCost=\"2.32\"").Replace("ElapsedTime=\"1562\"", "ElapsedTime=\"980\"");
     }
 }

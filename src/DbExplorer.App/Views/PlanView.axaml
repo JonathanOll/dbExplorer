@@ -5,6 +5,9 @@
              x:Class="DbExplorer.App.Views.PlanView"
              x:DataType="vm:PlanResultTab"
              Focusable="True">
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="vm:PlanCompareViewModel" x:DataType="vm:PlanCompareViewModel"><views:PlanCompareView /></DataTemplate>
+  </UserControl.DataTemplates>
   <UserControl.Styles>
     <!-- one operator: a card; the cost bar says how much of the metric it takes, the border says what is selected -->
     <Style Selector="Border.plannode">
@@ -60,7 +63,8 @@
     </Style>
   </UserControl.Styles>
 
-  <DockPanel>
+  <Grid>
+  <DockPanel IsVisible="{Binding !IsComparing}">
     <!-- Toolbar: colour by | zoom ... details, copy, save -->
     <Border DockPanel.Dock="Top" Classes="toolbar">
       <Grid ColumnDefinitions="Auto,*,Auto">
@@ -94,6 +98,40 @@
         </StackPanel>
 
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+          <Button Classes="ghost" MinHeight="28" Padding="8,0" Command="{Binding PinPlanCommand}" IsEnabled="{Binding CanPin}" IsVisible="{Binding !IsSelectedPinned}"
+                  ToolTip.ShowOnDisabled="True" ToolTip.Tip="{Binding PinTooltip}" AutomationProperties.Name="Pin this plan as the baseline">
+            <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource IconLocate}" Width="12" Height="12" /><TextBlock Text="Pin plan" /></StackPanel>
+          </Button>
+          <Button Classes="ghost" MinHeight="28" Padding="8,0" Command="{Binding UnpinPlanCommand}" IsVisible="{Binding IsSelectedPinned}"
+                  ToolTip.Tip="This plan is the pinned baseline. Click to unpin it." AutomationProperties.Name="Unpin the plan">
+            <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource IconLocate}" Width="12" Height="12" /><TextBlock Text="Pinned" FontWeight="SemiBold" /></StackPanel>
+          </Button>
+          <Button x:Name="CompareButton" Classes="ghost" MinHeight="28" Padding="8,0" AutomationProperties.Name="Compare this plan with another"
+                  ToolTip.Tip="Compare this plan with another one: operator by operator, before and after an index or a rewrite">
+            <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource IconCompare}" Width="12" Height="12" /><TextBlock Text="Compare with…" /></StackPanel>
+            <Button.Flyout>
+              <Flyout Placement="BottomEdgeAlignedRight" Opening="OnCompareOpening">
+                <StackPanel MinWidth="300" MaxWidth="420" Spacing="2">
+                  <TextBlock Classes="section" Text="BASELINE TO COMPARE WITH" Margin="4,0,4,4" />
+                  <ItemsControl ItemsSource="{Binding CompareChoices}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:PlanCompareChoice">
+                        <Button Classes="planrow" Tag="{Binding}" Click="OnCompareChoiceClick">
+                          <StackPanel>
+                            <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+                            <TextBlock Classes="dim num" Text="{Binding Detail}" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <TextBlock Classes="dim" TextWrapping="Wrap" FontSize="12" Margin="4,2,4,4" IsVisible="{Binding HasNoCompareChoices}"
+                             Text="No other plan to compare with yet. Pin this plan, change the query or add an index, then run again: the new plan can be compared with the pinned one." />
+                </StackPanel>
+              </Flyout>
+            </Button.Flyout>
+          </Button>
+          <Border Classes="vsep" />
           <Button Classes="ghost" MinHeight="28" Padding="8,0" Content="Copy plan" Click="OnCopyPlanClick"
                   ToolTip.Tip="Copy the plan as the server sent it (XML for SQL Server, JSON for PostgreSQL)" AutomationProperties.Name="Copy the plan text" />
           <Button Classes="ghost" MinHeight="28" Padding="8,0" Content="Save plan…" Click="OnSavePlanClick"
@@ -310,4 +348,8 @@
       </Border>
     </Grid>
   </DockPanel>
+
+  <!-- Compare mode: two plans and what differs, in place of the plan -->
+  <ContentControl Content="{Binding Comparison}" IsVisible="{Binding IsComparing}" />
+  </Grid>
 </UserControl>

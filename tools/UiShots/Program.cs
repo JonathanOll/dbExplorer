@@ -326,6 +326,7 @@ internal static class Scenes
         ("script-error", s => Script(s, true)),
         ("plan-sqlite", PlanSqlite),
         ("plan-sqlserver", PlanSqlServer),
+        ("plan-compare", PlanCompare),
         ("quick-open", QuickOpen),
         ("connection-dialog", ConnectionDialogScene),
         ("sql-preview", SqlPreview),
@@ -529,6 +530,42 @@ internal static class Scenes
         if (Environment.GetEnvironmentVariable("DBX_ZOOM") is { } z) { tab.Zoom = double.Parse(z, System.Globalization.CultureInfo.InvariantCulture); }
         await Settle();
         await Task.Delay(100);
+        Pump();
+        return null;
+    }
+
+    // The same query before and after an index: the plan of the first run is pinned, the second run's plan is compared with it
+    private static async Task<Window?> PlanCompare(Demo d)
+    {
+        await Open(d);
+        var script = d.Main.NewScript()!;
+        script.Text = "SELECT TOP 8 c.name, SUM(o.total) AS total\nFROM orders o JOIN customers c ON c.id = o.customer_id\nWHERE o.status <> 'open' AND o.total > 100\nGROUP BY c.id, c.name ORDER BY total DESC";
+        d.Window.Height = 1000;   // a plan comparison wants room: the real window is usually taller than the 800 px of the other shots
+        d.Window.Show();
+        Pump();
+        PlanResultTab Tab(bool indexed)
+        {
+            var plan = DbExplorer.Core.Plans.ShowplanParser.Parse(PlanSample.Xml(indexed), DbExplorer.Core.Plans.PlanMode.Actual);
+            return new PlanResultTab(plan.Statements.Select(st => (plan, st)).ToList(), DbExplorer.Core.Plans.PlanMode.Actual, DbKind.SqlServer) { Host = script };
+        }
+        var before = Tab(false);
+        script.ResultTabs.Add(before);
+        before.PinPlanCommand.Execute(null);
+        script.ResultTabs.Clear();
+        var after = Tab(true);
+        script.ResultTabs.Add(after);
+        script.SelectedResultTab = after;
+        after.ComparePinnedCommand.Execute(null);
+        await Settle();
+        if (Environment.GetEnvironmentVariable("DBX_STACKED") is { } st) after.Comparison!.Stacked = st == "1";
+        // Drag the editor/results splitter up, as a user comparing plans would: the plans get the room.
+        if (d.Window.GetVisualDescendants().OfType<GridSplitter>().FirstOrDefault(g => g.Name == "PaneSplitter")?.Parent is Grid panes)
+        {
+            panes.RowDefinitions[0].Height = new GridLength(150);
+            panes.RowDefinitions[2].Height = new GridLength(1, GridUnitType.Star);
+        }
+        await Settle();
+        await Task.Delay(150);
         Pump();
         return null;
     }
