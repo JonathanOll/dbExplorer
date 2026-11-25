@@ -1,22 +1,30 @@
 <#
 .SYNOPSIS
-Installs, updates or uninstalls dbExplorer from its GitHub releases, using the GitHub CLI (gh).
+Installs, updates or uninstalls dbExplorer from its GitHub releases. One PowerShell line is enough, nothing else to install.
 
 .DESCRIPTION
-Per-user installer for Windows 10/11 (Windows PowerShell 5.1 or PowerShell 7), no administrator rights needed.
+Per-user installer for Windows 10/11 (Windows PowerShell 5.1 or PowerShell 7), no administrator rights, no .NET, no
+GitHub CLI needed: it talks to GitHub over plain HTTPS.
+
+One-line install (or update):
+  irm https://raw.githubusercontent.com/JonathanOll/dbExplorer/main/install.ps1 | iex
 
 Install / update (default):
-  1. checks the prerequisites (Windows, gh, a writable install folder),
-  2. asks GitHub for the release (`gh release view`): the latest one, or -Version,
-  3. downloads DbExplorer.zip (`gh release download`) and verifies its SHA-256 against the digest
-     GitHub gives for the asset,
+  1. checks the prerequisites (Windows, a writable install folder),
+  2. asks GitHub for the release (REST API over HTTPS): the latest one, or -Version,
+  3. downloads DbExplorer.zip and verifies its SHA-256 against the digest GitHub gives for the asset (or, when
+     there is none, against the DbExplorer.zip.sha256 asset; with neither the install is refused),
   4. extracts it to a staging folder and checks it holds DbExplorer.exe,
   5. closes the running app if needed, then swaps the files in, with a rollback to the previous
      version on failure,
   6. copies this script outside the install folder, adds the Start Menu shortcut (desktop shortcut
      on request) and the "Apps & features" entry.
 If the same version (or a newer one) is already installed nothing is done, unless -Force.
-An older version is upgraded.
+An older version is upgraded: run the same command again to update.
+
+The GitHub CLI (gh) is optional: it is only used when HTTPS failed and gh is installed, or when -UseGh is given.
+Set $env:GITHUB_TOKEN (or $env:GH_TOKEN) to lift GitHub's anonymous rate limit (60 requests/hour) or to install from a
+private repository.
 
 Where things go (defaults):
   App files        %LOCALAPPDATA%\Programs\dbExplorer (-InstallDir; the in-app updater needs it writable)
@@ -32,7 +40,7 @@ The install folder is owned by the installer: a new install refuses a non-empty 
 DbExplorer.exe, and an install or update replaces everything in it (like the in-app updater does).
 
 Exit code: 0 on success (or nothing to do), 1 on any error (a cause line and a fix line).
-Supports -WhatIf and -Confirm.
+Supports -WhatIf and -Confirm (not through `| iex`, which has no parameters: use the script block form).
 
 .PARAMETER InstallDir
 Where to install. Default: %LOCALAPPDATA%\Programs\dbExplorer.
@@ -63,6 +71,9 @@ Remove dbExplorer: files, shortcuts, "Apps & features" entry and the setup copy.
 Only with -Uninstall: also delete the user data folder (%APPDATA%\dbExplorer, or DBEXPLORER_DATA_DIR when set).
 Asks for confirmation unless -Force.
 
+.PARAMETER UseGh
+Use the GitHub CLI (gh) instead of plain HTTPS to query and download the release. Needs gh installed (winget install --id GitHub.cli).
+
 .PARAMETER Quiet
 No banner, steps or summary: only warnings and errors.
 
@@ -88,6 +99,14 @@ Seconds to wait for a running dbExplorer to close before it is killed (-Force). 
 Wait for Enter at the end (used by the "Apps & features" uninstall command so its window stays readable).
 
 .EXAMPLE
+irm https://raw.githubusercontent.com/JonathanOll/dbExplorer/main/install.ps1 | iex
+Installs (or updates to) the latest release, straight from GitHub, nothing else needed.
+
+.EXAMPLE
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/JonathanOll/dbExplorer/main/install.ps1))) -Version 1.0.4 -DesktopShortcut -Launch
+The same one-liner with parameters: installs v1.0.4, adds a desktop shortcut and starts the app.
+
+.EXAMPLE
 .\install.ps1
 Installs (or updates to) the latest release for the current user.
 
@@ -103,12 +122,8 @@ Removes dbExplorer and keeps the user data.
 .\install.ps1 -Uninstall -RemoveUserData -Force
 Removes dbExplorer and its user data without asking.
 
-.EXAMPLE
-& ([scriptblock]::Create((gh api repos/JonathanOll/dbExplorer/contents/install.ps1 -H 'Accept: application/vnd.github.raw' | Out-String))) -Version 1.0.4
-Runs the installer straight from GitHub, with parameters, without saving the file first.
-
 .NOTES
-Needs the GitHub CLI (winget install --id GitHub.cli) and access to the repository (gh auth login if it is private).
+No gh needed. If GitHub answers "rate limit", set a token: $env:GITHUB_TOKEN = '<personal access token>' and run again.
 .LINK
 https://github.com/JonathanOll/dbExplorer
 #>
@@ -126,6 +141,7 @@ param(
     [switch]$Force,
     [switch]$Uninstall,
     [switch]$RemoveUserData,
+    [switch]$UseGh,
     [switch]$Quiet,
     [Parameter(DontShow)][string]$StartMenuDir = '',
     [Parameter(DontShow)][string]$DesktopDir = '',
@@ -150,6 +166,7 @@ if (-not $script:SelfPath) {
 $script:AppName = 'dbExplorer'
 $script:ExeName = 'DbExplorer.exe'
 $script:AssetName = 'DbExplorer.zip'
+$script:HttpClient = $null
 $script:Quiet = $false
 $script:LineOpen = $false
 $script:StepNo = 0
@@ -313,10 +330,16 @@ function Select-ReleaseAsset {
     $digest = [string](Get-OptionalProperty $asset 'digest')
     $sha = ''
     if ($digest -match '^sha256:([0-9A-Fa-f]{64})$') { $sha = $Matches[1].ToLowerInvariant() }
+    $name = [string]$asset.name
+    $side = $assets | Where-Object { [string](Get-OptionalProperty $_ 'name') -eq ($name + '.sha256') } | Select-Object -First 1
     [pscustomobject]@{
-        Name   = [string]$asset.name
-        Size   = [long](Get-OptionalProperty $asset 'size')
-        Sha256 = $sha
+        Name       = $name
+        Size       = [long](Get-OptionalProperty $asset 'size')
+        Sha256     = $sha
+        Url        = [string](Get-OptionalProperty $asset 'browser_download_url')
+        ApiUrl     = [string](Get-OptionalProperty $asset 'url')
+        SidecarUrl = [string](Get-OptionalProperty $side 'browser_download_url')
+        SidecarApi = [string](Get-OptionalProperty $side 'url')
     }
 }
 
@@ -343,6 +366,204 @@ function Get-GhFailure {
         return @{ Message = 'GitHub is not reachable (network error).'; Fix = 'Check your connection or proxy and retry.' }
     }
     return @{ Message = "gh failed: $first"; Fix = 'Run the same gh command by hand to see the full error.' }
+}
+
+# ---------------------------------------------------------------------------------------------------------------------
+# GitHub over plain HTTPS (default: no gh needed)
+# ---------------------------------------------------------------------------------------------------------------------
+
+# $env:GITHUB_TOKEN, else $env:GH_TOKEN: lifts the anonymous rate limit and allows private repositories. '' when unset.
+function Get-GitHubToken {
+    foreach ($n in 'GITHUB_TOKEN', 'GH_TOKEN') {
+        $v = [Environment]::GetEnvironmentVariable($n)
+        if ($v -and $v.Trim()) { return $v.Trim() }
+    }
+    return ''
+}
+
+function Initialize-Http {
+    if ($script:HttpClient) { return }
+    # Windows PowerShell 5.1 may default to TLS 1.0/1.1, which GitHub refuses.
+    try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12 } catch { }
+    Add-Type -AssemblyName System.Net.Http
+    $handler = New-Object System.Net.Http.HttpClientHandler
+    $handler.AllowAutoRedirect = $false   # redirects are followed by hand so the token never leaves api.github.com
+    try {
+        $proxy = [Net.WebRequest]::GetSystemWebProxy()
+        $proxy.Credentials = [Net.CredentialCache]::DefaultCredentials
+        $handler.Proxy = $proxy
+    }
+    catch { }
+    $client = New-Object System.Net.Http.HttpClient($handler)
+    $client.Timeout = [TimeSpan]::FromSeconds(60)
+    [void]$client.DefaultRequestHeaders.UserAgent.TryParseAdd('dbExplorer-installer')
+    $script:HttpClient = $client
+}
+
+# GET with redirects followed by hand. Returns the response (the caller disposes it); network problems become installer errors.
+function Send-HttpGet {
+    param([string]$Url, [string]$Accept = 'application/vnd.github+json')
+    Initialize-Http
+    $token = Get-GitHubToken
+    for ($hop = 0; $hop -le 5; $hop++) {
+        $uri = [Uri]$Url
+        $req = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Get, $uri)
+        [void]$req.Headers.TryAddWithoutValidation('Accept', $Accept)
+        [void]$req.Headers.TryAddWithoutValidation('X-GitHub-Api-Version', '2022-11-28')
+        if ($token -and $uri.Host -eq 'api.github.com') { [void]$req.Headers.TryAddWithoutValidation('Authorization', "Bearer $token") }
+        try { $resp = $script:HttpClient.SendAsync($req, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult() }
+        catch {
+            $m = $_.Exception.Message
+            if ($_.Exception -is [System.Threading.Tasks.TaskCanceledException] -or $_.Exception -is [OperationCanceledException]) {
+                Stop-Installer "GitHub did not answer in time ($($uri.Host))." 'Check your connection, proxy or firewall and retry.'
+            }
+            Stop-Installer "GitHub is not reachable ($($uri.Host)): $m" 'Check your connection, proxy or firewall (https://api.github.com must be reachable) and retry.'
+        }
+        $code = [int]$resp.StatusCode
+        if ($code -in 301, 302, 303, 307, 308 -and $resp.Headers.Location) {
+            $Url = ([Uri]::new($uri, $resp.Headers.Location)).ToString()
+            $resp.Dispose()
+            continue
+        }
+        return $resp
+    }
+    Stop-Installer 'GitHub redirected the request too many times.' 'Retry later.'
+}
+
+# Maps a failed HTTP answer to a one-line cause and a fix.
+function Get-HttpFailure {
+    param($Response, [string]$Tag, [string]$Repository)
+    $code = [int]$Response.StatusCode
+    $body = ''
+    try { $body = $Response.Content.ReadAsStringAsync().GetAwaiter().GetResult() } catch { }
+    $remaining = $null
+    $vals = $null
+    if ($Response.Headers.TryGetValues('X-RateLimit-Remaining', [ref]$vals)) { $remaining = @($vals)[0] }
+    if (($code -eq 403 -or $code -eq 429) -and ($remaining -eq '0' -or $code -eq 429 -or $body -match 'rate limit')) {
+        return @{ Message = 'GitHub rate limit reached (60 anonymous requests per hour).'; Fix = 'Set a token and retry: $env:GITHUB_TOKEN = ''<personal access token>'' (or wait an hour).' }
+    }
+    if ($code -eq 404 -and $Tag) {
+        return @{ Message = "Release $Tag was not found in $Repository."; Fix = "Check the version, see https://github.com/$Repository/releases." }
+    }
+    if ($code -eq 404) {
+        return @{ Message = "No release found in $Repository (it has none, or the repository is private)."; Fix = 'Check -Repository; for a private repository set $env:GITHUB_TOKEN.' }
+    }
+    if ($code -eq 401) {
+        return @{ Message = 'GitHub rejected the token (HTTP 401).'; Fix = 'Check $env:GITHUB_TOKEN / $env:GH_TOKEN, or remove it.' }
+    }
+    return @{ Message = "GitHub answered HTTP $code."; Fix = 'Retry later; if it persists, try -UseGh.' }
+}
+
+# The release as {tagName, assets[]} (assets keep name, size, digest, url, browser_download_url). Throws installer errors.
+function Get-ReleaseHttp {
+    param([string]$Repository, [string]$Tag)
+    $path = if ($Tag) { "repos/$Repository/releases/tags/$([Uri]::EscapeDataString($Tag))" } else { "repos/$Repository/releases/latest" }
+    $resp = Send-HttpGet "https://api.github.com/$path"
+    try {
+        if (-not $resp.IsSuccessStatusCode) {
+            $f = Get-HttpFailure $resp $Tag $Repository
+            Stop-Installer $f.Message $f.Fix
+        }
+        $text = $resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+    }
+    finally { $resp.Dispose() }
+    try { $r = $text | ConvertFrom-Json }
+    catch { Stop-Installer 'GitHub answered with something that is not JSON.' 'Retry later, or try -UseGh.' }
+    [pscustomobject]@{ tagName = [string](Get-OptionalProperty $r 'tag_name'); assets = @(Get-OptionalProperty $r 'assets') }
+}
+
+# Small text file (a .sha256 sidecar, the script itself). $null on any failure.
+function Get-HttpText {
+    param([string]$Url, [string]$Accept = 'application/octet-stream')
+    try {
+        $resp = Send-HttpGet $Url $Accept
+        try {
+            if (-not $resp.IsSuccessStatusCode) { return $null }
+            return $resp.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+        }
+        finally { $resp.Dispose() }
+    }
+    catch { return $null }
+}
+
+# Downloads the release asset to $Directory with a progress bar. Throws installer errors.
+function Invoke-HttpDownload {
+    param($Asset, [string]$Tag, [string]$Repository, [string]$Directory)
+    # With a token (private repository) the API url is the one that accepts it; without, the public url spares the API quota.
+    $url = $Asset.Url
+    if ((Get-GitHubToken) -and $Asset.ApiUrl) { $url = $Asset.ApiUrl }
+    if (-not $url) { $url = $Asset.ApiUrl }
+    if (-not $url) { Stop-Installer "GitHub gives no download address for $($Asset.Name)." "Check https://github.com/$Repository/releases/tag/$Tag." }
+    $resp = Send-HttpGet $url 'application/octet-stream'
+    $file = Join-Path $Directory $Asset.Name
+    try {
+        if (-not $resp.IsSuccessStatusCode) {
+            $f = Get-HttpFailure $resp $Tag $Repository
+            Stop-Installer "Download failed: $($f.Message)" $f.Fix
+        }
+        $total = $Asset.Size
+        $len = $resp.Content.Headers.ContentLength
+        if ($len) { $total = [long]$len }
+        $in = $resp.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+        $out = [IO.File]::Create($file)
+        try {
+            $buf = New-Object byte[] 262144
+            $done = [long]0
+            $clock = [Diagnostics.Stopwatch]::StartNew()
+            while (($n = $in.Read($buf, 0, $buf.Length)) -gt 0) {
+                $out.Write($buf, 0, $n)
+                $done += $n
+                if (-not $script:Quiet -and $total -gt 0 -and $clock.ElapsedMilliseconds -ge 200) {
+                    $pct = [int][Math]::Min(100, [Math]::Floor(100.0 * $done / $total))
+                    Write-Progress -Activity "Downloading $($Asset.Name)" -Status ('{0:N1} / {1:N1} MB' -f ($done / 1MB), ($total / 1MB)) -PercentComplete $pct
+                    $clock.Restart()
+                }
+            }
+        }
+        catch [System.IO.IOException] {
+            Stop-Installer "Download interrupted: $($_.Exception.Message)" 'Check your connection and retry.'
+        }
+        finally {
+            $out.Dispose()
+            $in.Dispose()
+            Write-Progress -Activity "Downloading $($Asset.Name)" -Completed
+        }
+    }
+    catch {
+        Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+        throw
+    }
+    finally { $resp.Dispose() }
+}
+
+# The expected SHA-256 of the asset from its .sha256 sidecar asset; '' when there is none.
+function Get-Sha256Sidecar {
+    param($Asset)
+    $url = $Asset.SidecarUrl
+    if ((Get-GitHubToken) -and $Asset.SidecarApi) { $url = $Asset.SidecarApi }
+    if (-not $url) { return '' }
+    $t = Get-HttpText $url
+    if ($t -and $t -match '(?m)^\s*([0-9A-Fa-f]{64})\b') { return $Matches[1].ToLowerInvariant() }
+    return ''
+}
+
+function Test-GhAvailable {
+    return [bool](Get-Command gh -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1)
+}
+
+# The release through gh, shaped like Get-ReleaseHttp's answer. Throws installer errors.
+function Get-ReleaseGh {
+    param([string]$Repository, [string]$Tag)
+    $view = @('release', 'view')
+    if ($Tag) { $view += $Tag }
+    $view += @('--repo', $Repository, '--json', 'tagName,assets')
+    $r = Invoke-Gh $view
+    if ($r.Code -ne 0) {
+        $f = Get-GhFailure $r.Err $Tag $Repository
+        Stop-Installer $f.Message $f.Fix
+    }
+    try { return ($r.Out | ConvertFrom-Json) }
+    catch { Stop-Installer 'GitHub answered with something that is not JSON.' 'Retry later; if it persists run `gh release view` by hand.' }
 }
 
 function Get-GhPath {
@@ -587,14 +808,18 @@ function Register-App {
 }
 
 # The text of this script, for the setup copy when it is not a file (piped): the script block text when it is the whole
-# script, otherwise the file from the repository's default branch through gh.
+# script, otherwise the file from the repository's main branch (HTTPS, then gh).
 function Get-SelfText {
     param([string]$Repository)
     $marker = 'function Invoke-DbExplorerInstaller'
     if ($script:SelfText -and $script:SelfText.Contains($marker)) { return $script:SelfText }
+    # Run through `irm | iex`: there is no file and no script block text, so fetch the same file again.
+    $t = Get-HttpText "https://raw.githubusercontent.com/$Repository/main/install.ps1" 'text/plain'
+    if ($t -and $t.Contains($marker)) { return $t }
+    if (-not (Test-GhAvailable)) { throw "could not download install.ps1 from $Repository (https://raw.githubusercontent.com/$Repository/main/install.ps1)" }
     $r = Invoke-Gh @('api', "repos/$Repository/contents/install.ps1", '-H', 'Accept: application/vnd.github.raw')
     if ($r.Code -ne 0 -or -not $r.Out.Contains($marker)) {
-        throw "could not fetch install.ps1 from $Repository through gh ($($r.Err.Trim()))"
+        throw "could not fetch install.ps1 from $Repository over HTTPS or through gh ($($r.Err.Trim()))"
     }
     return $r.Out
 }
@@ -673,7 +898,7 @@ function Invoke-Install {
     if (-not (Test-RepositoryName $repo)) {
         Stop-Installer "Invalid -Repository '$repo'." 'Use the owner/name form, for example JonathanOll/dbExplorer.'
     }
-    [void](Get-GhPath)
+    if ($Opt.UseGh) { [void](Get-GhPath) }
     $loc = Resolve-Locations $Opt
     if (-not (Test-WritableLocation $loc.InstallDir)) {
         Stop-Installer "The install folder is not writable: $($loc.InstallDir)" 'Choose a folder you can write to with -InstallDir (the in-app updater needs one too).'
@@ -685,16 +910,22 @@ function Invoke-Install {
 
     # 2. release
     Start-Step "Finding the release ($target)"
-    $view = @('release', 'view')
-    if ($tag) { $view += $tag }
-    $view += @('--repo', $repo, '--json', 'tagName,assets')
-    $r = Invoke-Gh $view
-    if ($r.Code -ne 0) {
-        $f = Get-GhFailure $r.Err $tag $repo
-        Stop-Installer $f.Message $f.Fix
+    $useGh = [bool]$Opt.UseGh
+    $release = $null
+    $httpError = $null
+    if (-not $useGh) {
+        try { $release = Get-ReleaseHttp $repo $tag }
+        catch {
+            if (-not (Test-GhAvailable)) { throw }
+            Write-Detail "HTTPS to GitHub failed ($($_.Exception.Message)): trying gh."
+            $useGh = $true
+            $httpError = $_
+        }
     }
-    try { $release = $r.Out | ConvertFrom-Json }
-    catch { Stop-Installer 'GitHub answered with something that is not JSON.' 'Retry later; if it persists run `gh release view` by hand.' }
+    if ($useGh) {
+        try { $release = Get-ReleaseGh $repo $tag }
+        catch { if ($httpError) { throw $httpError } else { throw } }
+    }
     $relTag = [string](Get-OptionalProperty $release 'tagName')
     $relVer = ConvertTo-SemVer $relTag
     $asset = Select-ReleaseAsset $release
@@ -723,24 +954,38 @@ function Invoke-Install {
         # 3. download + verify
         Start-Step ('Downloading {0} ({1:N1} MB)' -f $asset.Name, ($asset.Size / 1MB))
         [void](New-Item -ItemType Directory -Path $tmp -Force)
-        $d = Invoke-GhDownload $relTag $repo $asset.Name $tmp $asset.Size
         $zip = Join-Path $tmp $asset.Name
-        if ($d.Code -ne 0 -or -not (Test-Path -LiteralPath $zip)) {
-            $f = Get-GhFailure $d.Err $relTag $repo
-            Stop-Installer "Download failed: $($f.Message)" $f.Fix
-        }
-        if ($asset.Sha256) {
-            $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-            if ($actual -ne $asset.Sha256) {
-                Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
-                Stop-Installer "SHA-256 mismatch for $($asset.Name) (expected $($asset.Sha256), got $actual). The download was deleted." 'Retry; if it persists, the release asset was altered or corrupted: do not install it.'
+        $fetched = $false
+        if (-not $useGh) {
+            try { Invoke-HttpDownload $asset $relTag $repo $tmp; $fetched = $true }
+            catch {
+                if (-not (Test-GhAvailable)) { throw }
+                Write-Detail "HTTPS download failed ($($_.Exception.Message)): trying gh."
             }
-            Complete-Step 'OK (sha256 verified)'
         }
-        else {
-            Complete-Step 'OK'
-            Write-Warn "GitHub gave no digest for $($asset.Name): the download could not be verified."
+        if (-not $fetched) {
+            $d = Invoke-GhDownload $relTag $repo $asset.Name $tmp $asset.Size
+            if ($d.Code -ne 0 -or -not (Test-Path -LiteralPath $zip)) {
+                $f = Get-GhFailure $d.Err $relTag $repo
+                Stop-Installer "Download failed: $($f.Message)" $f.Fix
+            }
         }
+        $expected = $asset.Sha256
+        $from = 'sha256 verified'
+        if (-not $expected) {
+            $expected = Get-Sha256Sidecar $asset
+            $from = 'sha256 verified from the .sha256 asset'
+        }
+        if (-not $expected) {
+            Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+            Stop-Installer "GitHub gives no SHA-256 digest for $($asset.Name) and the release has no $($asset.Name).sha256 asset: the download cannot be verified, so it is refused." 'Install a release published with a digest (-Version), or ask the maintainer to re-publish it.'
+        }
+        $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actual -ne $expected) {
+            Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+            Stop-Installer "SHA-256 mismatch for $($asset.Name) (expected $expected, got $actual). The download was deleted." 'Retry; if it persists, the release asset was altered or corrupted: do not install it.'
+        }
+        Complete-Step "OK ($from)"
 
         # 4. extract + sanity check
         Start-Step 'Extracting'
@@ -801,6 +1046,8 @@ function Invoke-Install {
         ('Start Menu   ' + $(if ($made.ContainsKey('Start')) { $made.Start } else { $none })),
         ('Desktop      ' + $(if ($made.ContainsKey('Desktop')) { $made.Desktop } else { $none }))
     )
+    $lines += 'Start        Start Menu > dbExplorer'
+    $lines += 'Update       run the install command again (irm .../install.ps1 | iex), or use the in-app update'
     if ($setupScript) {
         $lines += 'Uninstall    Settings > Apps > dbExplorer, or:'
         $lines += ('             powershell -NoProfile -ExecutionPolicy Bypass -File "' + $setupScript + '" -Uninstall')
@@ -934,7 +1181,7 @@ if ($MyInvocation.InvocationName -ne '.') {
     $opt = @{
         InstallDir = $InstallDir; Version = $Version; Repository = $Repository
         DesktopShortcut = [bool]$DesktopShortcut; NoStartMenu = [bool]$NoStartMenu; Launch = [bool]$Launch
-        Force = [bool]$Force; Uninstall = [bool]$Uninstall; RemoveUserData = [bool]$RemoveUserData; Quiet = [bool]$Quiet
+        Force = [bool]$Force; Uninstall = [bool]$Uninstall; RemoveUserData = [bool]$RemoveUserData; UseGh = [bool]$UseGh; Quiet = [bool]$Quiet
         StartMenuDir = $StartMenuDir; DesktopDir = $DesktopDir; RegistryKey = $RegistryKey; SetupDir = $SetupDir
         UserDataDir = $UserDataDir; CloseTimeoutSec = $CloseTimeoutSec
     }

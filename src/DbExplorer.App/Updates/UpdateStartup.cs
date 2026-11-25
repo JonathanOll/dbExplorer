@@ -26,7 +26,8 @@ internal static class UpdateStartup
     {
         // Only cheap objects are built here (no process, no reflection, no disk): all of that runs in the check, on a worker.
         var exe = Environment.ProcessPath;
-        var gh = new GhProcessRunner();
+        // Plain HTTPS first (no gh needed); gh only when HTTPS failed and gh is installed.
+        var gh = new FallbackGhRunner(new GitHubHttpRunner(), new GhProcessRunner());
         var update = new UpdateViewModel(
             new GhUpdateChecker(gh, exe), new GhUpdateDownloader(gh),
             exe is null ? null : new SelfUpdateApplier(exe, Environment.ProcessId, args),
