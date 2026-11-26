@@ -15,6 +15,8 @@ public partial class MainWindow : Window
     private ConnectionNodeViewModel? _dragNode;
     private static readonly DataFormat<string> ScriptFormat = DataFormat.CreateStringApplicationFormat("dbx-script-path");
     private string? _dragScriptPath;
+    private static readonly DataFormat<string> FolderFormat = DataFormat.CreateStringApplicationFormat("dbx-folder-name");
+    private string? _dragFolder;
 
     public MainWindow()
     {
@@ -453,7 +455,7 @@ public partial class MainWindow : Window
         }
     }
 
-    // ---- drag a connection onto a folder (or empty area / loose connection = root) ----
+    // ---- drag a connection onto a folder (or empty area / loose connection = root), or a folder before / after another ----
 
     private void OnTreePointerPressed(object? sender, PointerPressedEventArgs e)
     {
@@ -461,12 +463,13 @@ public partial class MainWindow : Window
         var pressed = point.Properties.IsLeftButtonPressed ? NodeAt(e.Source) : null;
         _dragNode = pressed as ConnectionNodeViewModel;
         _dragScriptPath = pressed switch { ScriptFileNodeViewModel f => f.Path, ScriptFolderNodeViewModel d => d.Path, _ => null };
-        _dragStart = _dragNode is null && _dragScriptPath is null ? null : e.GetPosition(this);
+        _dragFolder = (pressed as FolderNodeViewModel)?.Name;
+        _dragStart = _dragNode is null && _dragScriptPath is null && _dragFolder is null ? null : e.GetPosition(this);
     }
 
     private async void OnTreePointerMoved(object? sender, PointerEventArgs e)
     {
-        if (_dragStart is not { } start || (_dragNode is null && _dragScriptPath is null)) return;
+        if (_dragStart is not { } start) return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) { _dragStart = null; return; }
         var delta = e.GetPosition(this) - start;
         if (Math.Abs(delta.X) < 6 && Math.Abs(delta.Y) < 6) return;
@@ -476,8 +479,10 @@ public partial class MainWindow : Window
         {
             var transfer = new DataTransfer();
             if (_dragNode is { } node) transfer.Add(DataTransferItem.Create(ConnectionFormat, node.Config.Id.ToString()));
-            else transfer.Add(DataTransferItem.Create(ScriptFormat, _dragScriptPath!));
+            else if (_dragScriptPath is { } path) transfer.Add(DataTransferItem.Create(ScriptFormat, path));
+            else transfer.Add(DataTransferItem.Create(FolderFormat, _dragFolder!));
             await DragDrop.DoDragDropAsync(e, transfer, DragDropEffects.Move);
+            ClearDropTarget();   // a cancelled drag may end without a DragLeave
         });
     }
 
@@ -487,6 +492,17 @@ public partial class MainWindow : Window
     // Over the Groups header: refused. Elsewhere: the root. The container that would receive the drop is outlined.
     private void OnTreeDragOver(object? sender, DragEventArgs e)
     {
+        if (e.DataTransfer.TryGetValue(FolderFormat) is { } folderName)
+        {
+            // A folder goes before or after another folder only (no nesting): a line shows where it would land.
+            SetDropTarget(null);
+            var spot = FolderSpotAt(e);
+            var allowed = spot is { } s && Tree?.CanMoveFolder(folderName, s.Folder.Name, s.After) == true;
+            e.DragEffects = allowed ? DragDropEffects.Move : DragDropEffects.None;
+            ShowFolderDropLine(allowed ? spot : null);
+            e.Handled = true;
+            return;
+        }
         if (e.DataTransfer.Contains(ScriptFormat))
         {
             // A script or script folder: only the Scripts section takes it (a folder, or the section for the top level).
@@ -521,7 +537,40 @@ public partial class MainWindow : Window
         _dropTarget?.Classes.Add("drop");
     }
 
-    private void ClearDropTarget() => SetDropTarget(null);
+    private void ClearDropTarget()
+    {
+        SetDropTarget(null);
+        ShowFolderDropLine(null);
+    }
+
+    // The folder under the pointer and the side: the upper half of its row means before it; the lower half, or anything
+    // inside it, means after it.
+    private static (TreeViewItem Item, FolderNodeViewModel Folder, bool After)? FolderSpotAt(DragEventArgs e)
+    {
+        var under = (e.Source as Visual)?.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+        for (var item = under; item is not null; item = item.FindAncestorOfType<TreeViewItem>())
+        {
+            if (item.DataContext is not FolderNodeViewModel folder) continue;
+            var row = item.GetVisualDescendants().OfType<Control>().FirstOrDefault(c => c.Name == "PART_LayoutRoot") ?? item;
+            return (item, folder, !ReferenceEquals(item, under) || e.GetPosition(row).Y > row.Bounds.Height / 2);
+        }
+        return null;
+    }
+
+    // After an expanded folder the line sits under its last child: that is where the moved folder will appear.
+    private void ShowFolderDropLine((TreeViewItem Item, FolderNodeViewModel Folder, bool After)? spot)
+    {
+        var line = this.FindControl<Border>("FolderDropLine")!;
+        if (spot is not { } s || line.Parent is not Visual host
+            || s.Item.TranslatePoint(new Point(0, s.After ? s.Item.Bounds.Height : 0), host) is not { } edge)
+        {
+            line.IsVisible = false;
+            return;
+        }
+        var y = Math.Clamp(edge.Y - line.Height / 2, 0, Math.Max(0, host.Bounds.Height - line.Height));
+        line.Margin = new Thickness(8, y, 8, 0);
+        line.IsVisible = true;
+    }
 
     /// <summary>The folder or group container a drop at the visual would land in; null for the root.</summary>
     private static TreeViewItem? DropContainerAt(object? source)
@@ -555,6 +604,14 @@ public partial class MainWindow : Window
 
     private void OnTreeDrop(object? sender, DragEventArgs e)
     {
+        if (e.DataTransfer.TryGetValue(FolderFormat) is { } folderName)
+        {
+            var spot = FolderSpotAt(e);
+            ClearDropTarget();
+            e.Handled = true;
+            if (spot is { } s) Tree?.MoveFolder(folderName, s.Folder.Name, s.After);
+            return;
+        }
         var scriptTarget = ScriptDropContainerAt(e.Source)?.DataContext;
         ClearDropTarget();
         if (e.DataTransfer.TryGetValue(ScriptFormat) is { } scriptPath)

@@ -10,6 +10,8 @@ where you left off. The big topics have their own page: [linked database groups]
 
 Folders (one level) > connection > schema > table/view (SQLite has no schema level). Several
 connections stay connected at once, one session each. Drag a connection into a folder; add, rename, edit, delete.
+Reorder folders by dragging one above or below another (a line shows where it lands), or with **Move up** / **Move down**
+in the folder's context menu; the order is saved.
 A **Groups** section at the top lists the linked database groups (see [Linked database groups](groups.md)).
 
 Import from DBeaver: folders, connections, credentials and virtual keys, see [DBeaver import](dbeaver-import.md).

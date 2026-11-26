@@ -59,9 +59,25 @@ public sealed class PlaceholderNodeViewModel : TreeNodeViewModel
     public override string Title => "Loading…";
 }
 
-public sealed class FolderNodeViewModel : TreeNodeViewModel
+public sealed partial class FolderNodeViewModel : TreeNodeViewModel
 {
     private List<ConnectionNodeViewModel> _watched = [];
+
+    /// <summary>False for the first folder.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MoveUpTip))]
+    private bool _canMoveUp;
+
+    /// <summary>False for the last folder.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MoveDownTip))]
+    private bool _canMoveDown;
+
+    /// <summary>Why "Move up" is disabled; null (no tooltip) when it is enabled.</summary>
+    public string? MoveUpTip => CanMoveUp ? null : "This folder is already the first one.";
+
+    /// <summary>Why "Move down" is disabled; null (no tooltip) when it is enabled.</summary>
+    public string? MoveDownTip => CanMoveDown ? null : "This folder is already the last one.";
 
     public FolderNodeViewModel(string name)
     {

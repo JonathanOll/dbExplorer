@@ -209,9 +209,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
     /// <summary>Rebuilds the node list from the config. Node objects are reused so state and expansion survive.</summary>
     public void Rebuild()
     {
-        var folderNames = Config.Folders.Concat(Config.Connections.Select(c => c.Folder)
-                .Where(f => !string.IsNullOrWhiteSpace(f)).Select(f => f!))
-            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var folderNames = FolderOrder();
 
         var liveIds = Config.Connections.Select(c => c.Id).ToHashSet();
         foreach (var gone in _connectionNodes.Keys.Where(id => !liveIds.Contains(id)).ToList())
@@ -242,6 +240,8 @@ public partial class ConnectionTreeViewModel : ObservableObject
                     .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
                     .Select(c => _connectionNodes[c.Id]));
             folder.WatchChildren();
+            folder.CanMoveUp = seenFolders.Count > 1;
+            folder.CanMoveDown = seenFolders.Count < folderNames.Count;
             if (Config.ShowFolders) Nodes.Add(folder);
         }
 
@@ -348,9 +348,11 @@ public partial class ConnectionTreeViewModel : ObservableObject
             && Config.Folders.Contains(newName, StringComparer.OrdinalIgnoreCase))
             return Fail($"Folder '{newName}' already exists.");
 
-        var index = Config.Folders.FindIndex(f => string.Equals(f, oldName, StringComparison.OrdinalIgnoreCase));
+        // A folder only known through its connections is stored first, so renaming does not move it.
+        if (IndexOfFolder(Config.Folders, oldName) < 0) StoreFolderOrder(FolderOrder());
+        var index = IndexOfFolder(Config.Folders, oldName);
         if (index >= 0) Config.Folders[index] = newName;
-        else Config.Folders.Add(newName); // folder only known through its connections
+        else Config.Folders.Add(newName);
         ReplaceConnections(c => string.Equals(c.Folder, oldName, StringComparison.OrdinalIgnoreCase) ? c with { Folder = newName } : c);
         Persist();
         return true;
@@ -367,7 +369,8 @@ public partial class ConnectionTreeViewModel : ObservableObject
     /// <summary>Moves a connection into <paramref name="folder"/> (null = root). Also used by drag and drop.</summary>
     public void MoveToFolder(ConnectionConfig connection, string? folder)
     {
-        if (folder is not null && !Config.Folders.Contains(folder, StringComparer.OrdinalIgnoreCase))
+        var folders = FolderOrder();   // includes the folders only connections know about
+        if (folder is not null && IndexOfFolder(folders, folder) < 0)
         {
             Fail($"Folder '{folder}' does not exist.");
             return;
@@ -375,7 +378,9 @@ public partial class ConnectionTreeViewModel : ObservableObject
 
         var current = Config.Connections.FirstOrDefault(c => c.Id == connection.Id);
         if (current is null) return;
-        var canonical = folder is null ? null : Config.Folders.First(f => string.Equals(f, folder, StringComparison.OrdinalIgnoreCase));
+        var canonical = folder is null ? null : folders[IndexOfFolder(folders, folder)];
+        // Folders known only through connections get a stored place first: moving the last one out must not reorder them.
+        if (folders.Count != Config.Folders.Count) StoreFolderOrder(folders);
         UpdateConnection(current with { Folder = canonical });
     }
 

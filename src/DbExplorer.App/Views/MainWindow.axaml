@@ -392,6 +392,11 @@
                         <ContextMenu>
                           <MenuItem Header="Rename…" Command="{Binding Tree.RenameFolderCommand}" CommandParameter="{Binding}" InputGesture="F2" />
                           <Separator />
+                          <MenuItem Header="Move up" Command="{Binding Tree.MoveFolderUpCommand}" CommandParameter="{Binding}"
+                                    IsEnabled="{Binding CanMoveUp}" ToolTip.Tip="{Binding MoveUpTip}" ToolTip.ShowOnDisabled="True" />
+                          <MenuItem Header="Move down" Command="{Binding Tree.MoveFolderDownCommand}" CommandParameter="{Binding}"
+                                    IsEnabled="{Binding CanMoveDown}" ToolTip.Tip="{Binding MoveDownTip}" ToolTip.ShowOnDisabled="True" />
+                          <Separator />
                           <MenuItem Classes="danger" Header="Delete folder" Command="{Binding Tree.DeleteFolderCommand}" CommandParameter="{Binding}" InputGesture="Delete">
                             <MenuItem.Icon><PathIcon Data="{StaticResource IconDelete}" /></MenuItem.Icon>
                           </MenuItem>
@@ -600,6 +605,9 @@
                   </TreeDataTemplate>
                 </TreeView.DataTemplates>
               </TreeView>
+              <!-- where a dragged folder would land (placed by the code-behind, over the tree) -->
+              <Border x:Name="FolderDropLine" Height="2" CornerRadius="1" Margin="8,0" VerticalAlignment="Top" IsHitTestVisible="False"
+                      IsVisible="False" Background="{DynamicResource DbxAccent}" />
 
               <!-- nothing configured yet -->
               <StackPanel Classes="empty" Margin="16" IsVisible="{Binding Tree.IsEmpty}">
