@@ -68,7 +68,7 @@ Limits and edge cases: [docs/limitations.md](docs/limitations.md).
 | `Ctrl+Enter` | Script tab: run the statement under the cursor, or the selection |
 | `F5` | Script tab: run the whole script. Table tab: reload |
 | `Ctrl+S` | Save the script, or review and apply staged edits |
-| `Ctrl+Shift+F` | Format SQL |
+| `Ctrl+Shift+F` / `Ctrl+K, Ctrl+D` | Format SQL |
 | `Ctrl+Alt+F` | Search in scripts and in data |
 | `Ctrl+Shift+T` | Reopen the last closed tab |
 | `Ctrl+,` | Settings |

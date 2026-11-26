@@ -33,6 +33,15 @@ public enum ScriptKeyAction
 
     /// <summary>Ctrl+Shift+F: formats the selection, or the whole script when nothing is selected.</summary>
     FormatSql,
+
+    /// <summary>Ctrl+K: the first key of a two-key chord (see <see cref="ScriptTabKeys.ResolveChord"/>).</summary>
+    StartChord,
+
+    /// <summary>Ctrl+K, Ctrl+C: comments the selected lines.</summary>
+    CommentLines,
+
+    /// <summary>Ctrl+K, Ctrl+U: uncomments the selected lines.</summary>
+    UncommentLines,
 }
 
 /// <summary>One line of the shortcuts flyout.</summary>
@@ -60,8 +69,26 @@ public static class ScriptTabKeys
         (Key.L, KeyModifiers.Control) => ScriptKeyAction.EstimatedPlan,
         (Key.M, KeyModifiers.Control) => ScriptKeyAction.ToggleActualPlan,
         (Key.F, KeyModifiers.Control | KeyModifiers.Shift) => ScriptKeyAction.FormatSql,
+        (Key.K, KeyModifiers.Control) => ScriptKeyAction.StartChord,
         _ => ScriptKeyAction.None,
     };
+
+    /// <summary>
+    /// The second key of a Ctrl+K chord, with Ctrl still held or already released. None means the chord has no such key: the
+    /// key is then dropped, never handed to the editor (whose own Ctrl+D deletes the line).
+    /// </summary>
+    public static ScriptKeyAction ResolveChord(Key key, KeyModifiers modifiers) =>
+        modifiers is not (KeyModifiers.Control or KeyModifiers.None) ? ScriptKeyAction.None : key switch
+        {
+            Key.D => ScriptKeyAction.FormatSql,
+            Key.C => ScriptKeyAction.CommentLines,
+            Key.U => ScriptKeyAction.UncommentLines,
+            _ => ScriptKeyAction.None,
+        };
+
+    /// <summary>A modifier key on its own: pressing it again between the two keys of a chord does not end the chord.</summary>
+    public static bool IsModifier(Key key) =>
+        key is Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift or Key.LeftAlt or Key.RightAlt or Key.LWin or Key.RWin;
 
     /// <summary>The chords shown by the shortcuts flyout of the toolbar.</summary>
     public static IReadOnlyList<ScriptShortcut> Shortcuts { get; } =
@@ -78,6 +105,9 @@ public static class ScriptTabKeys
         new("Find in the script", "Ctrl+F"),
         new("Comment or uncomment the selected lines", "Ctrl+/"),
         new("Format the selection, or the whole script", "Ctrl+Shift+F"),
+        new("Format the selection, or the whole script", "Ctrl+K, Ctrl+D"),
+        new("Comment the selected lines", "Ctrl+K, Ctrl+C"),
+        new("Uncomment the selected lines", "Ctrl+K, Ctrl+U"),
         new("Complete tables, columns and keywords (also while typing)", "Ctrl+Space"),
         new("Open result tab 1 to 9", "Ctrl+1 to 9"),
         new("Move between the editor and the results", "F6"),

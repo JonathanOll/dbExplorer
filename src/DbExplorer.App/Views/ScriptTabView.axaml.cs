@@ -31,6 +31,7 @@ public partial class ScriptTabView : UserControl
     private DispatcherTimer? _elapsedTimer;
     private ScriptTabViewModel? _vm;
     private bool _syncing;
+    private bool _chordPending;   // Ctrl+K was pressed in the editor: the next key belongs to the chord
 
     // Remembered while the results are maximized (double-click on the splitter).
     private (GridLength Editor, GridLength Results, double EditorMin)? _restoreSplit;
@@ -48,6 +49,9 @@ public partial class ScriptTabView : UserControl
         InitCompletion();
         ActualThemeVariantChanged += (_, _) => ApplyEditorTheme();
         AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
+        // A click, or the focus going elsewhere, gives up a pending chord: a key typed much later must not be eaten.
+        AddHandler(PointerPressedEvent, (_, _) => _chordPending = false, RoutingStrategies.Tunnel, handledEventsToo: true);
+        Editor.TextArea.LostFocus += (_, _) => _chordPending = false;
         DataContextChanged += (_, _) => Attach(DataContext as ScriptTabViewModel);
         DetachedFromVisualTree += (_, _) =>
         {
@@ -133,6 +137,7 @@ public partial class ScriptTabView : UserControl
             _vm.FormatRequested -= OnFormatRequested;
         }
         _vm = next;
+        _chordPending = false;
         _marks.Clear();
         if (_vm is null) return;
 
@@ -434,8 +439,9 @@ public partial class ScriptTabView : UserControl
         Editor.TextArea.Caret.BringCaretToView();
     }
 
-    // Ctrl+/: puts "-- " in front of the selected lines, or takes it off when they all have it.
-    private void ToggleComment()
+    // Puts "-- " in front of the selected lines (comment: true) or takes it off (false). Ctrl+/ passes null: it takes it
+    // off when they all have it, and puts it otherwise.
+    private void CommentSelectedLines(bool? comment = null)
     {
         var document = Editor.Document;
         var selectionStart = Editor.SelectionStart;
@@ -448,7 +454,9 @@ public partial class ScriptTabView : UserControl
             .Select(l => (Line: l, Text: document.GetText(l.Offset, l.Length)))
             .Where(l => l.Text.Trim().Length > 0).ToList();
         if (lines.Count == 0) return;
-        var uncomment = lines.All(l => l.Text.TrimStart().StartsWith("--", StringComparison.Ordinal));
+        static bool IsCommented(string text) => text.TrimStart().StartsWith("--", StringComparison.Ordinal);
+        var uncomment = comment is { } wanted ? !wanted : lines.All(l => IsCommented(l.Text));
+        if (uncomment) lines.RemoveAll(l => !IsCommented(l.Text));
 
         using (document.RunUpdate())
         {
@@ -467,9 +475,27 @@ public partial class ScriptTabView : UserControl
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (_vm is not { } vm) return;
-        Func<Task>? action = null;
-        switch (ScriptTabKeys.Resolve(e.Key, e.KeyModifiers))
+        ScriptKeyAction resolved;
+        if (_chordPending)
         {
+            if (ScriptTabKeys.IsModifier(e.Key)) return;   // Ctrl pressed again for the second key
+            // Whatever the second key is, it stops here: the editor would take Ctrl+D as "delete line".
+            e.Handled = true;
+            if (e.Key == Key.K && e.KeyModifiers == KeyModifiers.Control) return;   // Ctrl+K again (or held): still waiting
+            _chordPending = false;
+            resolved = ScriptTabKeys.ResolveChord(e.Key, e.KeyModifiers);
+            if (resolved == ScriptKeyAction.None) return;
+        }
+        else resolved = ScriptTabKeys.Resolve(e.Key, e.KeyModifiers);
+
+        Func<Task>? action = null;
+        switch (resolved)
+        {
+            case ScriptKeyAction.StartChord:
+                if (!Editor.IsKeyboardFocusWithin) return;
+                _chordPending = true;
+                e.Handled = true;
+                return;
             case ScriptKeyAction.RunStatement: action = vm.RunStatementAsync; break;
             case ScriptKeyAction.RunScript: action = vm.RunScriptAsync; break;
             case ScriptKeyAction.RunStatementOnGroup: action = vm.RunStatementOnGroupAsync; break;
@@ -491,8 +517,12 @@ public partial class ScriptTabView : UserControl
                 return;
             case ScriptKeyAction.ToggleComment:
                 if (!Editor.IsKeyboardFocusWithin) return;
-                ToggleComment();
+                CommentSelectedLines();
                 e.Handled = true;
+                return;
+            case ScriptKeyAction.CommentLines:
+            case ScriptKeyAction.UncommentLines:
+                CommentSelectedLines(resolved == ScriptKeyAction.CommentLines);
                 return;
             case ScriptKeyAction.FormatSql:
                 vm.FormatSqlCommand.Execute(null);

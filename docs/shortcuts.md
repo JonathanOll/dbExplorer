@@ -20,6 +20,8 @@ Every shortcut of the app. The same list is in the app (`F1`, and Settings > Sho
 | `Ctrl+Enter` | script tab | Run the statement under the cursor (ends at `;`, a `GO` line or a blank line) or the selection |
 | `F5` | script tab | Run the whole script; in a table tab: reload the data |
 | `Ctrl+Shift+F` | script tab | Format the selection, or the whole script when nothing is selected (see [SQL formatting](scripts.md#sql-formatting)) |
+| `Ctrl+K, Ctrl+D` | script tab | Same as `Ctrl+Shift+F` |
+| `Ctrl+K, Ctrl+C` / `Ctrl+K, Ctrl+U` | script tab | Comment / uncomment the selected lines (after `Ctrl+K`, a key that completes no chord is ignored) |
 | `Ctrl+Shift+Enter` | script tab on a connection in a group | Run the statement under the cursor / the selection on **every database of the group** (read-only, see [Linked database groups](groups.md)); in a script tab that is not in a group the status bar only says so (no ordinary run) |
 | `Ctrl+Shift+F5` | script tab on a connection in a group | Run the whole script on every database of the group (read-only) |
 | `Ctrl+S` | script tab / table tab | Save the script (the first time: name and library folder) / review the SQL and apply staged edits |

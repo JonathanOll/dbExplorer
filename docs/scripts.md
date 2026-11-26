@@ -47,7 +47,7 @@ Group runs (one statement on every database) are not recorded.
 
 ## SQL formatting
 
-`Ctrl+Shift+F`, the toolbar button next to Save and **Script > Format SQL** format the selection, or the whole script when
+`Ctrl+Shift+F` (or `Ctrl+K, Ctrl+D`), the toolbar button next to Save and **Script > Format SQL** format the selection, or the whole script when
 nothing is selected. It is one edit of the editor: `Ctrl+Z` brings the old text back in a single step, and the caret stays on
 the token it was on. The formatter is our own (no dependency) and built to be safe:
 

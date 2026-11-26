@@ -57,6 +57,9 @@ public static class ShortcutCatalog
             new("Ctrl+L", "Show the estimated execution plan (nothing runs)"),
             new("Ctrl+M", "Include the actual execution plan in the runs"),
             new("Ctrl+Shift+F", "Format the selection, or the whole script"),
+            new("Ctrl+K, Ctrl+D", "Format the selection, or the whole script"),
+            new("Ctrl+K, Ctrl+C", "Comment the selected lines"),
+            new("Ctrl+K, Ctrl+U", "Uncomment the selected lines"),
         ]),
         new("Linked databases", [
             new("Ctrl+Alt+PageDown", "Next database of the group"),
