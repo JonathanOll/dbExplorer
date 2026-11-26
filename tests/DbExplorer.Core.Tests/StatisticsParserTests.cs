@@ -69,6 +69,45 @@ public class StatisticsParserTests
         Assert.Equal(new IoStats("Invoices", 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11), fr);
     }
 
+    // Captured from a real server (SQL Server 2025, SET LANGUAGE French): guillemets padded with no-break spaces, a
+    // typographic apostrophe, and the scan count between guillemets too.
+    private const string RealFrench =
+        "Table « sysschobjs ». Nombre d’analyses « 1 », lectures logiques 44, lectures physiques 2, " +
+        "lectures de serveur de page 3, lectures anticipées 4, lectures anticipées de serveur de page 5, lectures logiques LOB 6, " +
+        "lectures physiques LOB 7, lectures de serveur de page LOB 8, lectures anticipées LOB 9, " +
+        "lectures anticipées de serveur de page LOB 10.";
+
+    [Fact]
+    public void Io_RealFrenchServerMessage_MapsEveryColumn()
+    {
+        Assert.Equal(new IoStats("sysschobjs", 1, 44, 2, 3, 4, 5, 6, 7, 8, 9, 10), Io(RealFrench));
+    }
+
+    [Fact]
+    public void Statistics_RealFrenchServerMessage_FillsLogicalReads()
+    {
+        var table = StatisticsReport.BuildStatistics(
+            [new StatementMessages(null, 1, [new ServerMessage(DateTimeOffset.Now, RealFrench)])]);
+
+        var logical = table.Columns.ToList().IndexOf("Logical reads");
+        Assert.Equal(["IO", "Total"], table.Rows.Select(r => (string)r[1]!));
+        Assert.All(table.Rows, r => Assert.Equal(44L, r[logical]));
+    }
+
+    // The server's own templates (sys.messages 3615) for other languages that quote the table name differently.
+    [Theory]
+    [InlineData("Tabelle: „x“. Anzahl von Überprüfungen: 1, logische Lesevorgänge: 2, physische Lesevorgänge: 3, Lesevorgänge Auslagerungsserver: 4, Read-Ahead-Lesevorgänge: 5, Read-Ahead-Lesevorgänge Auslagerungsserver: 6, logische LOB-Lesevorgänge: 7, physische LOB-Lesevorgänge: 8, LOB-Lesevorgänge Auslagerungsserver: 9, LOB-Read-Ahead-Lesevorgänge: 10, LOB-Read-Ahead-Lesevorgänge Auslagerungsserver: 11.")]
+    [InlineData("Tabla \"x\". Número de examen 1, lecturas lógicas 2, lecturas físicas 3, lecturas de servidor de páginas 4, lecturas anticipadas 5, lecturas anticipadas de servidor de páginas 6, lecturas lógicas de línea de negocio 7, lecturas físicas de línea de negocio 8, lecturas de servidor de páginas de línea de negocio 9, lecturas anticipadas de línea de negocio 10, lecturas anticipadas de servidor de páginas de línea de negocio 11.")]
+    [InlineData("Tabela ''x''. Contagem de verificação 1, leituras lógicas 2, leituras físicas 3, leituras do servidor de páginas 4, leituras antecipadas 5, leituras antecipadas do servidor de páginas 6, leituras lógicas de LOB 7, leituras físicas de LOB 8, leituras de LOB no servidor de páginas 9, leituras antecipadas de LOB 10, leituras antecipadas de LOB no servidor de páginas 11.")]
+    public void Io_OtherQuoteStyles_AreRead(string text)
+    {
+        Assert.Equal(new IoStats("x", 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11), Io(text));
+    }
+
+    [Fact]
+    public void Io_FrenchSegmentReads_StayPlain() =>
+        Assert.IsType<TextLine>(Assert.Single(StatisticsParser.Parse("Table « x ». Segments lus : 1, segments ignorés : 0.")));
+
     [Theory]
     [InlineData("Worktable")]
     [InlineData("Workfile")]

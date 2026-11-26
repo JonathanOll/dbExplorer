@@ -36,7 +36,8 @@ public sealed record TextLine(string Text) : StatsItem;
 
 /// <summary>
 /// Turns server messages into STATISTICS IO / TIME items. The server writes them in the language of the login (English,
-/// French, ...), so nothing depends on keywords: an IO line is a table name between quotes followed by exactly 7 or 11
+/// French, ...), so nothing depends on keywords: an IO line is a table name between the language's quotes ('x', "x",
+/// « x », „x“) followed by exactly 7 or 11
 /// integers (older servers report 7 counters, newer ones add the page-server ones), and a TIME message is two
 /// <c>= N ms</c> values; only the parse/compile versus execution split looks at words (English and French markers, else
 /// execution). Anything that does not match stays a <see cref="TextLine"/>.
@@ -52,6 +53,8 @@ public static partial class StatisticsParser
     // A whole number as the server prints it: set off by white space, ended by a comma, a full stop or the end.
     [GeneratedRegex(@"(?<![\w.,'-])\d+(?=[,.]?(?:\s|$))")]
     private static partial Regex StandaloneNumber();
+
+    private static readonly System.Buffers.SearchValues<char> OpeningQuotes = System.Buffers.SearchValues.Create("'\"«„");
 
     /// <summary>Parses one server message (it may hold several lines). An empty message gives no items.</summary>
     public static IReadOnlyList<StatsItem> Parse(string? message)
@@ -94,23 +97,37 @@ public static partial class StatisticsParser
     private static bool TryParseIo(string line, out IoStats io)
     {
         io = null!;
-        var open = line.IndexOf('\'');
-        if (open < 0 || line.AsSpan(0, open).ContainsAnyInRange('0', '9')) return false;   // "Table 'x'." / "Table de travail 'x'."
+        var open = line.AsSpan().IndexOfAny(OpeningQuotes);
+        if (open < 0 || line.AsSpan(0, open).ContainsAnyInRange('0', '9')) return false;   // "Table 'x'." / "Table « x »."
+        var close = line[open] switch { '«' => '»', '„' => '“', var same => same };
 
         // The name ends at the first quote followed by a full stop and a space whose rest is a list of 7 or 11 numbers: the
         // name itself may contain quotes (and digits: #temp tables), and French counters hold an apostrophe ("d'analyses").
         for (var i = open + 1; i < line.Length - 2; i++)
         {
-            if (line[i] != '\'' || line[i + 1] != '.' || !char.IsWhiteSpace(line[i + 2])) continue;
+            if (line[i] != close || line[i + 1] != '.' || !char.IsWhiteSpace(line[i + 2])) continue;
             if (!TryCounters(line[(i + 2)..], out var n)) continue;
 
-            var name = line[(open + 1)..i];
+            var name = Unpad(line[(open + 1)..i], close);
             io = n.Length == 7
                 ? new IoStats(name, n[0], n[1], n[2], 0, n[3], 0, n[4], n[5], 0, n[6], 0)
                 : new IoStats(name, n[0], n[1], n[2], n[3], n[4], n[5], n[6], n[7], n[8], n[9], n[10]);
             return true;
         }
         return false;
+    }
+
+    // French pads the name with one no-break space inside its guillemets; Portuguese doubles the apostrophes.
+    private static string Unpad(string name, char close)
+    {
+        if (name.Length < 2) return name;
+        var padded = close switch
+        {
+            '»' => char.IsWhiteSpace(name[0]) && char.IsWhiteSpace(name[^1]),
+            '\'' => name[0] == '\'' && name[^1] == '\'',
+            _ => false,
+        };
+        return padded ? name[1..^1] : name;
     }
 
     private static bool TryCounters(string rest, out long[] numbers)
