@@ -46,6 +46,9 @@ Table tabs are labelled `connection · table` with a colour chip per connection,
 
 **Follow foreign keys**: `Ctrl+click` (or double-click) an FK value to open the referenced row in a new tab.
 
+**Copy and export**: table and script grids copy the selected rows, cells or columns (also as CSV, JSON, Markdown or SQL)
+and export them, or every row of the query, to a file. [Copy and export](export.md)
+
 ## Quick open
 
 ![Quick open, dark](ui/after/quick-open-dark.png)

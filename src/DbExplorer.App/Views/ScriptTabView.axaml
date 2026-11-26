@@ -56,11 +56,11 @@
         <Button Classes="ghost" MinHeight="24" Padding="8,0" Content="Copy" Click="OnCopyResultClick"
                 ToolTip.Tip="{Binding CopyTip}" AutomationProperties.Name="Copy the rows" />
         <DropDownButton Classes="ghost" MinHeight="24" Padding="8,0" Content="Export" Click="OnExportMenuClick"
-                        ToolTip.Tip="Export as CSV or JSON: the selected rows, or all rows" AutomationProperties.Name="Export the rows">
+                        ToolTip.Tip="Export to a file, or copy with options (Ctrl+E and Ctrl+Alt+C in the grid)" AutomationProperties.Name="Export the rows">
           <DropDownButton.Flyout>
             <MenuFlyout Placement="TopEdgeAlignedRight">
-              <MenuItem Header="Export as CSV…" Click="OnExportCsvClick" />
-              <MenuItem Header="Export as JSON…" Click="OnExportJsonClick" />
+              <MenuItem Header="Export…" InputGesture="Ctrl+E" Click="OnExportClick" />
+              <MenuItem Header="Advanced copy…" InputGesture="Ctrl+Alt+C" Click="OnAdvancedCopyClick" />
             </MenuFlyout>
           </DropDownButton.Flyout>
         </DropDownButton>

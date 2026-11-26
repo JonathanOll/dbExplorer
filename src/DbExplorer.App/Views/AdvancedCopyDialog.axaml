@@ -1,0 +1,71 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbExplorer.App.ViewModels"
+        xmlns:views="using:DbExplorer.App.Views"
+        x:Class="DbExplorer.App.Views.AdvancedCopyDialog"
+        x:DataType="vm:AdvancedCopyViewModel"
+        Title="Advanced copy"
+        Width="760" Height="640" MinWidth="560" MinHeight="420"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel>
+    <views:DialogFooter DockPanel.Dock="Bottom">
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Content="Copy" Classes="accent" MinWidth="88" HorizontalContentAlignment="Center" IsDefault="True" Click="OnCopyClick"
+                IsEnabled="{Binding CanCopy}" ToolTip.Tip="Copy to the clipboard (Enter)" />
+        <Button Content="Cancel" IsCancel="True" MinWidth="88" HorizontalContentAlignment="Center" Click="OnCancelClick" />
+      </StackPanel>
+    </views:DialogFooter>
+
+    <views:DialogHeader DockPanel.Dock="Top" Icon="{StaticResource IconSave}" Title="Advanced copy" Subtitle="{Binding Subtitle}" />
+    <Border DockPanel.Dock="Top" Classes="banner error" IsVisible="{Binding HasError}">
+      <Grid ColumnDefinitions="Auto,*">
+        <PathIcon Classes="bi" Data="{StaticResource IconError}" Margin="0,1,10,0" VerticalAlignment="Top" />
+        <TextBlock Grid.Column="1" Text="{Binding Error}" TextWrapping="Wrap" />
+      </Grid>
+    </Border>
+
+    <Border Background="{DynamicResource DbxContentBg}">
+      <Grid ColumnDefinitions="300,*">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="4" Margin="24,16,20,16">
+            <TextBlock Classes="dim small" Text="Column delimiter" />
+            <ComboBox ItemsSource="{Binding Delimiters}" SelectedItem="{Binding Delimiter}" HorizontalAlignment="Stretch"
+                      AutomationProperties.Name="Column delimiter" />
+            <TextBox Text="{Binding CustomDelimiter}" Watermark="Delimiter" IsVisible="{Binding IsCustomDelimiter}"
+                     AutomationProperties.Name="Custom delimiter" />
+            <TextBlock Classes="dim small" Text="Row separator" Margin="0,6,0,0" />
+            <ComboBox ItemsSource="{Binding RowSeparators}" SelectedItem="{Binding RowSeparator}" HorizontalAlignment="Stretch"
+                      AutomationProperties.Name="Row separator" />
+            <TextBlock Classes="dim small" Text="Quotes" Margin="0,6,0,0" />
+            <ComboBox ItemsSource="{Binding Quotings}" SelectedItem="{Binding Quoting}" HorizontalAlignment="Stretch"
+                      AutomationProperties.Name="Quotes" />
+            <CheckBox Content="Column names" IsChecked="{Binding Header}" Margin="0,6,0,0" />
+            <CheckBox Content="Row numbers" IsChecked="{Binding RowNumbers}" />
+            <Grid ColumnDefinitions="*,8,*" Margin="0,6,0,0">
+              <StackPanel Spacing="4">
+                <TextBlock Classes="dim small" Text="NULL written as" />
+                <TextBox Text="{Binding NullText}" Watermark="(empty)" AutomationProperties.Name="NULL text" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Spacing="4">
+                <TextBlock Classes="dim small" Text="Date format" />
+                <TextBox Text="{Binding DateFormat}" Watermark="ISO 8601" AutomationProperties.Name="Date format"
+                         ToolTip.Tip="For example dd/MM/yyyy HH:mm. Empty: ISO 8601. Dates the engine returns as text (SQLite) are not changed." />
+              </StackPanel>
+            </Grid>
+            <CheckBox Content="Protect against spreadsheet formulas" IsChecked="{Binding GuardFormulas}" Margin="0,6,0,0" />
+            <TextBlock Classes="dim small" TextWrapping="Wrap" Text="{x:Static vm:ExportDialogViewModel.FormulaExplanation}" />
+          </StackPanel>
+        </ScrollViewer>
+
+        <DockPanel Grid.Column="1" Margin="12,16,24,16">
+          <TextBlock DockPanel.Dock="Top" Classes="section" Text="Preview (first rows)" Margin="0,0,0,6" />
+          <TextBox Text="{Binding Preview, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                   VerticalContentAlignment="Top" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12"
+                   ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                   AutomationProperties.Name="Preview" />
+        </DockPanel>
+      </Grid>
+    </Border>
+  </DockPanel>
+</Window>

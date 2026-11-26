@@ -52,5 +52,8 @@ What dbExplorer does not do, and the edges of what it does. Linked groups and th
   are left out. A PostgreSQL view definition is rebuilt from the catalog (`pg_get_viewdef` plus a `CREATE` line): original
   comments and layout, view options and the indexes of a materialized view are not in it. A definition opened in a script tab
   is plain text: running it is subject to the usual statement splitting (a SQL Server body is cut at `;`, see above).
+- Export: "All rows" of a script result runs the statement again, so the data can differ from what the grid shows, and
+  temporary tables or an open transaction of the tab are not seen. A cell or column selection covers loaded rows only.
+  Excel files were not checked in Excel itself (the tests read the package back). See [Copy and export](export.md).
 - Quick open: columns are matched without typo tolerance. Across connections, procedures and functions are found for the
   connections opened since this feature exists (the cache is written after connecting).

@@ -1,156 +1,193 @@
-using System.Text.Json;
 using DbExplorer.App.ViewModels;
+using DbExplorer.Core.Export;
+using DbExplorer.Core.Model;
 
 namespace DbExplorer.App.Tests;
 
-/// <summary>The text of copied and exported results: quoting, NULL, line breaks, JSON types, and the export through the tab.</summary>
+internal sealed class FakeExportDialogs : IExportDialogs
+{
+    public string? Path { get; set; }
+    public (string Name, string Extension)? Asked { get; private set; }
+    public AdvancedCopyViewModel? Advanced { get; private set; }
+    public ExportDialogViewModel? Export { get; private set; }
+
+    public Task<string?> ShowAdvancedCopyAsync(AdvancedCopyViewModel viewModel)
+    {
+        Advanced = viewModel;
+        return Task.FromResult(viewModel.Copy());
+    }
+
+    public Task ShowExportAsync(ExportDialogViewModel viewModel)
+    {
+        Export = viewModel;
+        return Task.CompletedTask;
+    }
+
+    public Task<string?> PickFileAsync(string suggestedName, string extension)
+    {
+        Asked = (suggestedName, extension);
+        return Task.FromResult(Path);
+    }
+}
+
+/// <summary>Copy and export through the view models: selection slices, the copy texts, the dialogs and the script tab's rows.</summary>
 public class ResultExportTests : IDisposable
 {
-    private static readonly IReadOnlyList<ResultColumn> Cols = [new("id"), new("name"), new("note")];
-
     private readonly ScriptTabFixture _t = new();
+    private readonly FakeExportDialogs _dialogs = new();
 
     public void Dispose() => _t.Dispose();
 
-    [Fact]
-    public void Csv_QuotesCommasQuotesAndLineBreaks_NullIsEmpty_AndEndsLinesWithCrLf()
+    private ExportServices Services => new(_t.Status, _dialogs);
+
+    private static ExportContext Context(GridSlice? selection = null) => new()
     {
-        object?[][] rows = [[1L, "a,b", null], [2L, "say \"hi\"", "line1\nline2"], [3L, " padded ", ""]];
+        Columns = [new("id"), new("name"), new("note")],
+        Rows = [[1L, "a", null], [2L, "b\tc", "x"], [3L, "d", "y"]],
+        Selection = selection,
+        Table = new TableRef(null, "t"),
+        KeyColumns = ["id"],
+    };
 
-        var csv = ResultExport.ToCsv(Cols, rows);
+    [Fact]
+    public void Selection_BlockAndColumns_BecomeSlices()
+    {
+        var selection = new GridSelection();
+        Assert.Null(selection.Slice(3, 3));
 
-        Assert.Equal("id,name,note\r\n1,\"a,b\",\r\n2,\"say \"\"hi\"\"\",\"line1\nline2\"\r\n3,\" padded \",\r\n", csv);
+        selection.SetBlock((2, 2), (1, 0));
+        Assert.Equal([1, 2], selection.Slice(3, 3)!.Rows);
+        Assert.Equal([0, 1, 2], selection.Slice(3, 3)!.Columns);
+
+        selection.ToggleColumn(2);
+        selection.ToggleColumn(0);
+        Assert.Equal([0, 1, 2], selection.Slice(3, 3)!.Rows);
+        Assert.Equal([0, 2], selection.Slice(3, 3)!.Columns);
+
+        selection.ToggleColumn(2);
+        selection.ToggleColumn(0);
+        Assert.False(selection.IsActive);
     }
 
     [Fact]
-    public void Csv_QuotesAColumnNameThatNeedsIt()
+    public void PlainCopy_OfOneCell_IsTheValue_AndOtherwiseTabSeparated()
     {
-        var csv = ResultExport.ToCsv([new ResultColumn("a,b")], []);
+        Assert.Equal("b\tc", GridCopy.Plain(Context(new([1], [1])), header: false).Text);
+        Assert.Equal("", GridCopy.Plain(Context(new([0], [2])), header: false).Text);
+        Assert.Equal("name\r\n\"b\tc\"", GridCopy.Plain(Context(new([1], [1])), header: true).Text);
 
-        Assert.Equal("\"a,b\"\r\n", csv);
+        var all = GridCopy.Plain(Context(), header: false);
+        Assert.Equal("1\ta\t\r\n2\t\"b\tc\"\tx\r\n3\td\ty", all.Text);
+        Assert.Equal("Copied 3 rows.", all.Message);
     }
 
     [Fact]
-    public void Tsv_HasAHeader_KeepsCommas_AndQuotesTabsAndNewlines()
+    public void CopyAs_Update_AddsTheKeyColumn_AndSqlWithoutATableSaysSo()
     {
-        object?[][] rows = [[1L, "a,b", "x\ty"], [2L, null, "l1\r\nl2"]];
+        var update = GridCopy.As(Context(new([1], [2])), ExportKind.SqlUpdate);
+        Assert.Equal("UPDATE \"t\" SET \"note\" = 'x' WHERE \"id\" = 2;", update.Text);
+        Assert.Equal("IN (1, 3)", GridCopy.As(Context(new([0, 2], [0])), ExportKind.InList).Text);
 
-        var tsv = ResultExport.ToTsv(Cols, rows);
-
-        Assert.Equal("id\tname\tnote\r\n1\ta,b\t\"x\ty\"\r\n2\t\t\"l1\r\nl2\"\r\n", tsv);
+        var unnamed = new ExportContext { Columns = [new("a")], Rows = [[1]] };
+        Assert.Contains("table_name", GridCopy.As(unnamed, ExportKind.SqlInsert).Message);
     }
 
     [Fact]
-    public void Cells_AreWrittenInTheInvariantCulture()
+    public void AdvancedCopy_PreviewsAsOptionsChange_RemembersThem_AndRefusesBadInput()
     {
-        var culture = System.Globalization.CultureInfo.CurrentCulture;
-        System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("fr-FR");
-        try
-        {
-            Assert.Equal("1234.5", ResultExport.FormatCell(1234.5));
-            Assert.Equal("2024-03-05 09:30:00", ResultExport.FormatCell(new DateTime(2024, 3, 5, 9, 30, 0)));
-            Assert.Equal("2024-03-05", ResultExport.FormatCell(new DateTime(2024, 3, 5)));
-            Assert.Equal("0x0AFF", ResultExport.FormatCell(new byte[] { 0x0A, 0xFF }));
-            Assert.Equal("true", ResultExport.FormatCell(true));
-            Assert.Equal("", ResultExport.FormatCell(DBNull.Value));
-        }
-        finally
-        {
-            System.Globalization.CultureInfo.CurrentCulture = culture;
-        }
+        var services = Services;
+        var vm = new AdvancedCopyViewModel(Context(new([0, 1], [0, 1])), services);
+        Assert.Equal("2 rows × 2 columns", vm.Subtitle);
+
+        vm.Delimiter = vm.Delimiters.Single(d => d.Value == ";");
+        vm.Header = false;
+        vm.RowNumbers = true;
+        Assert.Equal("1;1;a\r\n2;2;b\tc", vm.Preview);
+
+        vm.Delimiter = vm.Delimiters[^1];
+        Assert.True(vm.IsCustomDelimiter);
+        Assert.False(vm.CanCopy);
+        Assert.Null(vm.Copy());
+        vm.CustomDelimiter = " ~ ";
+        Assert.StartsWith("1 ~ 1 ~ a", vm.Copy());
+
+        var again = new AdvancedCopyViewModel(Context(), services);
+        Assert.Equal(" ~ ", again.CustomDelimiter);
+        Assert.True(again.RowNumbers);
+        Assert.False(again.Header);
     }
 
     [Fact]
-    public void Json_IsAnArrayOfObjects_WithNativeNumbersBooleansAndNull()
+    public async Task ExportDialog_DefaultsTheScope_WritesTheSelection_AndRemembersTheFormat()
     {
-        IReadOnlyList<ResultColumn> cols = [new("id"), new("name"), new("ok"), new("price"), new("when")];
-        object?[][] rows = [[1L, "é \"q\"\nx", true, 9.5m, new DateTime(2024, 3, 5, 9, 30, 0)], [2L, null, false, null, null]];
+        var services = Services;
+        Assert.Equal(ExportScope.Loaded, new ExportDialogViewModel(Context(new([0], [0, 1, 2])), services).Scope);
+        var vm = new ExportDialogViewModel(Context(new([0, 2], [0, 1, 2])), services);
+        Assert.Equal(ExportScope.Selection, vm.Scope);
+        Assert.False(vm.CanAll);
+        vm.Format = vm.Formats.Single(f => f.Value == ExportKind.SqlInsert);
+        Assert.True(vm.ShowTableName);
+        Assert.StartsWith("INSERT INTO \"t\"", vm.Preview);
+        var closed = false;
+        vm.CloseRequested += () => closed = true;
+        _dialogs.Path = _t.TempFile("out.sql");
 
-        using var doc = JsonDocument.Parse(ResultExport.ToJson(cols, rows));
+        await vm.ExportCommand.ExecuteAsync(null);
 
-        var items = doc.RootElement.EnumerateArray().ToList();
-        Assert.Equal(2, items.Count);
-        Assert.Equal(1, items[0].GetProperty("id").GetInt64());
-        Assert.Equal("é \"q\"\nx", items[0].GetProperty("name").GetString());
-        Assert.True(items[0].GetProperty("ok").GetBoolean());
-        Assert.Equal(9.5m, items[0].GetProperty("price").GetDecimal());
-        Assert.Equal("2024-03-05 09:30:00", items[0].GetProperty("when").GetString());
-        Assert.Equal(JsonValueKind.Null, items[1].GetProperty("name").ValueKind);
-        Assert.False(items[1].GetProperty("ok").GetBoolean());
+        Assert.Equal(("result.sql", "sql"), _dialogs.Asked);
+        Assert.Equal(2, File.ReadAllLines(_dialogs.Path).Length);
+        Assert.True(closed);
+        Assert.Contains("Exported 2 rows", _t.Status.Message);
+        Assert.Equal(ExportKind.SqlInsert, services.Preferences.Format);
     }
 
     [Fact]
-    public void Json_OfNoRows_IsAnEmptyArray()
+    public async Task ExportDialog_PickerCancelled_WritesNothing_AndAFailureStaysOnScreen()
     {
-        using var doc = JsonDocument.Parse(ResultExport.ToJson(Cols, []));
+        var vm = new ExportDialogViewModel(Context(), Services);
+        _dialogs.Path = null;
+        await vm.ExportCommand.ExecuteAsync(null);
+        Assert.False(vm.HasError);
+        Assert.False(vm.IsExporting);
 
-        Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
-        Assert.Equal(0, doc.RootElement.GetArrayLength());
-    }
-
-    // ---- through the tab ----
-
-    [Fact]
-    public async Task Copy_UsesTheSelectedRows_OrAllWhenNoneAreSelected()
-    {
-        var tab = await _t.NewTab("SELECT id, name FROM t ORDER BY id");
-        await tab.RunScriptAsync();
-        var set = tab.Results[0].Sets[0];
-
-        var all = tab.CopyText(set, null);
-        Assert.Equal(4, all.Split("\r\n", StringSplitOptions.RemoveEmptyEntries).Length);   // header + 3 rows
-        Assert.Contains("Copied 3 rows", _t.Status.Message);
-
-        var one = tab.CopyText(set, [set.Rows[2]]);
-        Assert.Equal("id\tname\r\n3\tgamma\r\n", one);
-        Assert.Contains("Copied 1 row", _t.Status.Message);
+        _dialogs.Path = _t.TempFile("no-such-folder/x.csv");
+        await vm.ExportCommand.ExecuteAsync(null);
+        Assert.Contains("Cannot export", vm.Error);
+        Assert.True(_t.Status.IsError);
     }
 
     [Fact]
-    public async Task Export_WritesCsvWithBom_AndJsonWithout_AndSaysSo()
-    {
-        var tab = await _t.NewTab("SELECT id, name FROM t ORDER BY id");
-        await tab.RunScriptAsync();
-        var set = tab.Results[0].Sets[0];
-        var csv = _t.TempFile("out.csv");
-        var json = _t.TempFile("out.json");
-
-        _t.Files.ExportPath = csv;
-        await tab.ExportAsync(set, ExportFormat.Csv, null);
-        var csvBytes = await File.ReadAllBytesAsync(csv);
-        Assert.Equal([0xEF, 0xBB, 0xBF], csvBytes[..3]);
-        Assert.Equal("id,name\r\n1,alpha\r\n2,\r\n3,gamma\r\n", System.Text.Encoding.UTF8.GetString(csvBytes[3..]));
-        Assert.Contains("Exported 3 rows", _t.Status.Message);
-        Assert.Equal(("Script 1 result.csv", "csv"), _t.Files.LastExport);
-
-        _t.Files.ExportPath = json;
-        await tab.ExportAsync(set, ExportFormat.Json, [set.Rows[0]]);
-        var jsonBytes = await File.ReadAllBytesAsync(json);
-        Assert.NotEqual(0xEF, jsonBytes[0]);
-        using var doc = JsonDocument.Parse(jsonBytes);
-        Assert.Equal(1, doc.RootElement.GetArrayLength());
-        Assert.Contains("Exported 1 row", _t.Status.Message);
-    }
-
-    [Fact]
-    public async Task Export_Cancelled_WritesNothing_AndAFailureIsReported()
+    public async Task ScriptResult_ExportsAllRowsByRunningTheReadQueryAgain()
     {
         var tab = await _t.NewTab("SELECT id FROM big");
         tab.RowLimit = 5;
         await tab.RunScriptAsync();
         var set = tab.Results[0].Sets[0];
+        var context = tab.CreateExportContext(set.Columns, set.Rows, null);
+        Assert.Equal(5, context.Rows.Count);
+        var vm = new ExportDialogViewModel(context, Services);
+        Assert.True(vm.CanAll);
+        vm.Scope = ExportScope.All;
+        Assert.Contains("read-only", vm.ScopeNote);
+        _dialogs.Path = _t.TempFile("all.csv");
 
-        _t.Files.ExportPath = null;
-        await tab.ExportAsync(set, ExportFormat.Csv, null);
-        Assert.DoesNotContain("Exported", _t.Status.Message);
+        await vm.ExportCommand.ExecuteAsync(null);
 
-        _t.Files.ExportPath = _t.TempFile("no-such-folder/x.csv");
-        await tab.ExportAsync(set, ExportFormat.Csv, null);
-        Assert.True(_t.Status.IsError);
-        Assert.Contains("Cannot export", _t.Status.Message);
+        Assert.Null(vm.Error);
+        Assert.Equal(51, File.ReadAllLines(_dialogs.Path).Length);
+        Assert.Equal("Script 1 result", context.BaseName);
+    }
 
-        _t.Files.ExportPath = _t.TempFile("ok.csv");
-        await tab.ExportAsync(set, ExportFormat.Csv, null);
-        Assert.Contains("limited to the first 5 rows", _t.Status.Message);   // the truncated result says what the file holds
+    [Fact]
+    public async Task ScriptResult_OfAWrite_DoesNotOfferAllRows()
+    {
+        var tab = await _t.NewTab("UPDATE t SET name = 'z' WHERE id = 1 RETURNING id");
+        await tab.RunScriptAsync();
+        var set = tab.Results[0].Sets[0];
+
+        var context = tab.CreateExportContext(set.Columns, set.Rows, null);
+
+        Assert.Null(context.OpenAllRows);
+        Assert.Contains("may write", context.AllRowsUnavailable);
     }
 }

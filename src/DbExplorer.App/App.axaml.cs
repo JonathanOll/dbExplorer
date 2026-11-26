@@ -58,6 +58,7 @@ public class App : Application
             tree.OpenFolderInShell = ShellLauncher.OpenFolder;
             // Only stores the dialog service and the clipboard delegate: the dbupdate folder is not read until the gear menu opens.
             main.UseUpgrade(new UpgradeDialogService(window));
+            main.UseExport(new ExportDialogService(window));
             main.CopyToClipboard = async text =>
             {
                 if (window.Clipboard is { } clipboard) await clipboard.SetTextAsync(text);

@@ -112,6 +112,8 @@ public static class ScriptTabKeys
         new("Complete tables, columns and keywords (also while typing)", "Ctrl+Space"),
         new("Open result tab 1 to 9", "Ctrl+1 to 9"),
         new("Move between the editor and the results", "F6"),
+        new("Results: copy / with column names", "Ctrl+C / Ctrl+Shift+C"),
+        new("Results: advanced copy / export", "Ctrl+Alt+C / Ctrl+E"),
         new("Next or previous database of the group", "Ctrl+Alt+PageDown / PageUp"),
     ];
 

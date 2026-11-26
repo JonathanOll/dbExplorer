@@ -57,6 +57,12 @@ public sealed class GridCell : TextBlock
     /// <summary>The column that made this cell (its current width tells whether a value is cut).</summary>
     public GridCellColumn? Column { get; init; }
 
+    /// <summary>The DataGrid cell around this element, which is what lights up when selected.</summary>
+    public DataGridCell? Host { get; init; }
+
+    /// <summary>Lights the cell, or not, as the cell selection says (a recycled cell shows another row).</summary>
+    public void ApplyPicked() => Host?.Classes.Set("picked", Column?.IsPicked?.Invoke(Row, Index) == true);
+
     /// <summary>
     /// The row this cell currently shows. The DataGrid recycles row containers while scrolling (and when a row is added)
     /// WITHOUT rebuilding their cells, so this follows the inherited DataContext (the row item) instead of staying what
@@ -107,6 +113,7 @@ public sealed class GridCell : TextBlock
         };
         TextDecorations = row is { IsDeleted: true } ? Avalonia.Media.TextDecorations.Strikethrough : null;
         ToolTip.SetTip(this, BuildTip(formatted, row, dirty, untouched));
+        ApplyPicked();
     }
 
     private object? BuildTip(FormattedCell formatted, RowViewModel? row, bool dirty, bool untouched)
@@ -174,6 +181,9 @@ public sealed class GridCellColumn(int index, ResultColumn column, bool isLink) 
 {
     public int Index => index;
 
+    /// <summary>Whether the cell of this row and column is part of the cell or column selection.</summary>
+    public Func<object?, int, bool>? IsPicked { get; init; }
+
     /// <summary>The values of a row item: <c>object?[]</c> or <see cref="RowViewModel"/>.</summary>
     public static object?[]? ValuesOf(object? item) => item switch
     {
@@ -190,6 +200,7 @@ public sealed class GridCellColumn(int index, ResultColumn column, bool isLink) 
             ColumnName = column.Name,
             Row = dataItem,
             Column = this,
+            Host = cell,
             CanLink = isLink,
             LinkTarget = isLink ? column.LinkTarget : null,
             Padding = new Thickness(8, 2),

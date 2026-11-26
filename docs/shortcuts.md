@@ -46,3 +46,9 @@ Every shortcut of the app. The same list is in the app (`F1`, and Settings > Sho
 | `Ctrl+0` | table grid, cell selected | Set the cell to NULL (staged); with a cell or column selection, every selected cell |
 | `Ctrl+Break` | script tab | Cancel the running query, or the running group run (all databases) |
 | `F2` | table grid | Edit the cell |
+| `Ctrl+C` / `Ctrl+Shift+C` | result and table grids | Copy the cell or the selection / with the column names (tab separated) |
+| `Ctrl+Alt+C` | result and table grids | [Advanced copy](export.md#advanced-copy) |
+| `Ctrl+E` | result and table grids | [Export to a file](export.md#export-to-a-file) |
+| `Shift+arrows` / `Alt+click` / drag | result and table grids | Select a rectangle of cells |
+| `Ctrl+Space` / `Ctrl+click` on a header | result and table grids | Select (or unselect) whole columns |
+| `Esc` | result and table grids | Drop the cell or column selection |

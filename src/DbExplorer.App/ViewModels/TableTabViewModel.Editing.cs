@@ -19,6 +19,9 @@ public interface ITableEditActions : System.ComponentModel.INotifyPropertyChange
     /// <summary>Stages a new value (<c>null</c> = NULL, text is validated against the column type). False when refused; <see cref="CellError"/> says why.</summary>
     bool SetCell(int row, int col, object? value);
 
+    /// <summary>Stages NULL in every cell given; those refused are skipped and <see cref="CellError"/> keeps the first reason.</summary>
+    void SetNull(IReadOnlyList<(int Row, int Column)> cells);
+
     string? CellError { get; }
 
     void DismissCellError();
@@ -189,6 +192,15 @@ public sealed partial class TableTabViewModel : ITableEditActions
         r.Values[col] = stored;
         UpdateRowState(r);
         return true;
+    }
+
+    public void SetNull(IReadOnlyList<(int Row, int Column)> cells)
+    {
+        string? refused = null;
+        foreach (var (row, column) in cells)
+            if (!SetCell(row, column, null)) refused ??= CellError;
+        // a later cell that was accepted cleared the reason of an earlier refusal
+        if (refused is not null) CellError = refused;
     }
 
     /// <summary>Appends an empty new row to the page (INSERT on save; cells left NULL are omitted so column defaults apply). Returns its index, -1 when refused.</summary>

@@ -40,7 +40,8 @@ public class ConfigStore(string path, ISecretProtector protector)
             RecordHistory = config.RecordHistory,
             QuickOpenHidden = config.QuickOpenHidden,
             Format = (config.Format ?? new()).Normalized(),
-            Settings = (config.Settings ?? new()).Normalized()
+            Settings = (config.Settings ?? new()).Normalized(),
+            Export = (config.Export ?? new()).Normalized()
         };
         if (normalized.Groups.Any(g => g is null || g.Name is null || g.ConnectionIds is null)
             || normalized.Folders.Any(f => f is null)

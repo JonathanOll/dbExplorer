@@ -1,9 +1,13 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
+using DbExplorer.Core.Model;
 using DbExplorer.Core.Scripting;
 
 namespace DbExplorer.App.ViewModels;
+
+/// <summary>Where a result set came from, so an export can run its statement again to read every row.</summary>
+public sealed record ResultSource(Guid ConnectionId, DbKind Kind, string Statement, int SetIndex);
 
 /// <summary>One result set of a statement, shaped for a read-only <c>ResultGrid</c> (no filters, no edit state).</summary>
 public sealed partial class ResultSetViewModel(IReadOnlyList<ResultColumn> columns, IReadOnlyList<object?[]> rows, bool truncated, int index = 1)
@@ -28,6 +32,9 @@ public sealed partial class ResultSetViewModel(IReadOnlyList<ResultColumn> colum
     public IReadOnlyList<object?[]> Rows { get; } = rows;
 
     public bool Truncated { get; } = truncated;
+
+    /// <summary>Set by the script tab that ran the statement; null for a group run (nothing is run again there).</summary>
+    public ResultSource? Source { get; set; }
 
     /// <summary>A header is shown over the set (the statement returned several).</summary>
     public bool ShowTitle { get; init; }

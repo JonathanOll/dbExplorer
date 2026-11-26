@@ -46,6 +46,8 @@
     <!-- the column the rows are sorted by -->
     <Style Selector="TextBlock.colTitle.sorted"><Setter Property="Foreground" Value="{DynamicResource DbxAccent}" /></Style>
     <!-- Ctrl+L: the column jumped to is lit for a moment (class set by ResultGrid.FlashColumn) -->
+    <!-- cells of a selected rectangle or column (ResultGrid.Selection.cs) -->
+    <Style Selector="DataGridCell.picked"><Setter Property="Background" Value="{DynamicResource DbxRowSelected}" /></Style>
     <Style Selector="DataGridCell.flash"><Setter Property="Background" Value="{DynamicResource DbxColumnFlash}" /></Style>
     <Style Selector="StackPanel.flashHeader"><Setter Property="Background" Value="{DynamicResource DbxColumnFlashHeader}" /></Style>
   </UserControl.Styles>

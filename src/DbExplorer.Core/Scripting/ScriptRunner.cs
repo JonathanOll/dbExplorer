@@ -227,7 +227,7 @@ public static class ScriptRunner
     /// therefore repeated until <see cref="Stop"/> says the command is done. Interrupts and <see cref="Stop"/> are serialised, so
     /// none can reach a later statement of the same connection.
     /// </summary>
-    private sealed class CancelPump(DbCommand cmd)
+    internal sealed class CancelPump(DbCommand cmd)
     {
         private readonly object _gate = new();
         private bool _stopped;

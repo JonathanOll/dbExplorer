@@ -23,20 +23,6 @@ public sealed class ScriptFiles(Window owner) : IScriptFiles
         return file?.TryGetLocalPath();
     }
 
-    public async Task<string?> PickExportAsync(string suggestedName, string extension)
-    {
-        var type = new FilePickerFileType(extension.ToUpperInvariant() + " files") { Patterns = [$"*.{extension}"] };
-        var file = await owner.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title = "Export result",
-            SuggestedFileName = suggestedName,
-            DefaultExtension = extension,
-            FileTypeChoices = [type, AllFiles],
-            ShowOverwritePrompt = true,
-        });
-        return file?.TryGetLocalPath();
-    }
-
     public async Task<string?> PickOpenAsync()
     {
         var files = await owner.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions

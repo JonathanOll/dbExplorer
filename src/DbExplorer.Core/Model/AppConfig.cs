@@ -1,3 +1,4 @@
+using DbExplorer.Core.Export;
 using DbExplorer.Core.Scripting;
 
 namespace DbExplorer.Core.Model;
@@ -37,6 +38,9 @@ public record AppConfig(
 
     /// <summary>Settings dialog values (appearance, editor, results...). Missing in old files: the defaults.</summary>
     public AppSettings Settings { get; set; } = new();
+
+    /// <summary>What the copy and export dialogs remember. Missing in old files: the defaults.</summary>
+    public ExportPreferences Export { get; set; } = new();
 
     public static AppConfig Empty() => new(new(), new(), new());
 }

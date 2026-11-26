@@ -34,6 +34,8 @@ All switches, install locations, GitHub rate limit (`$env:GITHUB_TOKEN`) and man
 - **Explore and edit data**: connection tree with folders, table tabs with paging, per-column filters and a raw `WHERE`,
   follow foreign keys with `Ctrl+click`, staged row editing applied in one transaction, and tabs restored at the next start.
   [Features](docs/features.md)
+- **Copy and export**: select rows, cells or columns; copy as CSV, JSON, Markdown, SQL or an `IN` list; export to CSV,
+  TSV, JSON, XLSX, SQL or Markdown, the whole query streamed to disk. [Copy and export](docs/export.md)
 - **Quick open**: fuzzy search of tables, views, procedures, functions and columns, on one connection or across all of them,
   forgiving typos.
 - **Views and routines**: browse views, procedures and functions in the navigator and open their definition as text.

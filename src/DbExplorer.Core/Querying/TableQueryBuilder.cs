@@ -50,6 +50,16 @@ public static class TableQueryBuilder
         return new SqlCommandSpec(d.PageSql(select, BuildOrderBy(d, q), q.Offset, q.Limit), parameters);
     }
 
+    /// <summary>Every matching row, in the query's sort order, without paging (offset and limit are ignored).</summary>
+    public static SqlCommandSpec BuildAll(IDbDriver d, TableQuery q)
+    {
+        var (from, parameters) = BuildFromWhere(d, q);
+        var orderBy = BuildOrderBy(d, q);
+        // "(SELECT NULL)" only exists to satisfy OFFSET / FETCH.
+        var order = orderBy.Length == 0 || orderBy == "(SELECT NULL)" ? "" : " ORDER BY " + orderBy;
+        return new SqlCommandSpec("SELECT * " + from + order, parameters);
+    }
+
     public static SqlCommandSpec BuildCount(IDbDriver d, TableQuery q)
     {
         var (from, parameters) = BuildFromWhere(d, q);

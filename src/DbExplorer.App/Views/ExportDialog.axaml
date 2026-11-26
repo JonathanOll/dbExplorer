@@ -1,0 +1,101 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DbExplorer.App.ViewModels"
+        xmlns:views="using:DbExplorer.App.Views"
+        x:Class="DbExplorer.App.Views.ExportDialog"
+        x:DataType="vm:ExportDialogViewModel"
+        Title="Export"
+        Width="860" Height="760" MinWidth="640" MinHeight="460"
+        WindowStartupLocation="CenterOwner">
+
+  <DockPanel>
+    <views:DialogFooter DockPanel.Dock="Bottom">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+          <Button Content="Export…" Classes="accent" MinWidth="100" HorizontalContentAlignment="Center" IsDefault="True"
+                  Command="{Binding ExportCommand}" ToolTip.ShowOnDisabled="True" ToolTip.Tip="Choose the file and write it" />
+          <Button Content="Cancel" IsCancel="True" MinWidth="88" HorizontalContentAlignment="Center" Command="{Binding CancelCommand}"
+                  ToolTip.Tip="Stop the export (the partial file is deleted), or close (Esc)" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding IsExporting}">
+          <PathIcon Classes="spin dim" Data="{StaticResource IconRefresh}" Width="13" Height="13" IsVisible="{Binding IsExporting}" />
+          <TextBlock Classes="dim" Text="{Binding ProgressText}" VerticalAlignment="Center" />
+        </StackPanel>
+      </DockPanel>
+    </views:DialogFooter>
+
+    <views:DialogHeader DockPanel.Dock="Top" Icon="{StaticResource IconSave}" Title="Export rows"
+                        Subtitle="Write the rows of the grid, or of the whole query, to a file." />
+    <ProgressBar DockPanel.Dock="Top" Classes="thin" IsIndeterminate="{Binding IsExporting}" IsVisible="{Binding IsExporting}" />
+    <Border DockPanel.Dock="Top" Classes="banner error" IsVisible="{Binding HasError}">
+      <Grid ColumnDefinitions="Auto,*">
+        <PathIcon Classes="bi" Data="{StaticResource IconError}" Margin="0,1,10,0" VerticalAlignment="Top" />
+        <SelectableTextBlock Grid.Column="1" Text="{Binding Error}" TextWrapping="Wrap" />
+      </Grid>
+    </Border>
+
+    <Border Background="{DynamicResource DbxContentBg}">
+      <Grid ColumnDefinitions="340,*">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" IsEnabled="{Binding IsIdle}">
+          <StackPanel Spacing="6" Margin="24,16,20,16">
+            <TextBlock Classes="section" Text="Format" />
+            <ComboBox ItemsSource="{Binding Formats}" SelectedItem="{Binding Format}" HorizontalAlignment="Stretch"
+                      AutomationProperties.Name="Format" />
+
+            <TextBlock Classes="section" Text="Rows" Margin="0,10,0,0" />
+            <RadioButton GroupName="scope" Content="{Binding SelectionLabel}" IsChecked="{Binding IsSelectionScope}"
+                         IsEnabled="{Binding CanSelection}" ToolTip.Tip="{Binding SelectionTip}" ToolTip.ShowOnDisabled="True" />
+            <RadioButton GroupName="scope" Content="{Binding LoadedLabel}" IsChecked="{Binding IsLoadedScope}"
+                         ToolTip.Tip="The rows the grid holds now" />
+            <RadioButton GroupName="scope" IsChecked="{Binding IsAllScope}" IsEnabled="{Binding CanAll}"
+                         ToolTip.Tip="{Binding AllTip}" ToolTip.ShowOnDisabled="True">
+              <TextBlock Text="{Binding AllLabel}" TextWrapping="Wrap" />
+            </RadioButton>
+            <TextBlock Classes="dim small" Text="{Binding ScopeNote}" TextWrapping="Wrap"
+                       IsVisible="{Binding ScopeNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            <TextBlock Classes="section" Text="Options" Margin="0,10,0,0" />
+            <StackPanel Spacing="4" IsVisible="{Binding ShowTableName}">
+              <TextBlock Classes="dim small" Text="Table of the INSERT statements" />
+              <TextBox Text="{Binding TableName}" AutomationProperties.Name="Table name" />
+            </StackPanel>
+            <CheckBox Content="Column names in the first row" IsChecked="{Binding Header}" IsVisible="{Binding ShowHeader}" />
+            <StackPanel Spacing="4" IsVisible="{Binding ShowDelimiter}">
+              <TextBlock Classes="dim small" Text="Delimiter" />
+              <ComboBox ItemsSource="{Binding Delimiters}" SelectedItem="{Binding Delimiter}" HorizontalAlignment="Stretch"
+                        AutomationProperties.Name="Delimiter" />
+            </StackPanel>
+            <Grid ColumnDefinitions="*,8,*" IsVisible="{Binding ShowTextOptions}">
+              <StackPanel Spacing="4">
+                <TextBlock Classes="dim small" Text="NULL written as" />
+                <TextBox Text="{Binding NullText}" Watermark="(empty)" AutomationProperties.Name="NULL text" />
+              </StackPanel>
+              <StackPanel Grid.Column="2" Spacing="4">
+                <TextBlock Classes="dim small" Text="Date format" />
+                <TextBox Text="{Binding DateFormat}" Watermark="ISO 8601" AutomationProperties.Name="Date format"
+                         ToolTip.Tip="For example dd/MM/yyyy HH:mm. Empty: ISO 8601. Dates the engine returns as text (SQLite) are not changed." />
+              </StackPanel>
+            </Grid>
+            <StackPanel Spacing="4" IsVisible="{Binding ShowEncoding}">
+              <TextBlock Classes="dim small" Text="Encoding" />
+              <ComboBox ItemsSource="{Binding Encodings}" SelectedItem="{Binding Encoding}" HorizontalAlignment="Stretch"
+                        AutomationProperties.Name="Encoding" />
+            </StackPanel>
+            <StackPanel Spacing="2" IsVisible="{Binding ShowGuard}">
+              <CheckBox Content="Protect against spreadsheet formulas" IsChecked="{Binding GuardFormulas}" />
+              <TextBlock Classes="dim small" TextWrapping="Wrap" Text="{x:Static vm:ExportDialogViewModel.FormulaExplanation}" />
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+
+        <DockPanel Grid.Column="1" Margin="12,16,24,16">
+          <TextBlock DockPanel.Dock="Top" Classes="section" Text="Preview (first rows)" Margin="0,0,0,6" />
+          <TextBox Text="{Binding Preview, Mode=OneWay}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                   VerticalContentAlignment="Top" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12"
+                   ScrollViewer.HorizontalScrollBarVisibility="Auto" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                   AutomationProperties.Name="Preview" />
+        </DockPanel>
+      </Grid>
+    </Border>
+  </DockPanel>
+</Window>

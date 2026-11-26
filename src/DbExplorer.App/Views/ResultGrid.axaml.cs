@@ -73,6 +73,9 @@ public partial class ResultGrid : UserControl
         Grid.AddHandler(PointerMovedEvent, OnLinkPointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
         Grid.AddHandler(PointerExitedEvent, OnGridPointerExited, RoutingStrategies.Tunnel, handledEventsToo: true);
         Grid.AddHandler(PointerReleasedEvent, OnPanReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, handledEventsToo: true);
+        Grid.AddHandler(PointerPressedEvent, OnSelectionPointerPressed, RoutingStrategies.Tunnel);
+        Grid.AddHandler(PointerMovedEvent, OnSelectionPointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
+        Grid.AddHandler(PointerReleasedEvent, (_, _) => _dragStart = null, RoutingStrategies.Tunnel, handledEventsToo: true);
         Grid.DoubleTapped += OnGridDoubleTapped;
         Grid.LoadingRow += (_, e) => e.Row.Classes.Set("odd", (e.Row.Index & 1) == 1);
         // Cells carry theme brushes chosen when they are drawn: repaint them when the theme switches while the app runs.
@@ -82,7 +85,11 @@ public partial class ResultGrid : UserControl
         };
         Grid.BeginningEdit += OnBeginningEdit;
         Grid.CellEditEnding += OnCellEditEnding;
-        Grid.SelectionChanged += (_, _) => SelectedRowsChanged?.Invoke(this, EventArgs.Empty);
+        Grid.SelectionChanged += (_, e) =>
+        {
+            if (e.AddedItems.Count > 0) ClearCellSelection();   // rows picked: they replace a cell or column selection
+            SelectedRowsChanged?.Invoke(this, EventArgs.Empty);
+        };
         Grid.AddHandler(KeyDownEvent, OnGridKeyDown, RoutingStrategies.Tunnel);
         Grid.AddHandler(KeyUpEvent, OnGridKeyUp, RoutingStrategies.Tunnel, handledEventsToo: true);
     }
@@ -282,6 +289,8 @@ public partial class ResultGrid : UserControl
         _autoWidths.Clear();
         Grid.Columns.Clear();
         _clientSortColumn = -1;
+        _selection.Clear();
+        _pickedRows.Clear();
         if (Columns is not { } columns) return;
 
         for (var i = 0; i < columns.Count; i++)
@@ -295,6 +304,7 @@ public partial class ResultGrid : UserControl
                 MinWidth = 64,
                 IsReadOnly = columns[i].ClrType == typeof(byte[]),   // binary values cannot be typed in
                 CanUserSort = false,
+                IsPicked = IsPicked,
             });
         }
         ApplyFilterRowVisibility();
@@ -364,6 +374,7 @@ public partial class ResultGrid : UserControl
     {
         if (_watching is not null) _watching.CollectionChanged -= OnSourceChanged;
         _watching = null;
+        ClearCellSelection();
         _mirror = null;
         Grid.ItemsSource = null;
         if (!_attached || ItemsSource is not { } source) return;
@@ -383,6 +394,7 @@ public partial class ResultGrid : UserControl
     private void OnSourceChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         if (_mirror is null || ItemsSource is not { } source) return;
+        ClearCellSelection();   // it is held by position: rows move under it
         switch (e.Action)
         {
             case NotifyCollectionChangedAction.Add when e.NewItems is not null && e.NewStartingIndex >= 0:
@@ -405,6 +417,7 @@ public partial class ResultGrid : UserControl
         if (_clientSortColumn != column) { _clientSortColumn = column; _clientSortDescending = false; }
         else if (!_clientSortDescending) _clientSortDescending = true;
         else _clientSortColumn = -1;
+        ClearCellSelection();
         ApplyClientSort();
         RefreshClientSortGlyph();
     }
@@ -522,9 +535,20 @@ public partial class ResultGrid : UserControl
         if (column.IsPrimaryKey) tip += "\nPrimary key";
         if (column.LinkTarget is not null) tip += $"\nForeign key → {column.LinkTarget} (Ctrl+click or double-click a value to open it)";
         if (Features is not null) tip += "\nClick to sort (ascending, descending, none). Right-click for more.";
+        tip += "\nCtrl+click to select the column.";
         ToolTip.SetTip(nameBand, tip);
         Avalonia.Automation.AutomationProperties.SetName(nameBand, Features is not null ? $"Sort by {column.Name}" : column.Name);
         root.Children.Add(nameBand);
+
+        // Ctrl+click on a name selects the column; registered first, so the sort handlers below never see that click.
+        var position = _headers.Count;   // the header is added to the list right after this call
+        nameBand.Background = Brushes.Transparent;
+        nameBand.PointerPressed += (_, e) =>
+        {
+            if (e.KeyModifiers != KeyModifiers.Control || !e.GetCurrentPoint(nameBand).Properties.IsLeftButtonPressed) return;
+            e.Handled = true;
+            ToggleColumnSelection(position);
+        };
 
         TextBox? filter = null;
         Border? band = null;
@@ -537,7 +561,7 @@ public partial class ResultGrid : UserControl
             nameBand.Cursor = new Cursor(StandardCursorType.Hand);
             nameBand.PointerPressed += (_, e) =>
             {
-                if (!e.GetCurrentPoint(nameBand).Properties.IsLeftButtonPressed) return;
+                if (e.Handled || !e.GetCurrentPoint(nameBand).Properties.IsLeftButtonPressed) return;
                 e.Handled = true;
                 ToggleClientSort(index);
             };
@@ -549,7 +573,7 @@ public partial class ResultGrid : UserControl
             nameBand.Cursor = new Cursor(StandardCursorType.Hand);
             nameBand.PointerPressed += (_, e) =>
             {
-                if (!e.GetCurrentPoint(nameBand).Properties.IsLeftButtonPressed) return;
+                if (e.Handled || !e.GetCurrentPoint(nameBand).Properties.IsLeftButtonPressed) return;
                 e.Handled = true;
                 _ = RunSafe(() => features.ToggleSortAsync(column.Name));
             };
@@ -880,7 +904,8 @@ public partial class ResultGrid : UserControl
         editor.ClearValue(ToolTip.TipProperty);
     }
 
-    // Grid keys that are not the DataGrid's own: Ctrl+0 (NULL), Delete / Insert (rows), Ctrl+C and Ctrl+Shift+C (copy), Alt+Enter (view value).
+    // Grid keys that are not the DataGrid's own: Ctrl+0 (NULL), Delete / Insert (rows), copy and export (ResultGrid.Export.cs),
+    // cell selection (ResultGrid.Selection.cs), Alt+Enter (view value).
     // None of them applies while a text box (cell editor, filter) has the keyboard: there the keys keep their text meaning.
     private void OnGridKeyDown(object? sender, KeyEventArgs e)
     {
@@ -898,6 +923,10 @@ public partial class ResultGrid : UserControl
                 editor.SetNull = true;
                 Grid.CommitEdit();
             }
+            else if (_selection.IsActive)
+            {
+                SetSelectedCellsNull();
+            }
             else if (Grid.SelectedItem is RowViewModel row && MayEdit(row) && Grid.CurrentColumn is GridCellColumn column
                      && ItemsSource is IList list && list.IndexOf(row) is >= 0 and var index)
             {
@@ -906,6 +935,11 @@ public partial class ResultGrid : UserControl
             return;
         }
         if (e.Source is CellEditor) return;
+        if (HandleCopyKey(e) || HandleSelectionKey(e))
+        {
+            e.Handled = true;
+            return;
+        }
 
         switch (e.Key, e.KeyModifiers)
         {
@@ -917,19 +951,22 @@ public partial class ResultGrid : UserControl
                 e.Handled = true;
                 AddRowAndEdit();
                 break;
-            case (Key.C, KeyModifiers.Control):
-                e.Handled = true;
-                _ = RunSafe(() => CopySelectionAsync(withHeader: false));
-                break;
-            case (Key.C, KeyModifiers.Control | KeyModifiers.Shift):
-                e.Handled = true;
-                _ = RunSafe(() => CopySelectionAsync(withHeader: true));
-                break;
             case (Key.Enter, KeyModifiers.Alt):
                 e.Handled = true;
                 _ = RunSafe(ViewCurrentValueAsync);
                 break;
         }
+    }
+
+    // Ctrl+0 on a cell or column selection: the selected columns of every row it touches.
+    private void SetSelectedCellsNull()
+    {
+        if (_editing is not { } editing || ItemsSource is not IList list || CurrentSlice() is not { } slice) return;
+        var cells = new List<(int Row, int Column)>();
+        foreach (var row in SelectedRows)
+            if (list.IndexOf(row) is >= 0 and var index)
+                cells.AddRange(slice.Columns.Select(column => (index, column)));
+        editing.SetNull(cells);
     }
 
     /// <summary>
@@ -949,47 +986,6 @@ public partial class ResultGrid : UserControl
     public void AddRowAndEdit()
     {
         if (_editing is { } editing && editing.AddRow() is >= 0 and var index) StartEditingNewRow(index);
-    }
-
-    // ---- copy ----
-
-    /// <summary>
-    /// Ctrl+C: one row selected (or none) copies the current cell, several rows copy a TSV block; with <paramref name="withHeader"/>
-    /// the rows go with a header line. Values are complete (not the shortened text of the cell); NULL is empty.
-    /// </summary>
-    private async Task CopySelectionAsync(bool withHeader)
-    {
-        if (TopLevel.GetTopLevel(this)?.Clipboard is not { } clipboard) return;
-        var rows = Grid.SelectedItems.Cast<object>().ToList();
-        string text;
-        if (!withHeader && rows.Count <= 1 && Grid.CurrentColumn is GridCellColumn current)
-        {
-            var row = rows.FirstOrDefault() ?? Grid.SelectedItem;
-            text = ValueText(row, current.Index);
-        }
-        else
-        {
-            if (rows.Count == 0 && Grid.SelectedItem is { } one) rows.Add(one);
-            if (rows.Count == 0) return;
-            text = RowsText(rows, withHeader);
-        }
-        await clipboard.SetTextAsync(text);
-    }
-
-    private static string ValueText(object? row, int column) =>
-        GridCellColumn.ValuesOf(row) is { } values && column < values.Length && values[column] is { } v ? CopyText(v) : "";
-
-    private string RowsText(IEnumerable<object> rows, bool withHeader)
-    {
-        var lines = new List<string>();
-        var count = Columns?.Count ?? 0;
-        if (withHeader && Columns is { } columns) lines.Add(string.Join('\t', columns.Select(c => c.Name)));
-        foreach (var row in rows)
-        {
-            var width = count > 0 ? count : GridCellColumn.ValuesOf(row)?.Length ?? 0;
-            lines.Add(string.Join('\t', Enumerable.Range(0, width).Select(i => ValueText(row, i).Replace('\t', ' ').Replace("\r\n", " ").Replace('\n', ' '))));
-        }
-        return string.Join(Environment.NewLine, lines);
     }
 
     // ---- value viewer ----
@@ -1014,8 +1010,10 @@ public partial class ResultGrid : UserControl
     /// </summary>
     public bool CommitPendingEdit() => Grid.CommitEdit();
 
-    /// <summary>The rows selected in the grid.</summary>
-    public IReadOnlyList<RowViewModel> SelectedRows => Grid.SelectedItems.OfType<RowViewModel>().ToList();
+    /// <summary>The rows selected in the grid, or those a cell or column selection touches.</summary>
+    public IReadOnlyList<RowViewModel> SelectedRows => _selection.IsActive
+        ? ShownRows.Where((_, i) => _selection.ContainsRow(i)).OfType<RowViewModel>().ToList()
+        : Grid.SelectedItems.OfType<RowViewModel>().ToList();
 
     /// <summary>Selects and scrolls to a row (e.g. the one just added).</summary>
     public void SelectRow(int index)
@@ -1072,21 +1070,6 @@ public partial class ResultGrid : UserControl
 
     private ContextMenu BuildCellMenu()
     {
-        // Copy
-        var copyItem = new MenuItem { Header = "Copy value", InputGesture = new KeyGesture(Key.C, KeyModifiers.Control) };
-        copyItem.Click += async (_, _) =>
-        {
-            if (_contextCell is not { } c || TopLevel.GetTopLevel(this)?.Clipboard is not { } clipboard) return;
-            await RunSafe(() => clipboard.SetTextAsync(ValueText(c.Row, c.Index)));
-        };
-        var copyRowItem = new MenuItem { Header = "Copy row" };
-        copyRowItem.Click += async (_, _) =>
-        {
-            if (_contextCell is not { } c || TopLevel.GetTopLevel(this)?.Clipboard is not { } clipboard) return;
-            await RunSafe(() => clipboard.SetTextAsync(RowsText([c.Row!], withHeader: false)));
-        };
-        var copyRowsItem = new MenuItem { Header = "Copy selected rows with header", InputGesture = new KeyGesture(Key.C, KeyModifiers.Control | KeyModifiers.Shift) };
-        copyRowsItem.Click += (_, _) => _ = RunSafe(() => CopySelectionAsync(withHeader: true));
         var viewItem = new MenuItem { Header = "View value…", InputGesture = new KeyGesture(Key.Enter, KeyModifiers.Alt) };
         viewItem.Click += (_, _) =>
         {
@@ -1142,10 +1125,11 @@ public partial class ResultGrid : UserControl
         addItem.Click += (_, _) => AddRowAndEdit();
         var editSeparator = new Separator();
 
+        var (copyItems, copyOpening) = BuildCopyMenu();
         var menu = new ContextMenu();
-        foreach (var item in new Control[]
+        foreach (var item in new List<Control>(copyItems)
                  {
-                     copyItem, copyRowItem, copyRowsItem, viewItem, filterSeparator, filterItem, excludeItem, followItem,
+                     new Separator(), viewItem, filterSeparator, filterItem, excludeItem, followItem,
                      editSeparator, editItem, nullItem, deleteItem, restoreItem, addItem,
                  })
             menu.Items.Add(item);
@@ -1155,7 +1139,7 @@ public partial class ResultGrid : UserControl
             if (_contextCell is null) { e2.Cancel = true; return; }
             var table = Features is not null;
             var hasValue = GridCellColumn.ValuesOf(_contextCell.Row) is { } vs && _contextCell.Index < vs.Length && vs[_contextCell.Index] is not null;
-            copyRowsItem.IsVisible = Grid.SelectedItems.Count > 1;
+            copyOpening();
             viewItem.IsEnabled = hasValue;
             filterSeparator.IsVisible = table;
             filterItem.IsVisible = table;

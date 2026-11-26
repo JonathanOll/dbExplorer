@@ -171,6 +171,10 @@ current-cell frame: 2 px accent, inside the cell).
   The grid header is a name band (type-aware, sort in accent, context menu) over a lighter filter band with typed hints. Edited
   cells are bold with a "Was: …" tooltip; empty cells of a new row say `DEFAULT`. `Ctrl+C` / `Ctrl+Shift+C` copy, `Delete`, `Insert`,
   `Alt+Enter` opens the value viewer (full text, JSON indented, hex for binary).
+- **Copy and export** (both grids, [docs/export.md](../export.md)): drag, `Alt+click` or `Shift+arrows` select a rectangle,
+  `Ctrl+click` on a header or `Ctrl+Space` whole columns (cells lit like selected rows). The cell menu starts with Copy, Copy with
+  headers, Advanced copy, "Copy as", Export and Select column. `ExportDialog` and `AdvancedCopyDialog` have the options on the
+  left and a monospace preview on the right. Scenes: `grid-selection`, `export-dialog`, `export-dialog-sql`, `advanced-copy`.
 - **Script tab**: one-row toolbar: Run (accent) and Run all, "Run on group" menu, row-limit dropdown with presets, Statistics
   toggle, icon-only Open and Save, progress + elapsed time + Stop only while running, connection badge (+ read-only badge) and a
   shortcuts flyout. Editor with find (`Ctrl+F`), `Ctrl+/` comments, gutter marks per statement that ran. Results: a run summary

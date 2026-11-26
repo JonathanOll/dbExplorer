@@ -76,6 +76,14 @@ public static class ShortcutCatalog
             new("Ctrl+F", "Find a table (Enter: next match)"),
             new("Enter / double-click", "Open the data of the selected table"),
         ]),
+        new("Result and data grids", [
+            new("Drag / Alt+click / Shift+arrows", "Select a rectangle of cells"),
+            new("Ctrl+click a header / Ctrl+Space", "Select whole columns"),
+            new("Ctrl+C", "Copy the cell or the selection"),
+            new("Ctrl+Shift+C", "Copy with the column names"),
+            new("Ctrl+Alt+C", "Advanced copy: delimiter, quotes, NULL, dates"),
+            new("Ctrl+E", "Export to a file"),
+        ]),
         new("Linked databases", [
             new("Ctrl+Alt+PageDown", "Next database of the group"),
             new("Ctrl+Alt+PageUp", "Previous database of the group"),
