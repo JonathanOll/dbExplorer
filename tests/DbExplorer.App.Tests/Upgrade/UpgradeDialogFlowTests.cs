@@ -173,7 +173,11 @@ public class UpgradeDialogFlowTests : IDisposable
         Assert.False(run.IsCompleted);
 
         var sawStopping = false;
-        vm.PropertyChanged += (_, e) => sawStopping |= e.PropertyName == nameof(UpgradeViewModel.IsStopping) && vm.IsStopping;
+        // Only ever writes true: run progress raises other changes from pool threads, and a `|=` there could overwrite it.
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(UpgradeViewModel.IsStopping) && vm.IsStopping) sawStopping = true;
+        };
         vm.RequestStopCommand.Execute(null);
         vm.ConfirmStopCommand.Execute(null);
         await run.WaitAsync(Bound);
