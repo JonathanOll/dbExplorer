@@ -41,8 +41,9 @@ internal sealed class SqlCompletionData(CompletionItem item) : ICompletionData
 
         var document = textArea.Document;
         var start = completionSegment.Offset;
-        // The window filters on what follows the opening quote the user typed; that quote is replaced too.
-        if (start > 0 && item.Text.Length > 0 && item.Text[0] is '"' or '[' && document.GetCharAt(start - 1) == item.Text[0]) start--;
+        // The window filters on what follows the opening quote the user typed; that quote is replaced too. Only then does the item
+        // start before the segment: a quote that closes the previous name stays.
+        if (item.ReplaceStart == start - 1 && document.GetCharAt(start - 1) is '"' or '[') start--;
         var end = Math.Max(start, completionSegment.EndOffset);
         document.Replace(start, end - start, item.Text);
         textArea.Caret.Offset = start + item.Text.Length;

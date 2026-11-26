@@ -80,7 +80,9 @@ public static class SqlCompletion
         if (open)
         {
             // Only a quoted identifier being typed ("Ord) is completed, never a string literal or a comment.
-            if (tokens.Count == 0 || tokens[^1] is not { Kind: SqlTokenKind.Quoted } q || q.End <= caretInStmt || before[q.Start] != '"')
+            // An identifier never spans lines here: a stray quote further up must not make the following lines the replaced text.
+            if (tokens.Count == 0 || tokens[^1] is not { Kind: SqlTokenKind.Quoted } q || q.End <= caretInStmt || before[q.Start] != '"'
+                || before.IndexOf('\n', q.Start) >= 0)
                 return [];
             replaceStart = q.Start;
             prefix = before[(q.Start + 1)..];
@@ -94,7 +96,10 @@ public static class SqlCompletion
             replaceStart = ws;
             if (prefix.Length > 0 && char.IsDigit(prefix[0])) return [];
             if (ws > 0 && before[ws - 1] is '@' or '#') return [];
-            if (kind == DbKind.SqlServer && before.LastIndexOf('[') is >= 0 and var bracket && before.IndexOf(']', bracket) < 0)
+            // The lexer leaves an unclosed '[' as a lone character; one inside a string or a comment is not a token at all.
+            if (kind == DbKind.SqlServer
+                && tokens.FindLastIndex(t => t.Kind == SqlTokenKind.Other && t.Start < before.Length && before[t.Start] == '[') is >= 0 and var at
+                && tokens[at].Start is var bracket && before.IndexOf(']', bracket) < 0 && before.IndexOf('\n', bracket) < 0)
             {
                 replaceStart = bracket;   // [Order D: the identifier is still open
                 prefix = before[(bracket + 1)..];
@@ -140,7 +145,9 @@ public static class SqlCompletion
         }
 
         var tables = schema?.Tables ?? [];
-        var length = caret - replaceStart;
+        // Everything above counts from the start of the statement; the items speak of the whole script.
+        var scriptStart = stmtStart + replaceStart;
+        var length = caret - scriptStart;
         var cands = new List<Cand>();
 
         if (ctx.Count > 0 && IsChar(ctx[^1], '.'))
@@ -148,13 +155,13 @@ public static class SqlCompletion
             var qualifiers = Qualifiers(ctx, before);
             if (qualifiers.Count == 0) return [];
             Qualified(cands, qualifiers, clause == Clause.Object, tables, TableUses(stmtTokens, all), kind, quoted);
-            return Rank(cands, prefix, replaceStart, length, max, objectsFirst: false);
+            return Rank(cands, prefix, scriptStart, length, max, objectsFirst: false);
         }
 
         if (ctx.Count == 0)
         {
             foreach (var k in SqlCompletionVocabulary.StatementKeywords(kind)) cands.Add(Keyword(k, 0));
-            return Rank(cands, prefix, replaceStart, length, max, objectsFirst: false);
+            return Rank(cands, prefix, scriptStart, length, max, objectsFirst: false);
         }
 
         var previous = ctx[^1];
@@ -164,7 +171,7 @@ public static class SqlCompletion
         {
             AddObjects(cands, tables, kind, quoted);
             foreach (var k in SqlCompletionVocabulary.Keywords(kind)) cands.Add(Keyword(k, 2));
-            return Rank(cands, prefix, replaceStart, length, max, objectsFirst: true);
+            return Rank(cands, prefix, scriptStart, length, max, objectsFirst: true);
         }
 
         if (clause == Clause.Column)
@@ -177,7 +184,7 @@ public static class SqlCompletion
             foreach (var f in SqlCompletionVocabulary.Functions(kind)) cands.Add(Function(f, 1));
         }
         foreach (var k in SqlCompletionVocabulary.Keywords(kind)) cands.Add(Keyword(k, 3));
-        return Rank(cands, prefix, replaceStart, length, max, objectsFirst: false);
+        return Rank(cands, prefix, scriptStart, length, max, objectsFirst: false);
     }
 
     // ---- the statement under the caret ----

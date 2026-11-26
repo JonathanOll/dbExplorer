@@ -169,6 +169,50 @@ public class SqlCompletionViewTests : IDisposable
     }
 
     [AvaloniaTheory]
+    [InlineData("SELECT id FROM t;\n\nSELECT * FROM ")]
+    [InlineData("SELECT id FROM t;\r\nSELECT * FROM ")]
+    public async Task Accepting_InALaterStatement_KeepsEverythingBeforeTheWord(string text)
+    {
+        var (window, view, editor, tab) = await Open(text);
+        Type(window, "bi");
+        Assert.NotNull(view.OpenCompletion);
+
+        Press(window, Key.Enter, PhysicalKey.Enter);
+
+        Assert.Equal(text + "big", editor.Text);
+        Assert.Equal(editor.Text.Length, editor.CaretOffset);
+        Assert.Equal(editor.Text, tab.Text);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task Accepting_AfterAClosedQuotedName_KeepsItsClosingQuote()
+    {
+        var (window, _, editor, _) = await Open("SELECT \"name\"");
+        var caret = editor.CaretOffset;
+        var quoted = new SqlCompletionData(new CompletionItem("\"x\"", "x", CompletionKind.Column, null, caret, 0));
+
+        quoted.Complete(editor.TextArea, new AvaloniaEdit.Document.TextSegment { StartOffset = caret, Length = 0 }, EventArgs.Empty);
+
+        Assert.Equal("SELECT \"name\"\"x\"", editor.Text);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task TextReplacedWhileTheListIsOpen_ClosesIt()
+    {
+        var (window, view, _, tab) = await Open("SELECT * FROM ");
+        Type(window, "bi");
+        Assert.NotNull(view.OpenCompletion);
+
+        tab.Text = "select *\nfrom bi";   // what Format SQL does
+        Pump();
+
+        Assert.Null(view.OpenCompletion);
+        window.Close();
+    }
+
+    [AvaloniaTheory]
     [InlineData(" ")]
     [InlineData(",")]
     [InlineData("(")]

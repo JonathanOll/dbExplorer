@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Threading;
 using AvaloniaEdit.CodeCompletion;
+using AvaloniaEdit.Document;
 using DbExplorer.Core.Scripting;
 
 namespace DbExplorer.App.Views;
@@ -86,7 +87,16 @@ public partial class ScriptTabView
         if (items.Count == 0) return;
 
         EnsureCompletionStyles();
-        var window = new CompletionWindow(Editor.TextArea);
+        CompletionWindow? window = null;
+        var document = Editor.Document;
+        // A change outside the replaced range (the whole text rewritten by Format SQL, a reload) stretches that range over text
+        // the user never typed: accepting would delete it. Subscribed before the window, to read the range as it was.
+        void CloseOnForeignChange(object? sender, DocumentChangeEventArgs e)
+        {
+            if (window is not null && (e.Offset < window.StartOffset || e.Offset + e.RemovalLength > window.EndOffset)) window.Close();
+        }
+        document.Changing += CloseOnForeignChange;
+        window = new CompletionWindow(Editor.TextArea);
         var start = items[0].ReplaceStart;
         // The list narrows on what follows an opening quote; the quote itself is part of the replaced text.
         if (start < caret && Editor.Document.GetCharAt(start) is '"' or '[') start++;
@@ -94,6 +104,7 @@ public partial class ScriptTabView
         foreach (var item in items) window.CompletionList.CompletionData.Add(new SqlCompletionData(item));
         window.Closed += (_, _) =>
         {
+            document.Changing -= CloseOnForeignChange;
             if (ReferenceEquals(_completion, window)) _completion = null;
         };
         _completion = window;
