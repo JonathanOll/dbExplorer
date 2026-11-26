@@ -27,7 +27,10 @@ ascending, then folder name, then file name in natural order (`adj - 003` before
    database and, when it belongs to groups of two or more databases, each of those groups.
 2. **Preview**: one line per script (folder, file name, Production label, one badge per warning with its reason and line in
    the tooltip), a check box on each (a script that cannot be played cannot be ticked), a summary of the warnings of the
-   ticked scripts (`3 warnings: 2 index, 1 long-running`) and the list of ignored files. Press **Run...**.
+   ticked scripts (`3 warnings: 2 index, 1 long-running`) and the list of ignored files. **Search by file name** (any part,
+   case ignored; `Esc` clears) narrows the list shown only: ticks and what runs do not change. **Untick long (n)** /
+   **Tick long (n)** unticks every script with a long-running badge when one of them is ticked, ticks them all otherwise
+   (Production ones and those hidden by the search included; index-only warnings do not count). Press **Run...**.
 3. **Confirmation**: the number of scripts, the databases, every warning of the ticked scripts, and a note when Production
    scripts are ticked. For a group you must type the sprint number (the folder code, such as `v0860`, for a run by folder)
    before **Run** is enabled; **Back** returns to the preview with the ticks kept.

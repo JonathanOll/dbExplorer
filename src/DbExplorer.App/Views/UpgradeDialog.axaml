@@ -259,68 +259,96 @@
         <!-- Preview: the scripts by folder, one line each -->
         <DockPanel IsVisible="{Binding IsPreview}">
           <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1" Padding="24,6">
-            <Grid ColumnDefinitions="*,Auto">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" RowSpacing="4">
               <TextBlock Text="{Binding TickedText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="10">
+                <TextBox x:Name="FilterBox" Classes="search" Width="320" Watermark="Search by file name" Text="{Binding FilterText}"
+                         AutomationProperties.Name="Search scripts by file name">
+                  <TextBox.KeyBindings>
+                    <!-- Only while there is something to clear: an empty box leaves Esc to the Close button -->
+                    <KeyBinding Gesture="Escape" Command="{Binding ClearFilterCommand}" />
+                  </TextBox.KeyBindings>
+                  <TextBox.InnerLeftContent>
+                    <PathIcon Classes="dim" Data="{StaticResource IconSearch}" Width="13" Height="13" Margin="8,0,0,0" />
+                  </TextBox.InnerLeftContent>
+                  <TextBox.InnerRightContent>
+                    <Button Classes="close" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}" Margin="0,0,4,0"
+                            Command="{Binding ClearFilterCommand}" IsVisible="{Binding IsFiltering}"
+                            AutomationProperties.Name="Clear the search" ToolTip.Tip="Clear the search (Esc)" />
+                  </TextBox.InnerRightContent>
+                </TextBox>
+                <TextBlock Classes="dim small" Text="{Binding ShownText}" IsVisible="{Binding IsFiltering}" VerticalAlignment="Center" />
+              </StackPanel>
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
                 <Button Content="All" Classes="ghost" Command="{Binding SelectAllCommand}" ToolTip.Tip="Tick every script that can be played" />
                 <Button Content="None" Classes="ghost" Command="{Binding SelectNoneCommand}" ToolTip.Tip="Untick every script" />
                 <Button Content="No Production" Classes="ghost" Command="{Binding SelectNonProductionCommand}"
                         ToolTip.Tip="Tick everything except the scripts that target specific servers" />
+                <Border Classes="vsep" Margin="6,4" />
+                <Button Content="{Binding LongToggleText}" Classes="ghost" Command="{Binding ToggleLongCommand}"
+                        ToolTip.ShowOnDisabled="True" ToolTip.Tip="{Binding LongToggleTip}" />
               </StackPanel>
             </Grid>
           </Border>
-          <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding Groups}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:UpgradeFolderGroup">
-                  <StackPanel>
-                    <Border Background="{DynamicResource DbxWindowBg}" Padding="24,5">
-                      <TextBlock Classes="section" Margin="0" Text="{Binding Folder}" />
-                    </Border>
-                    <ItemsControl ItemsSource="{Binding Rows}">
-                      <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:UpgradeScriptRow">
-                          <Border BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1" Padding="24,6" Background="Transparent"
-                                  Tapped="OnRowTapped">
-                            <Grid ColumnDefinitions="Auto,*,Auto">
-                              <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding CanSelect}" VerticalAlignment="Center" Margin="0,0,8,0"
-                                        AutomationProperties.Name="{Binding Name}" />
-                              <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12.5"
-                                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
-                                <SelectableTextBlock Foreground="{DynamicResource DbxError}" Text="{Binding LoadError}" TextWrapping="Wrap"
-                                                     IsVisible="{Binding HasLoadError}" />
-                              </StackPanel>
-                              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="12,0,0,0">
-                                <Border Classes="badge warn" IsVisible="{Binding IsProduction}"
-                                        ToolTip.Tip="Targets specific servers: unticked by default">
-                                  <TextBlock Text="{Binding ProductionTag}" FontSize="11.5" />
-                                </Border>
-                                <ItemsControl ItemsSource="{Binding WarningBadges}">
-                                  <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                      <StackPanel Orientation="Horizontal" Spacing="6" />
-                                    </ItemsPanelTemplate>
-                                  </ItemsControl.ItemsPanel>
-                                  <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:UpgradeWarningBadge">
-                                      <Border Classes="badge warn" ToolTip.Tip="{Binding Tip}">
-                                        <TextBlock Text="{Binding Text}" FontSize="11.5" />
-                                      </Border>
-                                    </DataTemplate>
-                                  </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                              </StackPanel>
-                            </Grid>
-                          </Border>
-                        </DataTemplate>
-                      </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                  </StackPanel>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </ScrollViewer>
+          <Panel>
+            <StackPanel Classes="empty" IsVisible="{Binding HasNoMatch}">
+              <PathIcon Data="{StaticResource IconSearch}" />
+              <TextBlock Classes="h2" Text="No match" />
+              <TextBlock Classes="dim" TextAlignment="Center" TextWrapping="Wrap" Text="{Binding NoMatchText}" />
+            </StackPanel>
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" IsVisible="{Binding !HasNoMatch}">
+              <ItemsControl ItemsSource="{Binding VisibleGroups}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:UpgradeFolderGroup">
+                    <StackPanel>
+                      <Border Background="{DynamicResource DbxWindowBg}" Padding="24,5">
+                        <TextBlock Classes="section" Margin="0" Text="{Binding Folder}" />
+                      </Border>
+                      <ItemsControl ItemsSource="{Binding Rows}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:UpgradeScriptRow">
+                            <Border BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1" Padding="24,6" Background="Transparent"
+                                    Tapped="OnRowTapped">
+                              <Grid ColumnDefinitions="Auto,*,Auto">
+                                <CheckBox IsChecked="{Binding IsSelected}" IsEnabled="{Binding CanSelect}" VerticalAlignment="Center" Margin="0,0,8,0"
+                                          AutomationProperties.Name="{Binding Name}" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                  <TextBlock Text="{Binding Name}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12.5"
+                                             TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                                  <SelectableTextBlock Foreground="{DynamicResource DbxError}" Text="{Binding LoadError}" TextWrapping="Wrap"
+                                                       IsVisible="{Binding HasLoadError}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="12,0,0,0">
+                                  <Border Classes="badge warn" IsVisible="{Binding IsProduction}"
+                                          ToolTip.Tip="Targets specific servers: unticked by default">
+                                    <TextBlock Text="{Binding ProductionTag}" FontSize="11.5" />
+                                  </Border>
+                                  <ItemsControl ItemsSource="{Binding WarningBadges}">
+                                    <ItemsControl.ItemsPanel>
+                                      <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="6" />
+                                      </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                      <DataTemplate x:DataType="vm:UpgradeWarningBadge">
+                                        <Border Classes="badge warn" ToolTip.Tip="{Binding Tip}">
+                                          <TextBlock Text="{Binding Text}" FontSize="11.5" />
+                                        </Border>
+                                      </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                  </ItemsControl>
+                                </StackPanel>
+                              </Grid>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Panel>
         </DockPanel>
 
         <!-- Confirm: what is about to happen -->

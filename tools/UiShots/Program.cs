@@ -357,6 +357,9 @@ internal static class Scenes
         ("settings-format", d => SettingsDialogScene(d, "format")),
         ("settings-shortcuts", d => SettingsDialogScene(d, "shortcuts")),
         ("settings-upgrade", d => SettingsDialogScene(d, "upgrade")),
+        ("upgrade-scripts", d => UpgradeScripts(d, "")),
+        ("upgrade-scripts-filter", d => UpgradeScripts(d, "supplier")),
+        ("upgrade-scripts-nomatch", d => UpgradeScripts(d, "zzz")),
         ("settings-search", d => SettingsDialogScene(d, "appearance", search: "size")),
         ("main-table-settings", d => Customised(d, MainTable)),
         ("script-settings", d => Customised(d, s => Script(s, false))),
@@ -754,6 +757,34 @@ internal static class Scenes
         var vm = new SettingsViewModel(ctx, page);
         if (search is not null) vm.SearchText = search;
         var dialog = new SettingsDialog { DataContext = vm };
+        dialog.Show(d.Window);
+        await Settle();
+        return dialog;
+    }
+
+    // The Upgrade dialog on its script preview, over a throw-away dbupdate tree; narrowed when a search is given. Nothing is run.
+    private static async Task<Window?> UpgradeScripts(Demo d, string filter)
+    {
+        await Open(d);
+        var root = Path.Combine(d.Dir, "dbupdate");
+        void Add(string folder, string file, string sql)
+        {
+            Directory.CreateDirectory(Path.Combine(root, folder));
+            File.WriteAllText(Path.Combine(root, folder, file), sql);
+        }
+        Add("v0860-sprint 143", "adj - 002 - Add column ExternalRef on Orders.sql", "ALTER TABLE Orders ADD ExternalRef nvarchar(50) NULL");
+        Add("v0860-sprint 143", "adj - 003 - Add covering index on Suppliers.sql", "CREATE INDEX IX_Suppliers ON Suppliers(AccountId)");
+        Add("v0860-sprint 143", "fbo - 001 - Backfill supplier balances.sql", "UPDATE Suppliers SET Balance = 0");
+        Add("v0860-sprint 143", "mch - 010 - Disable users - Production2.sql", "UPDATE Users SET Active = 0 WHERE Id = 1");
+        Add("v0861-sprint 143", "fbo - 002 - Widen supplier name.sql", "ALTER TABLE Suppliers ALTER COLUMN Name nvarchar(400)");
+        Add("v0861-sprint 143", "mch - 011 - Refresh views.sql", "SELECT 1");
+        var vm = new UpgradeViewModel(DbExplorer.Core.Upgrade.DbUpdateCatalog.Scan(root),
+            [new DbExplorer.Core.Upgrade.UpgradeTarget($"This database ({d.Shop.Name})", [d.Shop], null)],
+            (_, _) => Task.FromResult<Session?>(null));
+        vm.SprintText = "143";
+        await vm.LoadCommand.ExecuteAsync(null);
+        vm.FilterText = filter;
+        var dialog = new UpgradeDialog { DataContext = vm };
         dialog.Show(d.Window);
         await Settle();
         return dialog;

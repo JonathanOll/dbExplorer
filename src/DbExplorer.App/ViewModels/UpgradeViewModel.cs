@@ -77,6 +77,9 @@ public sealed partial class UpgradeScriptRow : ObservableObject
 
     public IReadOnlyList<UpgradeWarningBadge> WarningBadges { get; }
 
+    /// <summary>The script carries at least one "Long-running" warning.</summary>
+    public bool IsLongRunning => Item.Warnings.Any(w => w.Kind == ScriptWarningKind.LongRunning);
+
     /// <summary>One line with every reason, e.g. <c>Creates index IX_a (line 3)</c>.</summary>
     public string WarningText => string.Join("; ", Item.Warnings.Select(w => $"{w.Reason} (line {w.Line})"));
 
@@ -421,6 +424,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
         RequestStopCommand.NotifyCanExecuteChanged();
         RequestRetryCommand.NotifyCanExecuteChanged();
         CopyLogCommand.NotifyCanExecuteChanged();
+        RefreshLongToggle();
         if (value != UpgradePhase.Running)
         {
             ConfirmingStop = false;
@@ -619,6 +623,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
         }
 
         _plan = plan;
+        FilterText = "";   // a new list is shown whole
         ConfirmToken = plan.ConfirmToken;
         Rows.Clear();
         foreach (var item in plan.Items) Rows.Add(new UpgradeScriptRow(item, RecomputeSelection));
@@ -637,6 +642,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
         _plan = null;
         Rows.Clear();
         Groups = [];
+        FilterText = "";
         OnPropertyChanged(nameof(HasRows));
         IgnoredNote = null;
         RecomputeSelection();
@@ -679,6 +685,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
         OnPropertyChanged(nameof(RunButtonText));
         OnPropertyChanged(nameof(IsDangerRun));
         RequestRunCommand.NotifyCanExecuteChanged();
+        RefreshLongToggle();
     }
 
     private bool CanRequestRun() => Phase == UpgradePhase.Preview && SelectedCount > 0 && Rows.All(r => !r.HasLoadError);

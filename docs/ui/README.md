@@ -218,7 +218,8 @@ Scenes: `empty`, `main-table`, `table-edit`, `table-structure`, `script`, `scrip
 `sql-preview`, `virtual-key`, `history` (the Query history window), `search`, `search-data`, `format-sql`, `confirm-dialog`, `live-theme-switch` (flips the theme while the window shows),
 `main-table-125` (1024x640 DIP, the 1280x800 window at 125 percent scaling), the Settings dialog (`settings-appearance`,
 `settings-editor`, `settings-results`, `settings-history`, `settings-format`, `settings-shortcuts`, `settings-upgrade`, `settings-search`, `settings-appearance-125`),
-`main-table-settings` and `script-settings` (UI scale 125 %, purple accent, Compact density), and for linked groups `groups-tree` (the Groups
+`main-table-settings` and `script-settings` (UI scale 125 %, purple accent, Compact density), the script preview of the Upgrade
+dialog (`upgrade-scripts`, `upgrade-scripts-filter`, `upgrade-scripts-nomatch`), and for linked groups `groups-tree` (the Groups
 section of the navigator), `group-editor`, `group-editor-warning` (one member + a name clash: warning and error bands) and
 `group-schema-diff` (schema-difference report with an unreachable member), `group-switch-table` and `group-switch-script`
 (the database selector in a table and a script tab), `group-run` and `group-run-differences` (a read-only run of one statement on
