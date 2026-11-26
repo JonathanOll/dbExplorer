@@ -6,6 +6,7 @@ using DbExplorer.Core.Model;
 namespace DbExplorer.App.Tests.Settings;
 
 /// <summary>How the Results settings change what a grid cell shows, and what they must leave alone (filters, copy, edit text).</summary>
+[Collection(GlobalSettingsCollection.Name)]
 public class ResultsDisplayTests : IDisposable
 {
     private readonly CultureInfo _culture = CultureInfo.CurrentCulture;

@@ -1,3 +1,4 @@
+using Avalonia.Headless.XUnit;
 using DbExplorer.App.ViewModels;
 using DbExplorer.Core.Groups;
 using DbExplorer.Core.Scripting;
@@ -22,7 +23,8 @@ public class GroupRunUxTests : IDisposable
 
     private const string Three = "SELECT id, label FROM big WHERE id <= 3 ORDER BY id";
 
-    [Fact]
+    // On the dispatcher, as in the app: members connect and report at once, and view models are not thread safe.
+    [AvaloniaFact]
     public async Task Summary_SaysHowManyDatabasesAreDone_AndHowLongTheSlowestTook()
     {
         var run = await Run(Three);
@@ -30,7 +32,7 @@ public class GroupRunUxTests : IDisposable
         Assert.Matches(@"^3 of 3 databases done · \d+ ms$", run.SummaryText);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void Summary_WhileRunning_CountsTheMembersThatEnded()
     {
         var run = new GroupRunViewModel([_g.A, _g.B, _g.Prod], 1000);
@@ -41,7 +43,7 @@ public class GroupRunUxTests : IDisposable
         Assert.Equal("1 of 3 databases finished", run.SummaryText);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task ChipText_IsShort_AndTheFullStatusStaysForTheTooltip()
     {
         var run = await Run(Three);
@@ -57,7 +59,7 @@ public class GroupRunUxTests : IDisposable
         Assert.Contains("connection refused", pending.StatusText);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task AChip_OpensItsMembersTab_OnceItEnded()
     {
         var run = await Run(Three);
@@ -74,7 +76,7 @@ public class GroupRunUxTests : IDisposable
         Assert.False(waiting.SelectCommand.CanExecute(null));   // nothing to open yet
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task Notices_AreSplitByKind_TheComparisonIsInfo_WhatWasLeftOutIsAWarning()
     {
         var run = await Run("SELECT 1 AS x; " + Three, whole: true);
@@ -88,7 +90,7 @@ public class GroupRunUxTests : IDisposable
         Assert.Equal([GroupRunViewModel.ReadOnlyNotice], refused.WarnNotices);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task TheDifferencesChip_CountsTheRowsThatDiffer_AndSaysWhenThereAreNone()
     {
         var run = await Run(Three);
@@ -102,7 +104,7 @@ public class GroupRunUxTests : IDisposable
         Assert.Equal(0, same.DifferenceCount);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task TheSegmentedControl_AllRowsIsTheOppositeOfDifferences()
     {
         var run = await Run(Three);
@@ -118,7 +120,7 @@ public class GroupRunUxTests : IDisposable
         Assert.Contains("from 3 databases", run.AllStatus);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task ClosingThePanel_ShowsTheOrdinaryResultsAgain_ButNeverWhileItRuns()
     {
         var tab = await _g.NewScript(_g.A);
@@ -132,7 +134,7 @@ public class GroupRunUxTests : IDisposable
         Assert.Null(tab.GroupRun);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task TheRunButtons_ExplainWhyTheyAreOff_DuringAGroupRun()
     {
         var tab = await _g.NewScript(_g.A);

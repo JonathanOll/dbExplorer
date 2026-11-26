@@ -1,3 +1,4 @@
+using Avalonia.Headless.XUnit;
 using DbExplorer.App.ViewModels;
 using DbExplorer.Core.Model;
 using static DbExplorer.App.Tests.TreeFixture;
@@ -26,7 +27,9 @@ public class GroupNavigatorTests : IDisposable
         return (tree, tree.Nodes.OfType<GroupsSectionNodeViewModel>().Single().Children.OfType<GroupNodeViewModel>().Single(), a, b);
     }
 
-    [Fact]
+    // [AvaloniaFact] where several members connect at once: the dispatcher runs their continuations one at a time, as the
+    // app does. Under a plain [Fact] they run in parallel and race on the view models.
+    [AvaloniaFact]
     public async Task ConnectGroup_ConnectsEveryMember_AndOpensTheGroup()
     {
         var (tree, group, _, _) = TwoDatabases();
@@ -38,7 +41,7 @@ public class GroupNavigatorTests : IDisposable
         Assert.Contains("2 of 2", _fx.Status.Message);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task ConnectGroup_AMemberThatFails_DoesNotStopTheOthers()
     {
         var good = Conn("Good", null, _fx.CreateSqliteFile("good.db"));
@@ -84,7 +87,7 @@ public class GroupNavigatorTests : IDisposable
         Assert.NotEmpty(member.Children.OfType<TableNodeViewModel>());
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task AMember_FollowsADisconnect_AndARebuildDoesNotLeakHandlers()
     {
         var (tree, group, _, _) = TwoDatabases();
@@ -135,7 +138,7 @@ public class GroupNavigatorTests : IDisposable
         Assert.Contains(tree.Nodes, n => n is GroupsSectionNodeViewModel);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task Filter_DoesNotHideTablesOfAConnection_BecauseOfItsGroupShortcut()
     {
         var (tree, group, _, _) = TwoDatabases();

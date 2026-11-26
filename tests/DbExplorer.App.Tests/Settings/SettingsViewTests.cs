@@ -15,6 +15,7 @@ using DbExplorer.Core.Model;
 namespace DbExplorer.App.Tests.Settings;
 
 /// <summary>Headless tests of the Settings dialog and of the live effects of the settings (theme, accent, scale, density, zebra).</summary>
+[Collection(GlobalSettingsCollection.Name)]
 public class SettingsViewTests : IDisposable
 {
     private readonly SettingsService _previous = SettingsService.Instance;

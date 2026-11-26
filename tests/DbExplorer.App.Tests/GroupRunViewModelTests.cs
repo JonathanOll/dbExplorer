@@ -1,3 +1,4 @@
+using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using DbExplorer.App.ViewModels;
 using DbExplorer.App.Views;
@@ -51,7 +52,8 @@ public class GroupRunViewModelTests : IDisposable
 
     // ---- status panel, per-member results, All, Differences ----
 
-    [Fact]
+    // On the dispatcher, as in the app: members connect and report at once, and view models are not thread safe.
+    [AvaloniaFact]
     public async Task RunOnGroup_ShowsOneStatusPerMember_AndPerMemberResults()
     {
         var tab = await Tab();
@@ -74,7 +76,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Equal(0, _g.Fx.Sessions.Open.Count(s => s.Config.Id == _g.NoBig.Id));   // only the group's members were touched
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_GroupListingAConnectionTwice_RunsItOnce_AndDoesNotThrow()
     {
         // A hand-edited config can repeat a connection id in a group: the run must treat it as one member.
@@ -89,7 +91,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.All(run.Members, m => Assert.Equal(MemberState.Done, m.State));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_AllTab_HasDatabaseColumn_FirstColumn()
     {
         var tab = await Tab();
@@ -103,7 +105,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Equal("Prod", run.AllRows[^1][0]);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_DifferencesToggle_ShowsOnlyNonIdenticalRows()
     {
         var tab = await Tab();
@@ -124,7 +126,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Equal(9, run.AllRows.Count);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_Differences_WhenAllMembersAreIdentical_SaysSo()
     {
         var tab = await Tab();
@@ -139,7 +141,7 @@ public class GroupRunViewModelTests : IDisposable
 
     // ---- read-only by construction ----
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_WriteStatement_IsRefused_NothingRuns_NoticeShown()
     {
         var tab = await Tab();
@@ -158,7 +160,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Equal(450, _g.Scalar(_g.FileA, "SELECT COUNT(*) FROM big"));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_WriteInTheMiddleOfAScript_RefusesTheWholeRun()
     {
         var tab = await Tab();
@@ -169,7 +171,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Equal(0, _g.Scalar(_g.FileA, "SELECT COUNT(*) FROM big WHERE label = 'x'"));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_ReadOnlyForcedEvenIfMemberIsNotReadOnly()
     {
         var tab = await Tab();
@@ -188,7 +190,7 @@ public class GroupRunViewModelTests : IDisposable
 
     // ---- failures stay on their member ----
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_UnreachableMember_ShowsErrorOnThatMemberOnly()
     {
         var tab = await Tab(group: _g.Broken);   // A, NoBig (no table big), Down (unreachable file)
@@ -211,7 +213,7 @@ public class GroupRunViewModelTests : IDisposable
 
     // ---- cancel: never freeze the panel ----
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_CancelAll_StopsEverything_IsRunningFalse()
     {
         var hang = _g.Gate(_g.B.Id);   // B's connect hangs
@@ -238,7 +240,7 @@ public class GroupRunViewModelTests : IDisposable
         }
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_CancelOneMember()
     {
         var hang = _g.Gate(_g.B.Id);
@@ -272,7 +274,7 @@ public class GroupRunViewModelTests : IDisposable
 
     // ---- statement selection: the rules of Ctrl+Enter ----
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_UsesSelectionRulesOfCtrlEnter()
     {
         var tab = await Tab();
@@ -298,7 +300,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Contains("statement 3", tab.GroupRun.Notice);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_NothingToRun_RunsNothing()
     {
         var tab = await Tab();
@@ -311,7 +313,7 @@ public class GroupRunViewModelTests : IDisposable
 
     // ---- ownership of the member connections ----
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_EveryMemberGetsItsOwnFreshConnection_DisposedWhenItsMemberEnded()
     {
         var tab = await Tab();
@@ -328,7 +330,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.DoesNotContain(tab.GroupConnectionsOpened, c => opened.Contains(c));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_ClosingTheTab_CancelsAndDisposesMemberConnections()
     {
         var hang = _g.Gate(_g.B.Id);
@@ -365,7 +367,7 @@ public class GroupRunViewModelTests : IDisposable
 
     // ---- availability and gates ----
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_NotInAGroup_IsNotAvailable()
     {
         var tab = await Tab(_g.Solo);
@@ -383,7 +385,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Contains("not in a group", _g.Fx.Status.Message);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_RowLimitAppliesPerMember_WithTruncationNotice()
     {
         var tab = await Tab();
@@ -406,7 +408,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Contains("A: rows were cut at the row limit (100); differences may be false", run.Notice);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_IsRefusedWhileTheTabIsSwitching()
     {
         var tab = await Tab();
@@ -433,7 +435,7 @@ public class GroupRunViewModelTests : IDisposable
         }
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task SwitchingIsRefusedWhileAGroupRunIsInProgress_AndLeavesNothingDangling()
     {
         var tab = await Tab();
@@ -462,7 +464,7 @@ public class GroupRunViewModelTests : IDisposable
         }
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task OrdinaryRunAndSecondGroupRun_AreRefusedWhileAGroupRunIsInProgress()
     {
         var tab = await Tab();
@@ -506,7 +508,7 @@ public class GroupRunViewModelTests : IDisposable
     private static MemberResult Done(string name, string[] columns, params object?[][] rows) =>
         new(Conn(name), MemberState.Done, [Stmt(columns, rows)], TimeSpan.FromMilliseconds(5), null);
 
-    [Fact]
+    [AvaloniaFact]
     public void Prepare_ExcludesFailedCancelledAndColumnlessMembers_WithANotice()
     {
         var empty = new StatementResult(new ScriptStatement("SELECT", 0, 6), [], 3, TimeSpan.Zero, null);
@@ -538,7 +540,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Equal("Cancelled.", prepared.MemberResults[3].Result.Error);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void Prepare_NoCommonColumns_ShowsADedicatedNoticeAndNoRows()
     {
         var results = new List<MemberResult> { Done("one", ["a"], [1L]), Done("two", ["b"], [2L]) };
@@ -551,7 +553,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Contains("no column in common", string.Join("\n", prepared.Differences.Notices));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void Prepare_DifferentColumnSets_MergeOnTheCommonOnes_AndWarn()
     {
         var results = new List<MemberResult> { Done("one", ["id", "x"], [1L, "p"]), Done("two", ["id", "y"], [1L, "q"]) };
@@ -562,7 +564,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Contains("columns not common to all members were left out", string.Join("\n", prepared.Merged.Notices));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void Prepare_TruncatedMember_InDifferences_WarnsThatDifferencesMayBeFalse()
     {
         var results = new List<MemberResult>
@@ -579,7 +581,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Contains("big: showing only the first 2 rows", string.Join("\n", prepared.Merged.Notices));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void Prepare_SameNameTwice_GetsUniqueDisplayNames()
     {
         var results = new List<MemberResult> { Done("dup", ["id"], [1L]), Done("dup", ["id"], [2L]), Done("Dup", ["id"], [3L]) };
@@ -592,7 +594,7 @@ public class GroupRunViewModelTests : IDisposable
             new GroupRunViewModel([Conn("dup"), Conn("dup"), Conn("Dup")], 10).Members.Select(m => m.Name));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void UniqueNames_KeepsRealNames_AndSkipsTakenSuffixes()
     {
         Assert.Equal(["a", "a (3)", "a (2)", "b", "a (4)"],
@@ -600,7 +602,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Equal(["x"], GroupRunViewModel.UniqueNames(["x"]));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void Prepare_NoMemberReturnedRows_SaysSo()
     {
         var results = new List<MemberResult> { new(Conn("broken"), MemberState.Failed, [], TimeSpan.Zero, "boom") };
@@ -613,7 +615,7 @@ public class GroupRunViewModelTests : IDisposable
 
     // ---- progress is advisory, the result authoritative ----
 
-    [Fact]
+    [AvaloniaFact]
     public void Complete_OverwritesEveryStatus_AndLateProgressIsIgnored()
     {
         var one = Conn("one");
@@ -629,7 +631,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.False(run.IsRunning);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void Detach_MarksUnfinishedMembersCancelled_AndIgnoresLateReports()
     {
         var one = Conn("one");
@@ -646,7 +648,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.False(run.IsRunning);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task SafeProgress_NeverThrows_WhateverTheHandlerDoes()
     {
         var progress = new SafeProgress<int>(_ => throw new InvalidOperationException("boom"));
@@ -660,7 +662,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Equal([7], seen);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void RunViewModel_CancelMember_AndCancelAllCommand_CallTheRunner_AndMarkTheLines()
     {
         var one = Conn("one");
@@ -686,7 +688,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Equal(42, run.Members[0].Ms);
     }
 
-    [Fact]
+    [AvaloniaFact]
     public async Task RunOnGroup_AResultColumnNamedDatabase_KeepsEveryValueInItsOwnColumn()
     {
         var tab = await Tab();
@@ -699,7 +701,7 @@ public class GroupRunViewModelTests : IDisposable
 
     // ---- chords ----
 
-    [Fact]
+    [AvaloniaFact]
     public void Chords_RunOnGroup_DoNotCollideWithTheOrdinaryRuns()
     {
         Assert.Equal(ScriptKeyAction.RunStatement, ScriptTabKeys.Resolve(Key.Enter, KeyModifiers.Control));
@@ -716,7 +718,7 @@ public class GroupRunViewModelTests : IDisposable
         Assert.Equal(ScriptKeyAction.None, ScriptTabKeys.Resolve(Key.F5, KeyModifiers.Shift));
     }
 
-    [Fact]
+    [AvaloniaFact]
     public void Chords_AreNotWindowShortcuts()
     {
         // MainShortcuts runs first (tunnel, window level): it must leave Ctrl+Shift+Enter and Ctrl+Shift+F5 to the editor.
