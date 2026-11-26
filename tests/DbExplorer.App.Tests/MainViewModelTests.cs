@@ -52,7 +52,7 @@ public class MainViewModelTests : IDisposable
         var node = tree.Nodes.OfType<ConnectionNodeViewModel>().Single();
         await tree.ConnectAsync(node);
 
-        await tree.OpenTableCommand.ExecuteAsync(node.Children[0]);
+        await tree.OpenTableCommand.ExecuteAsync(node.Children.OfType<TableNodeViewModel>().First());
 
         Assert.Equal("Lite · users", Assert.Single(main.Tabs).Title);
     }

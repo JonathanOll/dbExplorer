@@ -4,7 +4,7 @@ using Microsoft.Data.Sqlite;
 
 namespace DbExplorer.Core.Drivers;
 
-public sealed class SqliteDriver : IDbDriver
+public sealed partial class SqliteDriver : IDbDriver
 {
     public DbKind Kind => DbKind.Sqlite;
 

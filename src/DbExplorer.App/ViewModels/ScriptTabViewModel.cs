@@ -197,9 +197,27 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
     {
         get
         {
-            var name = FilePath is { } path ? Path.GetFileName(path) : $"Script {_number} · {Connection.Name}";
+            var name = FilePath is { } path ? Path.GetFileName(path) : $"{BaseName} · {Connection.Name}";
             return IsDirty ? "• " + name : name;
         }
+    }
+
+    /// <summary>The object whose definition the tab shows; null for an ordinary script. It names the tab.</summary>
+    public string? DocumentName { get; private set; }
+
+    private string BaseName => DocumentName ?? $"Script {_number}";
+
+    /// <summary>A definition nobody edited nor saved: it can be read from the database again, so no session keeps it.</summary>
+    public bool IsUnmodifiedDefinition => DocumentName is not null && FilePath is null && !IsDirty;
+
+    /// <summary>Fills a new tab with the source text of a database object. Not unsaved work: closing asks nothing.</summary>
+    public void ShowDocument(string name, string text)
+    {
+        DocumentName = name;
+        _savedText = text;
+        Text = text;
+        IsDirty = false;
+        OnPropertyChanged(nameof(Title));
     }
 
     /// <summary>The selected range (start inclusive, end exclusive) in <see cref="Text"/>; null or empty when nothing is selected.</summary>
@@ -278,7 +296,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
             return;
         }
         var extension = format == ExportFormat.Csv ? "csv" : "json";
-        var baseName = FilePath is { } path ? Path.GetFileNameWithoutExtension(path) : $"Script {_number}";
+        var baseName = FilePath is { } path ? Path.GetFileNameWithoutExtension(path) : BaseName;
         var name = $"{baseName} result{(set.Index > 1 ? " " + set.Index : "")}.{extension}";
         var target = await files.PickExportAsync(name, extension);
         if (target is null) return;
@@ -957,7 +975,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
         {
             if (_hooks.Library is { } library && _hooks.Dialogs is { } dialogs)
             {
-                var dialog = new SaveScriptViewModel(library, $"Script {_number}");
+                var dialog = new SaveScriptViewModel(library, BaseName);
                 if (!await dialogs.ShowSaveScriptAsync(dialog)) return;
                 path = dialog.UseFilePicker ? null : dialog.SavedPath;
                 reserved = path;
@@ -992,7 +1010,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
             _status.Error("Cannot save: no file dialog available.");
             return false;
         }
-        var picked = await files.PickSaveAsync(FilePath is { } current ? Path.GetFileName(current) : $"Script {_number}.sql");
+        var picked = await files.PickSaveAsync(FilePath is { } current ? Path.GetFileName(current) : $"{BaseName}.sql");
         if (picked is null) return false;
         chosen(picked);
         return true;
@@ -1178,7 +1196,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
             return false;
         }
 
-        var name = FilePath is { } path ? Path.GetFileName(path) : $"Script {_number}";
+        var name = FilePath is { } path ? Path.GetFileName(path) : BaseName;
         var choice = await dialogs.AskSaveDiscardAsync(
             "Unsaved script", $"{name} ({Connection.Name}) has unsaved changes. Save them first?");
         switch (choice)

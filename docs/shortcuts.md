@@ -6,8 +6,10 @@ Every shortcut of the app. The same list is in the app (`F1`, and Settings > Sho
 | Shortcut | Where | Action |
 | --- | --- | --- |
 | `Ctrl+Alt+F` | anywhere | Search in scripts (open tabs and library) and in the data of a connection |
-| `Ctrl+T` | anywhere | Quick open a table/view of the active connection |
-| `Ctrl+Shift+P` | anywhere | Quick open a table/view across all connections (metadata cache) |
+| `Ctrl+T` | anywhere | Quick open a table, view, procedure, function or column of the active connection |
+| `Ctrl+Shift+P` | anywhere | Quick open the same across all connections (metadata cache) |
+| `Alt+1` ... `Alt+5` | quick open overlay | Switch tables / views / procedures / functions / columns on or off (remembered) |
+| `Shift+Tab` | quick open overlay | Move to the type chips (`Tab` / arrows between them, `Space` or `Enter` toggles) |
 | `Ctrl+,` | anywhere | Open the Settings dialog (Tools > Settings...) |
 | `Ctrl+Shift+T` | anywhere | Reopen the last closed tab (like a browser; press again to go further back; up to 50 are remembered; a table keeps its filters, a script its text) |
 | `Ctrl+Shift+H` | anywhere | Query history: search, filter, re-open or re-run the statements you ran (View > Query history) |
@@ -19,6 +21,7 @@ Every shortcut of the app. The same list is in the app (`F1`, and Settings > Sho
 | `Ctrl++` / `Ctrl+-` / `Ctrl+0` | execution plan | Zoom in / zoom out / fit the whole plan |
 | `Ctrl+N` | anywhere | New script tab on the active (or selected) connection |
 | `Ctrl+O` | anywhere | Open a script file in a script tab |
+| `Enter` | navigator, a table or view / a procedure or function | Open its data / its definition |
 | `Enter` / `F2` / `Delete` | navigator, a script or script folder | Open / rename / delete it (see [Script library](scripts.md#script-library)) |
 | `Ctrl+Enter` | script tab | Run the statement under the cursor (ends at `;`, a `GO` line or a blank line) or the selection |
 | `F5` | script tab | Run the whole script; in a table tab: reload the data |

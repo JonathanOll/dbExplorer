@@ -43,3 +43,9 @@ What dbExplorer does not do, and the edges of what it does. Linked groups and th
   are run against real servers.
 - Authentication is user/password only (no Windows integrated or Azure AD), no SSH tunnels, no MySQL/Oracle, no DDL
   editing, ER diagrams or export wizards.
+- Views, procedures and functions: triggers are not listed. PostgreSQL aggregates and the functions installed by extensions
+  are left out. A PostgreSQL view definition is rebuilt from the catalog (`pg_get_viewdef` plus a `CREATE` line): original
+  comments and layout, view options and the indexes of a materialized view are not in it. A definition opened in a script tab
+  is plain text: running it is subject to the usual statement splitting (a SQL Server body is cut at `;`, see above).
+- Quick open: columns are matched without typo tolerance. Across connections, procedures and functions are found for the
+  connections opened since this feature exists (the cache is written after connecting).

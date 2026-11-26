@@ -1,6 +1,7 @@
 using Avalonia;
 using System.ComponentModel;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -31,6 +32,12 @@ public partial class QuickOpenOverlay : UserControl
         this.FindControl<Border>("Scrim")!.PointerPressed += (_, _) => _vm?.Cancel();
         this.FindControl<Border>("Card")!.PointerPressed += (_, e) => e.Handled = true; // clicks inside must not reach the scrim
         _list.Tapped += OnListTapped;
+        // A chip clicked with the mouse gives the keyboard back to the search box: typing goes on.
+        AddHandler(PointerReleasedEvent, (_, e) =>
+        {
+            if ((e.Source as Visual)?.FindAncestorOfType<ToggleButton>(includeSelf: true) is not null)
+                Dispatcher.UIThread.Post(() => _queryBox.Focus(), DispatcherPriority.Input);
+        }, RoutingStrategies.Bubble, handledEventsToo: true);
         _queryBox.LostFocus += OnQueryBoxLostFocus;
         DataContextChanged += (_, _) => Bind(DataContext as QuickOpenViewModel);
     }
@@ -87,11 +94,34 @@ public partial class QuickOpenOverlay : UserControl
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (_vm is null) return;
+        if (e.KeyModifiers == KeyModifiers.Alt && e.Key is >= Key.D1 and <= Key.D5 && _vm.HasTypeToggles)
+        {
+            _vm.ToggleType(e.Key - Key.D1);
+            e.Handled = true;
+            return;
+        }
+
+        var chip = e.Source as ToggleButton;
+        // Shift+Tab goes from the search box to the chips; among them Tab and the arrows move, past either end is the box.
+        if (_vm.HasTypeToggles && (chip is not null && e.Key is Key.Tab or Key.Left or Key.Right
+                                   || chip is null && e.Key == Key.Tab && e.KeyModifiers == KeyModifiers.Shift))
+        {
+            var chips = this.FindControl<ItemsControl>("TypeChips")!.GetVisualDescendants().OfType<ToggleButton>().ToList();
+            var back = e.Key == Key.Left || e.Key == Key.Tab && e.KeyModifiers == KeyModifiers.Shift;
+            var next = chip is null ? 0 : chips.IndexOf(chip) + (back ? -1 : 1);
+            if (next >= 0 && next < chips.Count) chips[next].Focus(NavigationMethod.Tab);
+            else _queryBox.Focus();
+            e.Handled = true;
+            return;
+        }
+
+        if (chip is not null && e.Key is Key.Enter or Key.Space) return;   // the chip toggles itself
+        if (chip is not null && e.Key is Key.Up or Key.Down) _queryBox.Focus();
         switch (e.Key)
         {
             case Key.Down: _vm.MoveDown(); break;
             case Key.Up: _vm.MoveUp(); break;
-            case Key.Tab when _vm.HasScopes: _vm.SwitchScope(); break;
+            case Key.Tab when _vm.HasScopes && e.KeyModifiers == KeyModifiers.None: _vm.SwitchScope(); break;
             case Key.PageDown: _vm.MoveBy(8); break;
             case Key.PageUp: _vm.MoveBy(-8); break;
             case Key.Escape: _vm.Cancel(); break;

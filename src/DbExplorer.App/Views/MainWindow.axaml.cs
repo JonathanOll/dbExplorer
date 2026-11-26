@@ -406,13 +406,21 @@ public partial class MainWindow : Window
         if ((sender as Control)?.DataContext is TableNodeViewModel table) await Safe(() => Activate(table));
     }
 
-    // "Copy name" of a connection or a table.
+    // "Open definition" of a view or a routine.
+    private async void OnOpenDefinition(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is TreeNodeViewModel node && Tree is { } tree)
+            await Safe(() => tree.OpenDefinitionAsync(node));
+    }
+
+    // "Copy name" of a connection, a table or a routine.
     private async void OnCopyNodeName(object? sender, RoutedEventArgs e)
     {
         var text = (sender as Control)?.DataContext switch
         {
             ConnectionNodeViewModel c => c.Title,
             TableNodeViewModel t => t.Table.Ref.ToString(),
+            RoutineNodeViewModel r => r.Routine.Ref.ToString(),
             _ => null,
         };
         if (text is null || TopLevel.GetTopLevel(this)?.Clipboard is not { } clipboard) return;
@@ -427,6 +435,9 @@ public partial class MainWindow : Window
         {
             case TableNodeViewModel table:
                 await tree.OpenTableAsync(table); // reports failures to the status bar itself
+                break;
+            case RoutineNodeViewModel routine:
+                await tree.OpenDefinitionAsync(routine); // reports failures to the status bar itself
                 break;
             case ConnectionNodeViewModel connection:
                 await tree.ConnectAsync(connection);

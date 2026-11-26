@@ -12,8 +12,8 @@ public static class ShortcutCatalog
 {
     public static readonly IReadOnlyList<ShortcutItem> Highlights =
     [
-        new("Ctrl+T", "Go to a table of the selected connection"),
-        new("Ctrl+Shift+P", "Go to a table in any connection"),
+        new("Ctrl+T", "Go to a table or object of the selected connection"),
+        new("Ctrl+Shift+P", "Go to a table or object in any connection"),
         new("Ctrl+N", "New SQL script"),
         new("Ctrl+O", "Open a script file"),
         new("Ctrl+Shift+T", "Reopen the last closed tab"),
@@ -22,12 +22,13 @@ public static class ShortcutCatalog
     public static readonly IReadOnlyList<ShortcutSection> Sections =
     [
         new("Navigate", [
-            new("Ctrl+T", "Go to a table of the selected connection"),
-            new("Ctrl+Shift+P", "Go to a table in any connection"),
+            new("Ctrl+T", "Go to a table or object of the selected connection"),
+            new("Ctrl+Shift+P", "Go to a table or object in any connection"),
+            new("Alt+1 … Alt+5", "In the quick open: search tables, views, procedures, functions, columns (on / off)"),
             new("Ctrl+Alt+F", "Search in scripts and in the data of a database"),
             new("Ctrl+F", "Filter the navigator (while it has the focus)"),
             new("Ctrl+B", "Hide or show the navigator"),
-            new("Enter", "Connect, or open the selected table"),
+            new("Enter", "Connect, open the selected table, or the definition of a routine"),
             new("F2", "Edit or rename the selected node"),
             new("Delete", "Delete the selected node"),
             new("F5", "Refresh the schema (navigator focused)"),

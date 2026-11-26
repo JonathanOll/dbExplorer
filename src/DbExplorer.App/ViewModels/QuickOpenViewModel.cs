@@ -21,6 +21,12 @@ public record QuickOpenItem(string Label, string? Detail, Func<Task> Open)
 
     public string DisplayLabel => Title ?? Label;
 
+    /// <summary>What kind of database object the row is; null for rows the type filter does not apply to.</summary>
+    public QuickOpenTypes? Type { get; init; }
+
+    /// <summary>The object's own name, without schema or connection (decides how columns are interleaved with the rest).</summary>
+    public string? Name { get; init; }
+
     public bool HasContext => !string.IsNullOrEmpty(Context);
     public bool HasDetail => !string.IsNullOrEmpty(Detail);
 }
@@ -33,7 +39,7 @@ public sealed partial class QuickOpenViewModel : ObservableObject
 {
     public const int MaxResults = 50;
 
-    private QuickOpenItem[] _items;
+    private QuickOpenSource _source;
     private QuickOpenViewModel? _otherScope;
     private readonly StatusModel? _status;
     private bool _suppressRank;
@@ -49,7 +55,9 @@ public sealed partial class QuickOpenViewModel : ObservableObject
     public string CountText => MatchCount > Results.Count ? $"{Results.Count:N0} of {MatchCount:N0}" : MatchCount == 1 ? "1 result" : $"{MatchCount:N0} results";
 
     /// <summary>Shown instead of the list when it is empty.</summary>
-    public string EmptyText => _items.Length == 0 ? EmptyListText : $"No match for ‘{Query}’";
+    public string EmptyText =>
+        EveryTypeHidden ? "Every type is switched off: turn one on above."
+        : _source.Items.Length == 0 && !_source.HasColumns ? EmptyListText : $"No match for ‘{Query}’";
 
     /// <summary>What an empty list says when there is nothing to search at all.</summary>
     public string EmptyListText { get; set; } = "Nothing to search here yet.";
@@ -70,7 +78,9 @@ public sealed partial class QuickOpenViewModel : ObservableObject
     {
         var other = _otherScope ??= OtherScope?.Invoke();
         if (other is null) return;
-        (_items, other._items) = (other._items, _items);
+        var mine = _source;
+        Use(other._source);
+        other.Use(mine);
         (Title, other.Title) = (other.Title, Title);
         (Notice, other.Notice) = (other.Notice, Notice);
         (EmptyListText, other.EmptyListText) = (other.EmptyListText, EmptyListText);
@@ -90,7 +100,8 @@ public sealed partial class QuickOpenViewModel : ObservableObject
         Title = title;
         _query = initialQuery;
         LastQuery = initialQuery;
-        _items = items as QuickOpenItem[] ?? items.ToArray();
+        _source = new QuickOpenSource(items as QuickOpenItem[] ?? items.ToArray());
+        _source.Changed += Rank;
         _status = status;
         Notice = notice;
         Rank();
@@ -112,63 +123,6 @@ public sealed partial class QuickOpenViewModel : ObservableObject
     public event Action? CloseRequested;
 
     // ---- factories ----
-
-    /// <summary>Tables and views of the LIVE schema of an open session, labelled <c>schema.table</c>.</summary>
-    public static QuickOpenViewModel ForTables(Session session, Func<Session, TableRef, Task> openTable, StatusModel? status = null,
-        string initialQuery = "")
-    {
-        var items = session.Schema
-            .Select(t => new QuickOpenItem(t.Ref.ToString(), t.IsView ? "view" : null, () => openTable(session, t.Ref))
-            {
-                Group = session.Config.Name,
-                Icon = t.IsView ? "IconView" : "IconTable",
-            })
-            .ToList();
-        return new QuickOpenViewModel($"Go to table in {session.Config.Name}", items, status, initialQuery: initialQuery);
-    }
-
-    /// <summary>
-    /// Tables of every connection that has a metadata cache, labelled <c>connection · schema.table</c>. Reads the
-    /// cache only; confirming a result calls <paramref name="connect"/> (which may return null after reporting its
-    /// own failure) and then opens the table, unless it vanished from the live schema.
-    /// </summary>
-    public static QuickOpenViewModel ForAllConnections(
-        MetadataCache cache, IEnumerable<ConnectionConfig> configs,
-        Func<ConnectionConfig, Task<Session?>> connect, Func<Session, TableRef, Task> openTable, StatusModel? status = null)
-    {
-        var items = new List<QuickOpenItem>();
-        var withoutCache = 0;
-        foreach (var config in configs)
-        {
-            var tables = cache.Load(config.Id);
-            if (tables.Count == 0)
-            {
-                withoutCache++;
-                continue;
-            }
-
-            foreach (var table in tables)
-            {
-                var (cfg, tableRef) = (config, table.Ref);
-                items.Add(new QuickOpenItem($"{cfg.Name} · {tableRef}", table.IsView ? "view" : null,
-                    () => ConnectThenOpen(cfg, tableRef, connect, openTable, status))
-                {
-                    Group = cfg.Name,
-                    Title = tableRef.ToString(),
-                    Context = cfg.Name,
-                    Icon = table.IsView ? "IconView" : "IconTable",
-                });
-            }
-        }
-
-        var notice = withoutCache switch
-        {
-            0 => null,
-            1 => "1 connection has no cache yet — open it once",
-            _ => $"{withoutCache} connections have no cache yet — open them once",
-        };
-        return new QuickOpenViewModel("Go to table in any connection", items, status, notice);
-    }
 
     /// <summary>Every connection, to connect to it (Ctrl+T with nothing selected): connected ones are marked in the detail column.</summary>
     public static QuickOpenViewModel ForConnections(
@@ -207,23 +161,6 @@ public sealed partial class QuickOpenViewModel : ObservableObject
         }
 
         return new QuickOpenViewModel("Go to column", items, status);
-    }
-
-    private static async Task ConnectThenOpen(
-        ConnectionConfig config, TableRef table,
-        Func<ConnectionConfig, Task<Session?>> connect, Func<Session, TableRef, Task> openTable, StatusModel? status)
-    {
-        var session = await connect(config);
-        if (session is null) return; // the connect step already told the user why
-
-        // The cache can be older than the database.
-        if (!session.Schema.Any(t => t.Ref == table))
-        {
-            status?.Error($"Table {table} no longer exists in {config.Name} (the schema changed since it was cached).");
-            return;
-        }
-
-        await openTable(session, table);
     }
 
     // ---- interaction ----
@@ -283,58 +220,5 @@ public sealed partial class QuickOpenViewModel : ObservableObject
         Results = [];
         SelectedIndex = -1;
         CloseRequested?.Invoke();
-    }
-
-    // ---- ranking ----
-
-    /// <summary>
-    /// Top <see cref="MaxResults"/> by fuzzy score, then label, then connection name, then input position (so the
-    /// order never depends on an unstable sort). Keeps a small sorted window instead of scoring into a big list.
-    /// </summary>
-    private void Rank()
-    {
-        var query = Query;
-        Span<int> topScore = stackalloc int[MaxResults];
-        Span<int> topIndex = stackalloc int[MaxResults];
-        var count = 0;
-        var matched = 0;
-
-        for (var i = 0; i < _items.Length; i++)
-        {
-            if (FuzzyMatcher.ScoreTolerant(query, _items[i].Label) is not { } score) continue;
-            matched++;
-            if (count == MaxResults && !Better(score, i, topScore[MaxResults - 1], topIndex[MaxResults - 1])) continue;
-
-            var pos = count < MaxResults ? count++ : MaxResults - 1;
-            while (pos > 0 && Better(score, i, topScore[pos - 1], topIndex[pos - 1]))
-            {
-                topScore[pos] = topScore[pos - 1];
-                topIndex[pos] = topIndex[pos - 1];
-                pos--;
-            }
-
-            topScore[pos] = score;
-            topIndex[pos] = i;
-        }
-
-        var results = new QuickOpenItem[count];
-        for (var i = 0; i < count; i++) results[i] = _items[topIndex[i]];
-        Results = results;
-        MatchCount = matched;
-        OnPropertyChanged(nameof(CountText));
-        OnPropertyChanged(nameof(EmptyText));
-        OnPropertyChanged(nameof(IsEmpty));
-        SelectedIndex = count == 0 ? -1 : 0;
-    }
-
-    private bool Better(int scoreA, int indexA, int scoreB, int indexB)
-    {
-        if (scoreA != scoreB) return scoreA > scoreB;
-        var a = _items[indexA];
-        var b = _items[indexB];
-        var byLabel = StringComparer.OrdinalIgnoreCase.Compare(a.Label, b.Label);
-        if (byLabel != 0) return byLabel < 0;
-        var byGroup = StringComparer.OrdinalIgnoreCase.Compare(a.Group, b.Group);
-        return byGroup != 0 ? byGroup < 0 : indexA < indexB;
     }
 }

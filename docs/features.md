@@ -8,10 +8,29 @@ where you left off. The big topics have their own page: [linked database groups]
 
 ## Connection tree
 
-Folders (one level) > connection > schema > table/view (SQLite has no schema level). Several
+Folders (one level) > connection > schema > tables (SQLite has no schema level). Several
 connections stay connected at once, one session each. Drag a connection into a folder; add, rename, edit, delete.
 Reorder folders by dragging one above or below another (a line shows where it lands), or with **Move up** / **Move down**
 in the folder's context menu; the order is saved.
+
+### Views, procedures and functions
+
+Above the tables of a schema (of the connection for SQLite) sit up to three groups:
+
+- **Views** (materialized views included): a double-click opens the data, as for a table, with the columns in the
+  Structure sub-tab.
+- **Procedures** and **Functions** (SQL Server and PostgreSQL; SQLite has neither): listed when a group is first expanded.
+  PostgreSQL shows the argument types, which tell overloads apart.
+
+**Open definition** (context menu of a view; double-click or `Enter` on a procedure or function) shows the source text in
+a new script tab. Nothing is executed. The tab is not unsaved work: it closes without a question and is not restored at
+the next start, unless you edit or save it. When the database gives no text (encrypted object, missing permission, CLR
+routine, object dropped meanwhile) the status bar says which.
+
+The procedures and functions are read in the background once the tables are shown, so connecting is not slower; a schema
+that holds only routines appears at that moment. **Refresh** reads them again. The navigator filter finds views, and the
+procedures and functions of the groups you have expanded.
+
 A **Groups** section at the top lists the linked database groups (see [Linked database groups](groups.md)).
 
 Import from DBeaver: folders, connections, credentials and virtual keys, see [DBeaver import](dbeaver-import.md).
@@ -31,10 +50,19 @@ Table tabs are labelled `connection · table` with a colour chip per connection,
 
 ![Quick open, dark](ui/after/quick-open-dark.png)
 
-Fuzzy-search tables/views of the active connection (`Ctrl+T`) or of all connections (`Ctrl+Shift+P`,
-served from an on-disk metadata cache, never connects by itself); `Ctrl+L` jumps to a column in the current table.
-The search forgives typos (a wrong, extra or missing letter, two letters swapped; from 4 letters on), exact matches
-rank first, and `Ctrl+T` reopens with the text you typed last time, selected (type to replace it, Enter to reuse it).
+Fuzzy-search the tables, views, procedures, functions and columns of the active connection (`Ctrl+T`) or of all
+connections (`Ctrl+Shift+P`, served from an on-disk metadata cache, never connects by itself); `Ctrl+L` jumps to a column
+in the current table. **Enter** opens a table or view, the definition of a procedure or function, or the table of a column,
+positioned on that column. Each row shows its kind's icon and its parent (schema, table, connection).
+
+The chips under the search box switch each kind off and on (mouse, `Alt+1` to `Alt+5`, or `Shift+Tab` then `Space`); the
+choice is remembered. Columns show once you type, and never push the tables out: at equal match quality objects come first,
+and a column rises above them only when its name fits what you typed better. Type `orders.total` to search a column within a
+table.
+
+The search forgives typos in table, view and routine names (a wrong, extra or missing letter, two letters swapped; from 4
+letters on; not in column names), exact matches rank first, and `Ctrl+T` reopens with the text you typed last time,
+selected (type to replace it, Enter to reuse it).
 
 ## Row editing
 

@@ -219,10 +219,10 @@ public class ConnectionTreeViewModelTests : IDisposable
 
         Assert.Equal(ConnectionState.Connected, node.State);
         Assert.True(node.IsExpanded);
-        var tables = node.Children.Cast<TableNodeViewModel>().ToList();
-        Assert.Equal(["users", "v_users"], tables.Select(t => t.Title));
-        Assert.False(tables[0].IsView);
-        Assert.True(tables[1].IsView);
+        Assert.Equal(["Views", "users"], node.Children.Select(n => n.Title));
+        Assert.False(Assert.IsType<TableNodeViewModel>(node.Children[1]).IsView);
+        node.Children[0].IsExpanded = true;
+        Assert.True(Assert.IsType<TableNodeViewModel>(Assert.Single(node.Children[0].Children)).IsView);
         Assert.False(_fx.Status.IsBusy);
     }
 
@@ -258,8 +258,7 @@ public class ConnectionTreeViewModelTests : IDisposable
         var pub = Assert.IsType<SchemaNodeViewModel>(node.Children[1]);
         Assert.IsType<PlaceholderNodeViewModel>(Assert.Single(pub.Children)); // not created yet
         pub.IsExpanded = true;
-        Assert.Equal(["users", "v_users"], pub.Children.Select(n => n.Title));
-        Assert.All(pub.Children, n => Assert.IsType<TableNodeViewModel>(n));
+        Assert.Equal(["Views", "Procedures", "Functions", "users"], pub.Children.Select(n => n.Title));
     }
 
     [Fact]
@@ -322,7 +321,7 @@ public class ConnectionTreeViewModelTests : IDisposable
         var node = NodeOf(tree, "Lite");
         await tree.ConnectAsync(node);
 
-        await tree.OpenTableAsync((TableNodeViewModel)node.Children[0]);
+        await tree.OpenTableAsync(node.Children.OfType<TableNodeViewModel>().First());
 
         Assert.True(_fx.Status.IsError);
         Assert.Contains("tab failed", _fx.Status.Message);
@@ -453,7 +452,7 @@ public class ConnectionTreeViewModelTests : IDisposable
         var node = NodeOf(tree, "Lite");
         await tree.ConnectAsync(node);
 
-        await tree.OpenTableCommand.ExecuteAsync(node.Children[0]);
+        await tree.OpenTableCommand.ExecuteAsync(node.Children.OfType<TableNodeViewModel>().First());
 
         var (session, table) = Assert.Single(opened);
         Assert.Equal(c.Id, session.Config.Id);

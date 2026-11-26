@@ -32,6 +32,9 @@ public record AppConfig(
     /// <summary>SQL formatter style (Options dialog). Missing in old files: the defaults.</summary>
     public SqlFormatOptions Format { get; set; } = new();
 
+    /// <summary>Object kinds switched off in the quick open. Missing in old files: none, so everything is searched.</summary>
+    public QuickOpenTypes QuickOpenHidden { get; set; }
+
     /// <summary>Settings dialog values (appearance, editor, results...). Missing in old files: the defaults.</summary>
     public AppSettings Settings { get; set; } = new();
 

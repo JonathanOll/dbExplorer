@@ -38,6 +38,7 @@ public class ConfigStore(string path, ISecretProtector protector)
             ShowScripts = config.ShowScripts,
             DbUpdatePath = config.DbUpdatePath,
             RecordHistory = config.RecordHistory,
+            QuickOpenHidden = config.QuickOpenHidden,
             Format = (config.Format ?? new()).Normalized(),
             Settings = (config.Settings ?? new()).Normalized()
         };

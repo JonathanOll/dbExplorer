@@ -91,9 +91,11 @@ public partial class ConnectionTreeViewModel : ObservableObject
                 return true;
             }
 
+            // Views are known with the tables: the filter searches them like tables.
+            if (node is ViewGroupNodeViewModel { HasUnrealizedChildren: true } viewGroup) viewGroup.RealizeChildren();
             // Script folders list their content when first opened: while filtering, the library is searched whole.
             if (node is ScriptFolderNodeViewModel { HasUnrealizedChildren: true } scriptFolder) scriptFolder.RealizeChildren();
-            var self = node is not PlaceholderNodeViewModel && node.Title.Contains(text, StringComparison.OrdinalIgnoreCase);
+            var self = node is not (PlaceholderNodeViewModel or ObjectGroupNodeViewModel or MessageNodeViewModel) && node.Title.Contains(text, StringComparison.OrdinalIgnoreCase);
             var below = false;
             // A group member shares its child nodes with the connection: they are filtered once, through the connection.
             if (node is not GroupMemberNodeViewModel)
@@ -298,8 +300,8 @@ public partial class ConnectionTreeViewModel : ObservableObject
     public const int AutoExpandLimit = 200;
 
     /// <summary>
-    /// Fills a connected node: schema nodes for engines with schemas, tables directly for SQLite. Table nodes are
-    /// created lazily, on first expansion of their parent; a parent with more than
+    /// Fills a connected node: schema nodes for engines with schemas, tables directly for SQLite; views (and routines)
+    /// sit in groups of their own above the tables. Table nodes are created lazily, on first expansion of their parent; a parent with more than
     /// <see cref="AutoExpandLimit"/> tables is not expanded automatically.
     /// </summary>
     public static void ApplySchema(ConnectionNodeViewModel node, Session session)
@@ -307,7 +309,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
         var tables = session.Schema;
         if (session.Driver.Kind == DbKind.Sqlite)
         {
-            node.SetLazyChildren(() => TableNodes(session, tables));
+            node.SetLazyChildren(() => SchemaChildren(node, session, "", tables));
             node.IsExpanded = tables.Count <= AutoExpandLimit;
             return;
         }
@@ -315,11 +317,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
         node.SetChildren(tables
             .GroupBy(t => t.Ref.Schema ?? "", StringComparer.OrdinalIgnoreCase)
             .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(g =>
-            {
-                var infos = g.ToList();
-                return (TreeNodeViewModel)new SchemaNodeViewModel(g.Key, infos.Count, () => TableNodes(session, infos));
-            })
+            .Select(g => (TreeNodeViewModel)SchemaNode(node, session, g.Key, g.ToList()))
             .ToList());
         node.IsExpanded = true;
     }
@@ -554,6 +552,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
                 session.UpdateConfig(node.Config);
             ApplySchema(node, session);
             node.State = ConnectionState.Connected;
+            _ = LoadRoutinesInBackgroundAsync(node, session);
             var count = session.Schema.Count;
             _status.Success($"Connected to {config.Name}: {count} {(count == 1 ? "table or view" : "tables and views")}.");
         }
@@ -1061,6 +1060,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
         ApplySchema(node, session);
         node.ErrorMessage = null;
         node.State = ConnectionState.Connected;
+        _ = LoadRoutinesInBackgroundAsync(node, session);
     }
 
     [RelayCommand]
@@ -1081,7 +1081,11 @@ public partial class ConnectionTreeViewModel : ObservableObject
         {
             await _sessions.RefreshSchemaAsync(node.Config.Id, CancellationToken.None);
             var session = _sessions.Find(node.Config.Id);
-            if (session is not null) ApplySchema(node, session);
+            if (session is not null)
+            {
+                ApplySchema(node, session);
+                _ = LoadRoutinesInBackgroundAsync(node, session);
+            }
             _status.Success($"Refreshed {node.Config.Name}.");
         }
         catch (Exception e)

@@ -4,7 +4,7 @@ using Npgsql;
 
 namespace DbExplorer.Core.Drivers;
 
-public sealed class PostgresDriver : IDbDriver
+public sealed partial class PostgresDriver : IDbDriver
 {
     // System schemas never shown: pg_catalog, pg_toast, pg_temp_N (all start with "pg_") and information_schema.
     private const string UserSchemaFilter = "n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'";

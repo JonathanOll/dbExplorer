@@ -34,7 +34,9 @@ All switches, install locations, GitHub rate limit (`$env:GITHUB_TOKEN`) and man
 - **Explore and edit data**: connection tree with folders, table tabs with paging, per-column filters and a raw `WHERE`,
   follow foreign keys with `Ctrl+click`, staged row editing applied in one transaction, and tabs restored at the next start.
   [Features](docs/features.md)
-- **Quick open**: fuzzy search of tables, views and columns, on one connection or across all of them, forgiving typos.
+- **Quick open**: fuzzy search of tables, views, procedures, functions and columns, on one connection or across all of them,
+  forgiving typos.
+- **Views and routines**: browse views, procedures and functions in the navigator and open their definition as text.
   [Features](docs/features.md#quick-open)
 - **Linked database groups**: group databases that share a schema, switch a tab between them with one key, run a read-only
   query on all of them and see where the results differ, or compare their schemas. [Groups](docs/groups.md)
@@ -62,7 +64,7 @@ Limits and edge cases: [docs/limitations.md](docs/limitations.md).
 
 | Shortcut | Action |
 | --- | --- |
-| `Ctrl+T` | Quick open a table or view of the active connection |
+| `Ctrl+T` | Quick open a table, view, routine or column of the active connection |
 | `Ctrl+Shift+P` | Quick open across all connections |
 | `Ctrl+L` | Table tab: jump to a column. Script tab: estimated execution plan |
 | `Ctrl+Enter` | Script tab: run the statement under the cursor, or the selection |

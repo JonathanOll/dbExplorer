@@ -55,14 +55,22 @@ public partial class ConnectionTreeViewModel
 
         connection.IsExpanded = true;   // creates the children of a lazily filled node
         var schema = tab.Table.Schema ?? "";
-        foreach (var child in connection.Children)
-        {
-            if (child is TableNodeViewModel direct && direct.Table.Ref == tab.Table) return direct;
-            if (child is not SchemaNodeViewModel schemaNode || !string.Equals(schemaNode.Title, schema, StringComparison.OrdinalIgnoreCase)) continue;
-            schemaNode.IsExpanded = true;
-            return schemaNode.Children.OfType<TableNodeViewModel>().FirstOrDefault(t => t.Table.Ref == tab.Table) ?? (TreeNodeViewModel)schemaNode;
-        }
-        return connection;
+        if (connection.Children.OfType<SchemaNodeViewModel>()
+                .FirstOrDefault(s => string.Equals(s.Title, schema, StringComparison.OrdinalIgnoreCase)) is not { } schemaNode)
+            return (TreeNodeViewModel?)FindTable(connection, tab.Table) ?? connection;
+        schemaNode.IsExpanded = true;
+        return (TreeNodeViewModel?)FindTable(schemaNode, tab.Table) ?? schemaNode;
+    }
+
+    /// <summary>The table node under <paramref name="parent"/>, or the view node inside its Views group (expanded for it).</summary>
+    private static TableNodeViewModel? FindTable(TreeNodeViewModel parent, TableRef table)
+    {
+        if (parent.Children.OfType<TableNodeViewModel>().FirstOrDefault(t => t.Table.Ref == table) is { } direct) return direct;
+        if (parent.Children.OfType<ViewGroupNodeViewModel>().FirstOrDefault() is not { } views) return null;
+        views.RealizeChildren();
+        var view = views.Children.OfType<TableNodeViewModel>().FirstOrDefault(t => t.Table.Ref == table);
+        if (view is not null) views.IsExpanded = true;
+        return view;
     }
 
     private TreeNodeViewModel? RevealScript(string path)

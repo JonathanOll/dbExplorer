@@ -138,6 +138,23 @@ public class SessionManager(
         }
     }
 
+    /// <summary>
+    /// Reads the procedures and functions of an open session (once, see <see cref="Session.LoadRoutinesAsync"/>) and writes
+    /// them to the metadata cache, for the search across connections.
+    /// </summary>
+    public async Task<IReadOnlyList<RoutineInfo>> LoadRoutinesAsync(Session session, CancellationToken ct)
+    {
+        var routines = await session.LoadRoutinesAsync(ct).ConfigureAwait(false);
+        lock (_gate)
+        {
+            if (_open.GetValueOrDefault(session.Config.Id) != session) return routines;   // closed meanwhile
+            try { cache.SaveRoutines(session.Config.Id, routines); }
+            catch (Exception) { /* like the table cache: only the search across connections misses them */ }
+        }
+
+        return routines;
+    }
+
     /// <summary>Opens a throw-away connection with the given plain password to validate the settings.</summary>
     public static Task TestConnectionAsync(ConnectionConfig config, string? plainPassword, CancellationToken ct) =>
         Task.Run(async () =>

@@ -37,4 +37,22 @@ public interface IDbDriver
     DbConnection CreateConnection(ConnectionConfig cfg, string? plainPassword);
 
     Task<IReadOnlyList<TableInfo>> LoadSchemaAsync(DbConnection c, CancellationToken ct);
+
+    // ---- views and routines, read on demand (the defaults describe an engine that has none) ----
+
+    /// <summary>True when the engine has stored procedures and functions.</summary>
+    bool HasRoutines => false;
+
+    Task<IReadOnlyList<RoutineInfo>> LoadRoutinesAsync(DbConnection c, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<RoutineInfo>>([]);
+
+    /// <summary>
+    /// The source text of a view. Throws <see cref="DefinitionUnavailableException"/> when the database gives none.
+    /// </summary>
+    Task<string> LoadViewDefinitionAsync(DbConnection c, TableRef view, CancellationToken ct) =>
+        throw new DefinitionUnavailableException($"The definition of {view} cannot be read on this engine.");
+
+    /// <summary>As <see cref="LoadViewDefinitionAsync"/>, for a procedure or function.</summary>
+    Task<string> LoadRoutineDefinitionAsync(DbConnection c, RoutineInfo routine, CancellationToken ct) =>
+        throw new DefinitionUnavailableException($"The definition of {routine.Ref} cannot be read on this engine.");
 }

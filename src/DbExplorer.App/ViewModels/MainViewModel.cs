@@ -21,6 +21,7 @@ public partial class MainViewModel : ObservableObject
         Status = status;
         _cache = cache;
         Tree.TableOpener = OpenTable;
+        Tree.DefinitionOpener = (session, name, sql) => OpenDefinition(session, name, sql);
         Tree.ScriptOpener = () => NewScript();
         Tree.TablePickerOpener = ShowTablePicker;
         Tabs.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmptyState));
@@ -356,7 +357,8 @@ public partial class MainViewModel : ObservableObject
     private void OnTabChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(TabViewModel.Connection) or nameof(TableTabViewModel.Sort) or nameof(TableTabViewModel.RawWhere)
-            or nameof(TableTabViewModel.ColumnFilters) or nameof(TableTabViewModel.Rows) or nameof(ScriptTabViewModel.FilePath))
+            or nameof(TableTabViewModel.ColumnFilters) or nameof(TableTabViewModel.Rows) or nameof(ScriptTabViewModel.FilePath)
+            or nameof(TabViewModel.HasUnsavedWork))
             ScheduleSessionSave();
     }
 
@@ -559,7 +561,7 @@ public partial class MainViewModel : ObservableObject
                     t.ColumnFilters.Where(kv => !string.IsNullOrWhiteSpace(kv.Value)).ToDictionary(kv => kv.Key, kv => kv.Value),
                     string.IsNullOrWhiteSpace(t.RawWhere) ? null : t.RawWhere,
                     t.Sort?.Column, t.Sort?.Descending ?? false),
-                ScriptTabViewModel { IsDiscarded: false } s => new SavedTab(SavedTabKind.Script, s.Connection.Id, ScriptId: s.Id, FilePath: s.FilePath),
+                ScriptTabViewModel { IsDiscarded: false, IsUnmodifiedDefinition: false } s => new SavedTab(SavedTabKind.Script, s.Connection.Id, ScriptId: s.Id, FilePath: s.FilePath),
                 _ => null,   // a placeholder, or a script the user discarded on exit
             };
             if (entry is null) continue;
@@ -679,7 +681,7 @@ public partial class MainViewModel : ObservableObject
 
     private void ShowTablePicker(Session session)
     {
-        var picker = QuickOpenViewModel.ForTables(session, OpenTable, Status, _lastTableQuery);
+        var picker = Filtered(TablesPicker(session, _lastTableQuery));
         picker.ScopeHint = "Search all connections";
         picker.OtherScope = () => BuildAllTablesPicker() is { } all ? Hinted(all, "Search this connection only") : null;
         picker.CloseRequested += () => _lastTableQuery = picker.LastQuery;   // kept on Esc too: the next Ctrl+T starts from it
@@ -687,7 +689,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     private QuickOpenViewModel? BuildAllTablesPicker() =>
-        _cache is { } cache ? QuickOpenViewModel.ForAllConnections(cache, Tree.Config.Connections.ToList(), Tree.EnsureConnectedAsync, OpenTable, Status) : null;
+        _cache is { } cache ? QuickOpenViewModel.ForAllConnections(cache, Tree.Config.Connections.ToList(), Tree.EnsureConnectedAsync, OpenTable, Status, SearchObjects) : null;
 
     private static QuickOpenViewModel Hinted(QuickOpenViewModel vm, string hint)
     {
@@ -726,13 +728,13 @@ public partial class MainViewModel : ObservableObject
 
             var configs = Tree.Config.Connections.ToList(); // snapshot on the UI thread; the pool thread must not read the live list
             var vm = await Task.Run(() =>
-                QuickOpenViewModel.ForAllConnections(cache, configs, Tree.EnsureConnectedAsync, OpenTable, Status));
+                QuickOpenViewModel.ForAllConnections(cache, configs, Tree.EnsureConnectedAsync, OpenTable, Status, SearchObjects));
             if ((ActiveTab?.Connection ?? Tree.SelectedConnection) is { } current && Tree.FindSession(current.Id) is { } session)
             {
                 vm.ScopeHint = "Search this connection only";
-                vm.OtherScope = () => Hinted(QuickOpenViewModel.ForTables(session, OpenTable, Status), "Search all connections");
+                vm.OtherScope = () => Hinted(TablesPicker(session), "Search all connections");
             }
-            Show(vm);
+            Show(Filtered(vm));
         }
         catch (Exception e)
         {

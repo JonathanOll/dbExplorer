@@ -4,7 +4,7 @@ using Microsoft.Data.SqlClient;
 
 namespace DbExplorer.Core.Drivers;
 
-public sealed class SqlServerDriver : IDbDriver
+public sealed partial class SqlServerDriver : IDbDriver
 {
     private const int ConnectTimeoutSeconds = 10;
 

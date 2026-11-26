@@ -586,6 +586,34 @@
                     </StackPanel>
                   </TreeDataTemplate>
 
+                  <!-- Views / Procedures / Functions of a schema -->
+                  <TreeDataTemplate DataType="vm:ObjectGroupNodeViewModel" ItemsSource="{Binding Children}">
+                    <StackPanel Orientation="Horizontal" Spacing="7" Background="Transparent">
+                      <PathIcon Classes="dim" Width="14" Height="14" Data="{Binding IconKey, Converter={x:Static views:Icons.ByKey}}" />
+                      <TextBlock Text="{Binding Title}" FontWeight="Medium" VerticalAlignment="Center" />
+                      <TextBlock Classes="faint small" Text="{Binding CountText}" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </TreeDataTemplate>
+
+                  <TreeDataTemplate DataType="vm:RoutineNodeViewModel">
+                    <StackPanel Orientation="Horizontal" Spacing="7" Background="Transparent">
+                      <PathIcon Classes="dim" Width="14" Height="14" Data="{Binding IconKey, Converter={x:Static views:Icons.ByKey}}" />
+                      <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                      <TextBlock Classes="faint small" Text="{Binding Signature}" VerticalAlignment="Center" MaxWidth="110" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Signature}"
+                                 IsVisible="{Binding Signature, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                      <StackPanel.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="Open definition" Click="OnOpenDefinition" FontWeight="SemiBold" InputGesture="Enter" />
+                          <MenuItem Header="Copy name" Click="OnCopyNodeName" />
+                        </ContextMenu>
+                      </StackPanel.ContextMenu>
+                    </StackPanel>
+                  </TreeDataTemplate>
+
+                  <TreeDataTemplate DataType="vm:MessageNodeViewModel">
+                    <TextBlock Classes="faint" Text="{Binding Title}" ToolTip.Tip="{Binding Title}" />
+                  </TreeDataTemplate>
+
                   <TreeDataTemplate DataType="vm:PlaceholderNodeViewModel">
                     <TextBlock Classes="faint" Text="{Binding Title}" />
                   </TreeDataTemplate>
@@ -598,6 +626,7 @@
                       <StackPanel.ContextMenu>
                         <ContextMenu>
                           <MenuItem Header="Open" Click="OnOpenTableNode" FontWeight="SemiBold" InputGesture="Enter" />
+                          <MenuItem Header="Open definition" Click="OnOpenDefinition" IsVisible="{Binding IsView}" />
                           <MenuItem Header="Copy name" Click="OnCopyNodeName" />
                         </ContextMenu>
                       </StackPanel.ContextMenu>
@@ -693,7 +722,7 @@
                     <PathIcon Classes="dim" Data="{StaticResource IconTable}" Width="20" Height="20" Margin="0,0,12,0" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                       <TextBlock Text="Go to a table" FontWeight="SemiBold" />
-                      <TextBlock Classes="dim small" Text="Search tables and views of the selected connection" />
+                      <TextBlock Classes="dim small" Text="Search tables, views, routines and columns" />
                     </StackPanel>
                     <Border Grid.Column="2" Classes="kbd"><TextBlock Text="Ctrl+T" /></Border>
                   </Grid>

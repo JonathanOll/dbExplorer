@@ -110,7 +110,7 @@ public class MainRound2Tests : IDisposable
         main.ShowTablePicker();
         var picker = main.QuickOpen!;
         picker.Query = "ord";
-        Assert.StartsWith("Go to table in Alpha", picker.Title);
+        Assert.StartsWith("Go to table or object in Alpha", picker.Title);
         Assert.Single(picker.Results);
         Assert.True(picker.HasScopes);
         Assert.Equal("Search all connections", picker.ScopeHint);
@@ -119,12 +119,12 @@ public class MainRound2Tests : IDisposable
 
         Assert.Same(picker, main.QuickOpen);   // not closed
         Assert.Equal("ord", picker.Query);
-        Assert.Equal("Go to table in any connection", picker.Title);
+        Assert.Equal("Go to table or object in any connection", picker.Title);
         Assert.Equal(2, picker.Results.Count);   // Alpha's orders and Beta's orders_b
         Assert.Equal("Search this connection only", picker.ScopeHint);
 
         picker.SwitchScope();
-        Assert.StartsWith("Go to table in Alpha", picker.Title);
+        Assert.StartsWith("Go to table or object in Alpha", picker.Title);
         Assert.Single(picker.Results);
     }
 

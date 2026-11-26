@@ -10,7 +10,7 @@ namespace DbExplorer.Core.Sessions;
 /// operation gets its own pooled connection from <see cref="OpenConnectionAsync"/>. Disposing (done by
 /// <see cref="SessionManager.Close"/>) closes the pooled connections and makes further opens fail.
 /// </summary>
-public class Session : IDisposable
+public partial class Session : IDisposable
 {
     private readonly ISecretProtector? _protector;
     private volatile bool _disposed;
@@ -60,7 +60,11 @@ public class Session : IDisposable
             foreach (var script in DedicatedConnections()) script.Invalidate();
     }
 
-    internal void ReplaceSchema(IReadOnlyList<TableInfo> schema) => Schema = schema;
+    internal void ReplaceSchema(IReadOnlyList<TableInfo> schema)
+    {
+        Schema = schema;
+        Routines = null;   // read again on demand
+    }
 
     // ---- dedicated script connections (see ScriptConnection) ----
 
@@ -85,6 +89,7 @@ public class Session : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
+        _lifetime.Cancel();   // reads of definitions and routines in flight
         // Held connections first: closing them returns them to the pool, which is cleared right after.
         foreach (var script in DedicatedConnections()) script.Dispose();
         try

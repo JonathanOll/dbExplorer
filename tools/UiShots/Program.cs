@@ -316,7 +316,7 @@ internal sealed class Demo : IDisposable
     }
 }
 
-internal static class Scenes
+internal static partial class Scenes
 {
     private static readonly (string Name, Func<Demo, Task<Window?>> Run)[] All =
     [
@@ -360,6 +360,10 @@ internal static class Scenes
         ("upgrade-scripts", d => UpgradeScripts(d, "")),
         ("upgrade-scripts-filter", d => UpgradeScripts(d, "supplier")),
         ("upgrade-scripts-nomatch", d => UpgradeScripts(d, "zzz")),
+        ("objects-tree", ObjectsTree),
+        ("object-definition", ObjectDefinition),
+        ("quick-open-objects", d => QuickOpenObjectsScene(d, "order")),
+        ("quick-open-columns", d => QuickOpenObjectsScene(d, "total")),
         ("settings-search", d => SettingsDialogScene(d, "appearance", search: "size")),
         ("main-table-settings", d => Customised(d, MainTable)),
         ("script-settings", d => Customised(d, s => Script(s, false))),

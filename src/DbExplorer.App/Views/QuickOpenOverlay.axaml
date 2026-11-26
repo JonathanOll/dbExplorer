@@ -32,6 +32,23 @@
                        FontSize="16" MinHeight="40" Padding="0,8" AutomationProperties.Name="Search" />
             </Grid>
             <TextBlock Classes="dim small" Text="{Binding Title}" Margin="28,0,0,0" />
+            <!-- which kinds of object are searched -->
+            <ItemsControl x:Name="TypeChips" ItemsSource="{Binding TypeToggles}" IsVisible="{Binding HasTypeToggles}" Margin="28,8,0,0">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:QuickOpenTypeToggle">
+                  <ToggleButton Classes="segment" Margin="0,0,6,2" IsChecked="{Binding IsOn, Mode=TwoWay}" ToolTip.Tip="{Binding Tooltip}"
+                                AutomationProperties.Name="{Binding Label}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <PathIcon Width="13" Height="13" Data="{Binding Icon, Converter={x:Static views:Icons.ByKey}}" />
+                      <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </ToggleButton>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
           </StackPanel>
         </Border>
         <!-- keyboard hints and the count -->
