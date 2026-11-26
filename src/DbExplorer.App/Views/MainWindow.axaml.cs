@@ -406,6 +406,10 @@ public partial class MainWindow : Window
         if ((sender as Control)?.DataContext is TableNodeViewModel table) await Safe(() => Activate(table));
     }
 
+    // "ER diagram" of a schema or a table.
+    private void OnShowDiagram(object? sender, RoutedEventArgs e) =>
+        Tree?.ShowDiagram((sender as Control)?.DataContext as TreeNodeViewModel);
+
     // "Open definition" of a view or a routine.
     private async void OnOpenDefinition(object? sender, RoutedEventArgs e)
     {

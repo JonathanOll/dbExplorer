@@ -51,20 +51,14 @@ public sealed partial class SqliteDriver : IDbDriver
             "AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' ORDER BY name",
             r => (Name: r.GetString(0), IsView: r.GetString(1) == "view"), ct);
 
-        var columnsByTable = new Dictionary<string, List<(ColumnInfo Column, int PkPosition)>>();
-        var rawForeignKeys = new Dictionary<string, List<RawForeignKey>>();
-        var indexesByTable = new Dictionary<string, List<IndexInfo>>();
+        // One query per kind of metadata for the whole file (table-valued pragmas), not three per table.
+        var columnsByTable = await LoadColumnsAsync(c, ct);
+        var rawForeignKeys = await LoadForeignKeysAsync(c, ct);
+        var indexesByTable = await LoadIndexesAsync(c, ct);
 
-        foreach (var (name, _) in objects)
-        {
-            columnsByTable[name] = await LoadColumnsAsync(c, name, ct);
-            rawForeignKeys[name] = await LoadForeignKeysAsync(c, name, ct);
-            indexesByTable[name] = await LoadIndexesAsync(c, name, ct);
-        }
-
-        var primaryKeys = columnsByTable.ToDictionary(
-            kv => kv.Key,
-            kv => (IReadOnlyList<string>)kv.Value.Where(x => x.PkPosition > 0)
+        var primaryKeys = objects.ToDictionary(
+            o => o.Name,
+            o => (IReadOnlyList<string>)columnsByTable[o.Name].Where(x => x.PkPosition > 0)
                 .OrderBy(x => x.PkPosition).Select(x => x.Column.Name).ToList());
 
         // SQLite identifiers are case-insensitive and REFERENCES keeps the name as written: use the canonical one.
@@ -73,7 +67,7 @@ public sealed partial class SqliteDriver : IDbDriver
         var tables = new List<TableInfo>();
         foreach (var (name, isView) in objects)
         {
-            var foreignKeys = rawForeignKeys[name]
+            var foreignKeys = rawForeignKeys.GetValueOrDefault(name, [])
                 .Select(fk =>
                 {
                     var refName = canonicalNames.GetValueOrDefault(fk.RefTable, fk.RefTable);
@@ -91,7 +85,7 @@ public sealed partial class SqliteDriver : IDbDriver
                 isView,
                 columnsByTable[name].Select(x => x.Column).ToList(),
                 foreignKeys,
-                indexesByTable[name]));
+                indexesByTable.GetValueOrDefault(name, [])));
         }
         return tables;
     }
@@ -99,63 +93,70 @@ public sealed partial class SqliteDriver : IDbDriver
     private sealed record RawForeignKey(
         long Id, IReadOnlyList<string> Columns, string RefTable, IReadOnlyList<string>? RefColumns);
 
-    private static async Task<List<(ColumnInfo Column, int PkPosition)>> LoadColumnsAsync(
-        DbConnection c, string table, CancellationToken ct)
+    // Every user table and view, joined to a table-valued pragma.
+    private static string PerObject(string select, string joins, string and, string orderBy) =>
+        $"SELECT m.name, {select} FROM sqlite_master m {joins} WHERE m.type IN ('table', 'view') " +
+        $"AND m.name NOT LIKE 'sqlite\\_%' ESCAPE '\\' {and} ORDER BY m.name, {orderBy}";
+
+    private static async Task<ILookup<string, (ColumnInfo Column, int PkPosition)>> LoadColumnsAsync(
+        DbConnection c, CancellationToken ct)
     {
         var rows = await QueryAsync(c,
-            "SELECT cid, name, type, \"notnull\", pk FROM pragma_table_info($t) ORDER BY cid",
+            PerObject("p.cid, p.name, p.type, p.\"notnull\", p.pk", "JOIN pragma_table_info(m.name) p", "", "p.cid"),
             r => new
             {
-                Ordinal = (int)r.GetInt64(0),
-                Name = r.GetString(1),
-                Type = r.IsDBNull(2) ? "" : r.GetString(2),
-                NotNull = r.GetInt64(3) != 0,
-                PkPosition = (int)r.GetInt64(4),
-            }, ct, ("$t", table));
+                Table = r.GetString(0),
+                Ordinal = (int)r.GetInt64(1),
+                Name = r.GetString(2),
+                Type = r.IsDBNull(3) ? "" : r.GetString(3),
+                NotNull = r.GetInt64(4) != 0,
+                PkPosition = (int)r.GetInt64(5),
+            }, ct);
 
-        return rows
-            .Select(x => (new ColumnInfo(
-                x.Name, x.Type, MapClrType(x.Type),
-                Nullable: !x.NotNull && x.PkPosition == 0,
-                IsPrimaryKey: x.PkPosition > 0,
-                x.Ordinal), x.PkPosition))
-            .ToList();
+        return rows.ToLookup(x => x.Table, x => (Column: new ColumnInfo(
+            x.Name, x.Type, MapClrType(x.Type),
+            Nullable: !x.NotNull && x.PkPosition == 0,
+            IsPrimaryKey: x.PkPosition > 0,
+            x.Ordinal), x.PkPosition));
     }
 
-    private static async Task<List<RawForeignKey>> LoadForeignKeysAsync(
-        DbConnection c, string table, CancellationToken ct)
+    private static async Task<Dictionary<string, List<RawForeignKey>>> LoadForeignKeysAsync(
+        DbConnection c, CancellationToken ct)
     {
         var rows = await QueryAsync(c,
-            "SELECT id, seq, \"table\", \"from\", \"to\" FROM pragma_foreign_key_list($t) ORDER BY id, seq",
-            r => (Id: r.GetInt64(0), RefTable: r.GetString(2), From: r.GetString(3),
-                To: r.IsDBNull(4) ? null : r.GetString(4)), ct, ("$t", table));
+            PerObject("f.id, f.\"table\", f.\"from\", f.\"to\"", "JOIN pragma_foreign_key_list(m.name) f",
+                "AND m.type = 'table'", "f.id, f.seq"),
+            r => (Table: r.GetString(0), Id: r.GetInt64(1), RefTable: r.GetString(2), From: r.GetString(3),
+                To: r.IsDBNull(4) ? null : r.GetString(4)), ct);
 
-        return rows.GroupBy(x => x.Id)
-            .Select(g => new RawForeignKey(
-                g.Key,
-                g.Select(x => x.From).ToList(),
-                g.First().RefTable,
-                g.All(x => x.To is not null) ? g.Select(x => x.To!).ToList() : null))
-            .ToList();
+        return rows.GroupBy(x => x.Table).ToDictionary(
+            t => t.Key,
+            t => t.GroupBy(x => x.Id)
+                .Select(g => new RawForeignKey(
+                    g.Key,
+                    g.Select(x => x.From).ToList(),
+                    g.First().RefTable,
+                    g.All(x => x.To is not null) ? g.Select(x => x.To!).ToList() : null))
+                .ToList());
     }
 
-    private static async Task<List<IndexInfo>> LoadIndexesAsync(DbConnection c, string table, CancellationToken ct)
+    private static async Task<Dictionary<string, List<IndexInfo>>> LoadIndexesAsync(DbConnection c, CancellationToken ct)
     {
         // origin 'pk' is the implicit index behind the primary key: already reported on the columns.
-        var indexes = await QueryAsync(c,
-            "SELECT name, \"unique\" FROM pragma_index_list($t) WHERE origin <> 'pk'",
-            r => (Name: r.GetString(0), Unique: r.GetInt64(1) != 0), ct, ("$t", table));
+        var rows = await QueryAsync(c,
+            PerObject("l.name, l.\"unique\", i.name",
+                "JOIN pragma_index_list(m.name) l LEFT JOIN pragma_index_info(l.name) i",
+                "AND l.origin <> 'pk'", "l.name, i.seqno"),
+            r => (Table: r.GetString(0), Name: r.GetString(1), Unique: r.GetInt64(2) != 0,
+                Column: r.IsDBNull(3) ? null : r.GetString(3)), ct);
 
-        var result = new List<IndexInfo>();
-        foreach (var (name, unique) in indexes.OrderBy(i => i.Name, StringComparer.Ordinal))
-        {
+        return rows.GroupBy(x => x.Table).ToDictionary(
+            t => t.Key,
             // Expression columns have a NULL name and are skipped.
-            var columns = await QueryAsync(c,
-                "SELECT name FROM pragma_index_info($i) WHERE name IS NOT NULL ORDER BY seqno",
-                r => r.GetString(0), ct, ("$i", name));
-            result.Add(new IndexInfo(name, unique, columns));
-        }
-        return result;
+            t => t.GroupBy(x => x.Name).OrderBy(g => g.Key, StringComparer.Ordinal)
+                .Select(g => new IndexInfo(g.Key, g.First().Unique,
+                    g.Where(x => x.Column is not null).Select(x => x.Column!).ToList()))
+                .ToList());
     }
 
     /// <summary>Maps a declared SQLite type to a CLR type, following SQLite's type-affinity name rules.</summary>
@@ -173,22 +174,19 @@ public sealed partial class SqliteDriver : IDbDriver
     }
 
     private static async Task<List<T>> QueryAsync<T>(
-        DbConnection c, string sql, Func<DbDataReader, T> map, CancellationToken ct,
-        params (string Name, object Value)[] parameters)
+        DbConnection c, string sql, Func<DbDataReader, T> map, CancellationToken ct)
     {
         await using var cmd = c.CreateCommand();
         cmd.CommandText = sql;
-        foreach (var (name, value) in parameters)
-        {
-            var p = cmd.CreateParameter();
-            p.ParameterName = name;
-            p.Value = value;
-            cmd.Parameters.Add(p);
-        }
+        cmd.CommandTimeout = 0;   // schema load of a big file: no automatic timeout
 
         var rows = new List<T>();
         await using var reader = await cmd.ExecuteReaderAsync(ct);
-        while (await reader.ReadAsync(ct)) rows.Add(map(reader));
+        while (await reader.ReadAsync(ct))
+        {
+            ct.ThrowIfCancellationRequested();   // SQLite runs synchronously
+            rows.Add(map(reader));
+        }
         return rows;
     }
 }

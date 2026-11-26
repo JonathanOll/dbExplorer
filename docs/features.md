@@ -84,6 +84,28 @@ unsaved editor contents are restored at the next start: from the saved tab list,
 
 More on scripts (library, history, formatting, search): [Scripts](scripts.md). Plans and statistics: [Execution plans and statistics](plans.md).
 
+## ER diagrams
+
+**ER diagram** in the navigator's context menu draws the tables and the foreign keys between them: on a connection the whole
+database, on a schema that schema (the toolbar's schema filter adds others), on a table that table and its neighbours, with
+an adjustable depth (1 to 9 keys away, followed in both directions). Views are not drawn.
+
+![ER diagram](ui/after/er-diagram-light.png)
+
+- Each card lists the columns with their types; a key icon marks the primary key, `FK` (and the link colour) a foreign key.
+  The **Columns** switch shows all columns, keys only, or table names only.
+- Relations: a crow's foot on the referencing side (a bar when its key is unique), a bar on the referenced side. A key that
+  accepts `NULL` is dashed and has a ring.
+- The layout puts referenced tables on the left and unlinked tables in a block of their own; cycles and self references are
+  fine. **Arrange** lays out again after tables were dragged.
+- The canvas works like the execution plan: drag the background to pan, wheel to zoom around the cursor, **Fit**. Below
+  45% the cards show names only; only what is in view is drawn, so hundreds of tables stay usable.
+- Hover a table to highlight its relations, drag it to move it, search by name (`Ctrl+F`) to centre it, double-click it to
+  open its data. Right-click: open, show its neighbours, copy the name.
+- **Export PNG** saves the whole diagram with the current theme and column choice.
+- Opening a diagram uses the schema read when the connection was opened; the reload button reads the catalog again. Nothing
+  is ever written.
+
 ## One connection per script tab
 
 The tab opens its own connection on its first run and keeps it, so `BEGIN TRAN`,

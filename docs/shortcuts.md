@@ -19,6 +19,11 @@ Every shortcut of the app. The same list is in the app (`F1`, and Settings > Sho
 | `Mouse wheel` / `Ctrl+wheel` | execution plan | Zoom around the cursor |
 | `Drag` / `Shift+wheel` | execution plan | Pan the plan / pan it sideways |
 | `Ctrl++` / `Ctrl+-` / `Ctrl+0` | execution plan | Zoom in / zoom out / fit the whole plan |
+| `Mouse wheel` / `Ctrl+wheel` | ER diagram | Zoom around the cursor |
+| `Drag` / `Shift+wheel` | ER diagram | Pan the canvas (or move a table) / pan sideways; arrows pan too |
+| `Ctrl++` / `Ctrl+-` / `Ctrl+0` | ER diagram | Zoom in / zoom out / fit the whole diagram |
+| `Ctrl+F` | ER diagram | Find a table (`Enter` next match, `Shift+Enter` previous, `Esc` clears) |
+| `Enter` / double-click | ER diagram | Open the data of the selected table |
 | `Ctrl+N` | anywhere | New script tab on the active (or selected) connection |
 | `Ctrl+O` | anywhere | Open a script file in a script tab |
 | `Enter` | navigator, a table or view / a procedure or function | Open its data / its definition |
@@ -38,6 +43,6 @@ Every shortcut of the app. The same list is in the app (`F1`, and Settings > Sho
 | `Ctrl+Alt+PageUp` | table / script tab on a connection in a group | Switch the tab to the previous database of the group (wraps around; with several groups, the group picked in the selector) |
 | `Esc` | quick open overlay | Close the overlay |
 | `Esc` | table tab | Discard staged edits: specified in the design, **not wired yet** (use the Revert button; in a cell editor Esc cancels that edit) |
-| `Ctrl+0` | table grid, cell selected | Set the cell to NULL (staged) |
+| `Ctrl+0` | table grid, cell selected | Set the cell to NULL (staged); with a cell or column selection, every selected cell |
 | `Ctrl+Break` | script tab | Cancel the running query, or the running group run (all databases) |
 | `F2` | table grid | Edit the cell |

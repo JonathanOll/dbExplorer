@@ -45,6 +45,8 @@ All switches, install locations, GitHub rate limit (`$env:GITHUB_TOKEN`) and man
   [Features](docs/features.md#script-runner)
 - **Script library, query history, formatting, search**: your `.sql` files in real folders, every statement you ran, a safe
   SQL formatter, and one search over scripts and data. [Scripts](docs/scripts.md)
+- **ER diagrams**: tables, columns and foreign keys of a database, a schema or around one table; search, drag, PNG
+  export. [Features](docs/features.md#er-diagrams)
 - **Execution plans**: estimated and actual plans for SQL Server, PostgreSQL and SQLite, a plan canvas with issues and missing
   indexes, and a before/after plan comparison. [Plans](docs/plans.md)
 - **Statistics** (SQL Server): `STATISTICS IO` and `TIME` captured per statement, also per database in a group run.

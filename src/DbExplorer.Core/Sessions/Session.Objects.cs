@@ -27,6 +27,12 @@ public partial class Session
         }
     }
 
+    /// <summary>
+    /// Reads the tables, columns and keys again from the database (what the ER diagram reloads). Catalog queries only;
+    /// <see cref="Schema"/>, which the navigator shows, is left as it is.
+    /// </summary>
+    public Task<IReadOnlyList<TableInfo>> ReadSchemaAsync(CancellationToken ct) => ReadAsync(Driver.LoadSchemaAsync, ct);
+
     /// <summary>The source text of a view. Nothing is executed.</summary>
     public Task<string> LoadViewDefinitionAsync(TableRef view, CancellationToken ct) =>
         ReadAsync((c, token) => Driver.LoadViewDefinitionAsync(c, view, token), ct);

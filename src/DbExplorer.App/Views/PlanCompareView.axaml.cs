@@ -17,15 +17,15 @@ public partial class PlanCompareView : UserControl
 {
     private PlanCompareViewModel? _vm;
     private bool _fitPending;
-    private readonly PlanCanvas _baseline;
-    private readonly PlanCanvas _candidate;
+    private readonly FreeCanvas _baseline;
+    private readonly FreeCanvas _candidate;
     private Point? _zoomAnchor;
 
     public PlanCompareView()
     {
         InitializeComponent();
-        _baseline = new PlanCanvas(BaselineScroller, BaselineZoomer, OnWheelZoom);
-        _candidate = new PlanCanvas(CandidateScroller, CandidateZoomer, OnWheelZoom);
+        _baseline = new FreeCanvas(BaselineScroller, BaselineZoomer, OnWheelZoom);
+        _candidate = new FreeCanvas(CandidateScroller, CandidateZoomer, OnWheelZoom);
         DataContextChanged += (_, _) => Attach();
         SizeChanged += (_, _) => { if (_fitPending && BaselineScroller.Bounds.Width > 50) { _fitPending = false; Fit(auto: true); } };
     }
@@ -70,7 +70,7 @@ public partial class PlanCompareView : UserControl
     private void OnSelectionChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(PlanStatementViewModel.SelectedNode) || sender is not PlanStatementViewModel statement || statement.SelectedNode is not { } node) return;
-        (statement == _vm?.Baseline ? _baseline : _candidate).BringIntoView(node);
+        (statement == _vm?.Baseline ? _baseline : _candidate).BringIntoView(new Rect(node.X, node.Y, node.Width, node.Height));
     }
 
     // ---- layout ----
@@ -128,8 +128,8 @@ public partial class PlanCompareView : UserControl
         if (auto && _vm.SelectedPair is { } pair)
             Dispatcher.UIThread.Post(() =>
             {
-                if (pair.Before is { } b && _vm.Baseline.Nodes.FirstOrDefault(n => n.Node == b) is { } left) _baseline.BringIntoView(left);
-                if (pair.After is { } a && _vm.Candidate.Nodes.FirstOrDefault(n => n.Node == a) is { } right) _candidate.BringIntoView(right);
+                if (pair.Before is { } b && _vm.Baseline.Nodes.FirstOrDefault(n => n.Node == b) is { } left) _baseline.BringIntoView(new Rect(left.X, left.Y, left.Width, left.Height));
+                if (pair.After is { } a && _vm.Candidate.Nodes.FirstOrDefault(n => n.Node == a) is { } right) _candidate.BringIntoView(new Rect(right.X, right.Y, right.Width, right.Height));
             }, DispatcherPriority.Loaded);
     }
 

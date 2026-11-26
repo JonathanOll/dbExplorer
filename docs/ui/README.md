@@ -187,6 +187,11 @@ current-cell frame: 2 px accent, inside the cell).
 - **Status bar**: severity icon + message (ellipsis; info and success fade after 8 s; warnings and errors stay with a dismiss
   button; click for the last 30 messages), busy spinner + Cancel only when the operation can be cancelled, the active connection
   with its state dot and a tooltip, a shortcuts button (`F1`, one list shared with the welcome page: `ShortcutCatalog`) and Settings.
+- **ER diagram** (`DiagramView`): one-row toolbar (wraps in a narrow tab): zoom and Fit, the Columns segments, the schema
+  filter flyout or the Depth stepper with "Show all"; on the right the table search with its "2 of 5" counter, Arrange,
+  reload and "Export PNG…". The canvas is `FreeCanvas`, shared with the execution plan; `DiagramSurface` paints the cards
+  (surface fill, header band, key icon, `FK` in link colour) from the theme tokens, accent for the selection and the hovered
+  relations, the others dimmed. A footer counts tables and relations and says how to move and open them.
 - **Quick open**: shadowed card, search box, table name (matched letters in bold) + schema, a connection badge, an empty state, a
   result counter ("50 of 1,284"), keyboard-hint footer. `Ctrl+T` connects first when needed.
 - **Search** (`Ctrl+Alt+F`, `SearchOverlay`): a card like quick open that stays up while a search runs: search box with the `Aa` /
@@ -215,7 +220,7 @@ dotnet run --project tools/UiShots -- <outDir> [scene,scene...|all] [light|dark]
 dotnet run --project tools/UiShots -- --scroll 3        # scroll benchmark of a 200 x 20 grid, prints ms per frame
 ```
 
-Scenes: `empty`, `main-table`, `table-edit`, `table-structure`, `script`, `script-error`, `quick-open`, `connection-dialog`,
+Scenes: `er-diagram`, `er-diagram-focus`, `er-diagram-hover`, `er-diagram-large`, `er-diagram-export`, `empty`, `main-table`, `table-edit`, `table-structure`, `script`, `script-error`, `quick-open`, `connection-dialog`,
 `sql-preview`, `virtual-key`, `history` (the Query history window), `search`, `search-data`, `format-sql`, `confirm-dialog`, `live-theme-switch` (flips the theme while the window shows),
 `main-table-125` (1024x640 DIP, the 1280x800 window at 125 percent scaling), the Settings dialog (`settings-appearance`,
 `settings-editor`, `settings-results`, `settings-history`, `settings-format`, `settings-shortcuts`, `settings-upgrade`, `settings-search`, `settings-appearance-125`),

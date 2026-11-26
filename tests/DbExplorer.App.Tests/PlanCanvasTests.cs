@@ -10,7 +10,7 @@ using DbExplorer.App.Views;
 
 namespace DbExplorer.App.Tests;
 
-public class PlanViewportMathTests
+public class FreeCanvasMathTests
 {
     [Theory]
     [InlineData(800, 2000)]   // bigger than the viewport
@@ -19,11 +19,11 @@ public class PlanViewportMathTests
     [InlineData(100, 2000)]   // tiny viewport
     public void BothEndsOfAPan_KeepAStripOfThePlanOnScreen(double view, double content)
     {
-        var pad = PlanViewportMath.Pad(view, content);
-        var strip = Math.Min(Math.Min(PlanViewportMath.Keep, view / 2), content);
+        var pad = FreeCanvasMath.Pad(view, content);
+        var strip = Math.Min(Math.Min(FreeCanvasMath.Keep, view / 2), content);
 
-        var low = PlanViewportMath.Clamp(double.MinValue, view, content);
-        var high = PlanViewportMath.Clamp(double.MaxValue, view, content);
+        var low = FreeCanvasMath.Clamp(double.MinValue, view, content);
+        var high = FreeCanvasMath.Clamp(double.MaxValue, view, content);
 
         Assert.Equal(strip, view - (pad - low), 6);          // pushed to the far end: its start is still visible
         Assert.Equal(strip, pad + content - high, 6);        // pushed to the near end: its end is still visible
@@ -35,9 +35,9 @@ public class PlanViewportMathTests
     public void AnyPointOfThePlan_CanBeBroughtToTheCentre(double point)
     {
         const double view = 800, content = 300;
-        var wanted = PlanViewportMath.Pad(view, content) + point - view / 2;
+        var wanted = FreeCanvasMath.Pad(view, content) + point - view / 2;
 
-        Assert.Equal(wanted, PlanViewportMath.Clamp(wanted, view, content), 6);
+        Assert.Equal(wanted, FreeCanvasMath.Clamp(wanted, view, content), 6);
     }
 
     [Theory]
@@ -46,29 +46,29 @@ public class PlanViewportMathTests
     public void Zoom_KeepsThePointUnderTheCursor(double from, double to)
     {
         const double view = 800, content = 2000, anchor = 200;
-        var offset = PlanViewportMath.Pad(view, content * from) + 300;
-        var before = (offset + anchor - PlanViewportMath.Pad(view, content * from)) / from;
+        var offset = FreeCanvasMath.Pad(view, content * from) + 300;
+        var before = (offset + anchor - FreeCanvasMath.Pad(view, content * from)) / from;
 
-        var next = PlanViewportMath.ZoomOffset(offset, anchor, view, content, from, to);
+        var next = FreeCanvasMath.ZoomOffset(offset, anchor, view, content, from, to);
 
-        Assert.Equal(before, (next + anchor - PlanViewportMath.Pad(view, content * to)) / to, 6);
+        Assert.Equal(before, (next + anchor - FreeCanvasMath.Pad(view, content * to)) / to, 6);
     }
 
     [Fact]
     public void Reveal_MovesOnlyWhenNeeded()
     {
-        Assert.Equal(100, PlanViewportMath.Reveal(100, 500, 200, 100));
-        Assert.Equal(26, PlanViewportMath.Reveal(100, 500, 50, 100));
-        Assert.Equal(324, PlanViewportMath.Reveal(100, 500, 700, 100));
+        Assert.Equal(100, FreeCanvasMath.Reveal(100, 500, 200, 100));
+        Assert.Equal(26, FreeCanvasMath.Reveal(100, 500, 50, 100));
+        Assert.Equal(324, FreeCanvasMath.Reveal(100, 500, 700, 100));
     }
 
     [Fact]
     public void WheelStep_IsATenthPerNotch_AndNeverNothing()
     {
-        Assert.Equal(0.1, PlanViewportMath.WheelStep(1), 6);
-        Assert.Equal(-0.1, PlanViewportMath.WheelStep(-3), 6);
-        Assert.Equal(0.01, PlanViewportMath.WheelStep(0.02), 6);
-        Assert.Equal(0, PlanViewportMath.WheelStep(0));
+        Assert.Equal(0.1, FreeCanvasMath.WheelStep(1), 6);
+        Assert.Equal(-0.1, FreeCanvasMath.WheelStep(-3), 6);
+        Assert.Equal(0.01, FreeCanvasMath.WheelStep(0.02), 6);
+        Assert.Equal(0, FreeCanvasMath.WheelStep(0));
     }
 }
 

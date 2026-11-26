@@ -37,6 +37,9 @@
     <DataTemplate DataType="vm:ScriptTabViewModel">
       <views:ScriptTabView />
     </DataTemplate>
+    <DataTemplate DataType="vm:DiagramTabViewModel">
+      <views:DiagramView />
+    </DataTemplate>
     <!-- Tab content templates; later features add one per TabViewModel subclass. -->
     <DataTemplate DataType="vm:PlaceholderTabViewModel">
       <TextBlock Text="{Binding Title}" Margin="16" Opacity="0.7" />

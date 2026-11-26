@@ -360,6 +360,11 @@ internal static partial class Scenes
         ("upgrade-scripts", d => UpgradeScripts(d, "")),
         ("upgrade-scripts-filter", d => UpgradeScripts(d, "supplier")),
         ("upgrade-scripts-nomatch", d => UpgradeScripts(d, "zzz")),
+        ("er-diagram", ErDiagram),
+        ("er-diagram-focus", ErDiagramFocus),
+        ("er-diagram-hover", ErDiagramHover),
+        ("er-diagram-large", ErDiagramLarge),
+        ("er-diagram-export", ErDiagramExport),
         ("objects-tree", ObjectsTree),
         ("object-definition", ObjectDefinition),
         ("quick-open-objects", d => QuickOpenObjectsScene(d, "order")),
@@ -371,10 +376,12 @@ internal static partial class Scenes
     ];
 
     private static string Theme = "light";
+    private static string ExportDir = ".";
 
     public static async Task RunAsync(string outDir, string theme, HashSet<string>? only)
     {
         Theme = theme;
+        ExportDir = outDir;
         Application.Current!.RequestedThemeVariant = theme == "dark" ? ThemeVariant.Dark : ThemeVariant.Light;
         foreach (var (name, run) in All)
         {

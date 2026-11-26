@@ -1,13 +1,13 @@
 namespace DbExplorer.App.ViewModels;
 
 /// <summary>
-/// The geometry of the free plan canvas, one axis at a time (call it once for x, once for y). The content is surrounded by an
+/// The geometry of a free canvas (execution plans, ER diagrams), one axis at a time (call it once for x, once for y). The content is surrounded by an
 /// empty margin on both sides, so it can be panned far past its edges; the margin is sized so that a strip of it stays on
 /// screen. "Offset" is the scroll offset in that padded extent; "content" is the canvas size at zoom 1 unless said otherwise.
 /// </summary>
-public static class PlanViewportMath
+public static class FreeCanvasMath
 {
-    /// <summary>How much of the plan stays on screen at the far end of a pan.</summary>
+    /// <summary>How much of the content stays on screen at the far end of a pan.</summary>
     public const double Keep = 120;
 
     private const double RevealPad = 24;

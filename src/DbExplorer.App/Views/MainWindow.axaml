@@ -423,6 +423,9 @@
                           <MenuItem Header="Go to table…" Command="{Binding Tree.PickTableOnCommand}" CommandParameter="{Binding}" InputGesture="Ctrl+T">
                             <MenuItem.Icon><PathIcon Data="{StaticResource IconTable}" /></MenuItem.Icon>
                           </MenuItem>
+                          <MenuItem Header="ER diagram" Command="{Binding Tree.ShowDiagramCommand}" CommandParameter="{Binding}">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconDiagram}" /></MenuItem.Icon>
+                          </MenuItem>
                           <MenuItem Header="Refresh schema" Command="{Binding Tree.RefreshCommand}" CommandParameter="{Binding}" IsVisible="{Binding IsConnected}"
                                     InputGesture="F5">
                             <MenuItem.Icon><PathIcon Data="{StaticResource IconRefresh}" /></MenuItem.Icon>
@@ -579,7 +582,14 @@
                   </TreeDataTemplate>
 
                   <TreeDataTemplate DataType="vm:SchemaNodeViewModel" ItemsSource="{Binding Children}">
-                    <StackPanel Orientation="Horizontal" Spacing="7">
+                    <StackPanel Orientation="Horizontal" Spacing="7" Background="Transparent">
+                      <StackPanel.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="ER diagram" Click="OnShowDiagram">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconDiagram}" /></MenuItem.Icon>
+                          </MenuItem>
+                        </ContextMenu>
+                      </StackPanel.ContextMenu>
                       <PathIcon Classes="dim" Data="{StaticResource IconSchema}" Width="14" Height="14" />
                       <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
                       <TextBlock Classes="faint small" Text="{Binding TableCount, Converter={x:Static views:Icons.CountInParens}}" VerticalAlignment="Center" />
@@ -627,6 +637,9 @@
                         <ContextMenu>
                           <MenuItem Header="Open" Click="OnOpenTableNode" FontWeight="SemiBold" InputGesture="Enter" />
                           <MenuItem Header="Open definition" Click="OnOpenDefinition" IsVisible="{Binding IsView}" />
+                          <MenuItem Header="ER diagram (neighbours)" Click="OnShowDiagram" IsVisible="{Binding !IsView}">
+                            <MenuItem.Icon><PathIcon Data="{StaticResource IconDiagram}" /></MenuItem.Icon>
+                          </MenuItem>
                           <MenuItem Header="Copy name" Click="OnCopyNodeName" />
                         </ContextMenu>
                       </StackPanel.ContextMenu>

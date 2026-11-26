@@ -35,6 +35,9 @@ A lightweight Windows desktop app to explore and edit databases (PostgreSQL, SQL
 
 - (Script runner moved to goals after user review: see "Script runner" below.)
 - No schema/DDL editing, no ER diagrams, no data export/import wizards.
+  - Update 2026-11-26: read-only ER diagrams are now in. Layout and model live in `DbExplorer.Core/Diagrams` (own layered
+    layout, no graph library); metadata is the schema each `IDbDriver` loads in bulk; the canvas is the one of the plan view
+    (`FreeCanvas`), painting only the visible tables. Schema editing is still out.
 - No cross-platform support (Windows only, though Avalonia keeps the door open).
 - No SSH tunnels, no other database engines (MySQL, Oracle) in v1; the driver layer must make adding them cheap.
 

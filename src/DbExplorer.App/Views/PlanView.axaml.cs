@@ -19,14 +19,14 @@ public partial class PlanView : UserControl
 {
     private PlanResultTab? _tab;
     private PlanStatementViewModel? _statement;
-    private readonly PlanCanvas _canvas;
+    private readonly FreeCanvas _canvas;
     private Point? _zoomAnchor;
 
     public PlanView()
     {
         InitializeComponent();
         DataContextChanged += (_, _) => Attach();
-        _canvas = new PlanCanvas(Scroller, Zoomer, OnWheelZoom);
+        _canvas = new FreeCanvas(Scroller, Zoomer, OnWheelZoom);
         Scroller.KeyDown += OnKeyDown;
         Scroller.SizeChanged += (_, _) => Dispatcher.UIThread.Post(() => { if (_fitPending) { _fitPending = false; Fit(auto: true); } }, DispatcherPriority.Loaded);
     }
@@ -168,7 +168,7 @@ public partial class PlanView : UserControl
         if (sender is ToggleButton { IsChecked: not true } button) button.IsChecked = true;
     }
 
-    private void BringIntoView(PlanNodeViewModel node) => _canvas.BringIntoView(node);
+    private void BringIntoView(PlanNodeViewModel node) => _canvas.BringIntoView(new Rect(node.X, node.Y, node.Width, node.Height));
 
     // ---- keyboard: arrows walk the tree, Ctrl +/-/0 zoom ----
 

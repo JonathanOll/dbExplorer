@@ -68,6 +68,14 @@ public static class ShortcutCatalog
             new("Ctrl++ / Ctrl+-", "Zoom in or out"),
             new("Ctrl+0", "Fit the whole plan in the window"),
         ]),
+        new("ER diagram", [
+            new("Mouse wheel", "Zoom around the cursor (with or without Ctrl)"),
+            new("Drag", "Pan the canvas, or move a table (Shift+wheel pans sideways)"),
+            new("Ctrl++ / Ctrl+-", "Zoom in or out"),
+            new("Ctrl+0", "Fit the whole diagram in the window"),
+            new("Ctrl+F", "Find a table (Enter: next match)"),
+            new("Enter / double-click", "Open the data of the selected table"),
+        ]),
         new("Linked databases", [
             new("Ctrl+Alt+PageDown", "Next database of the group"),
             new("Ctrl+Alt+PageUp", "Previous database of the group"),

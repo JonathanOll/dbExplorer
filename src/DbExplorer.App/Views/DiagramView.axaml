@@ -1,0 +1,145 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DbExplorer.App.ViewModels"
+             xmlns:views="using:DbExplorer.App.Views"
+             x:Class="DbExplorer.App.Views.DiagramView"
+             x:DataType="vm:DiagramTabViewModel">
+  <DockPanel>
+    <!-- Toolbar: zoom | columns | schemas or neighbourhood ... search, arrange, reload, export -->
+    <Border DockPanel.Dock="Top" Classes="toolbar">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" Margin="8,0,0,0">
+          <TextBlock Classes="dim small num" Text="{Binding SearchStatus}" VerticalAlignment="Center" />
+          <TextBox x:Name="SearchBox" Width="150" MinHeight="28" Watermark="Find a table" Text="{Binding SearchText}"
+                   AutomationProperties.Name="Find a table in the diagram"
+                   ToolTip.Tip="Centre a table: Enter for the next match, Shift+Enter for the previous one (Ctrl+F)" />
+          <Border Classes="vsep" />
+          <Button Classes="ghost" MinHeight="28" Padding="8,0" VerticalContentAlignment="Center" Content="Arrange" Command="{Binding ArrangeCommand}"
+                  ToolTip.Tip="Lay the tables out again (undoes the moves)" AutomationProperties.Name="Arrange the tables again" />
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRefresh}" Command="{Binding ReloadCommand}"
+                  IsEnabled="{Binding CanReload}" ToolTip.ShowOnDisabled="True" ToolTip.Tip="{Binding ReloadTip}"
+                  AutomationProperties.Name="Reload from the database" />
+          <Button Classes="ghost" MinHeight="28" Padding="8,0" VerticalContentAlignment="Center" Content="Export PNG…" Click="OnExportClick" IsEnabled="{Binding CanExport}"
+                  ToolTip.ShowOnDisabled="True" ToolTip.Tip="{Binding ExportTip}" AutomationProperties.Name="Export the diagram as PNG" />
+        </StackPanel>
+
+        <!-- wraps rather than hides a control in a narrow window -->
+        <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,4,0">
+            <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRemove}" Click="OnZoomOutClick" AutomationProperties.Name="Zoom out">
+              <ToolTip.Tip>
+                <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Zoom out (or mouse wheel)" /><Border Classes="kbd"><TextBlock Text="Ctrl+-" /></Border></StackPanel>
+              </ToolTip.Tip>
+            </Button>
+            <TextBlock Classes="dim num" Text="{Binding ZoomText}" MinWidth="38" TextAlignment="Center" VerticalAlignment="Center" />
+            <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconAdd}" Click="OnZoomInClick" AutomationProperties.Name="Zoom in">
+              <ToolTip.Tip>
+                <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Zoom in (or mouse wheel)" /><Border Classes="kbd"><TextBlock Text="Ctrl++" /></Border></StackPanel>
+              </ToolTip.Tip>
+            </Button>
+            <Button Classes="ghost" MinHeight="28" Padding="8,0" VerticalContentAlignment="Center" Content="Fit" Click="OnFitClick" AutomationProperties.Name="Fit the diagram to the window">
+              <ToolTip.Tip>
+                <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Fit the whole diagram in the window" /><Border Classes="kbd"><TextBlock Text="Ctrl+0" /></Border></StackPanel>
+              </ToolTip.Tip>
+            </Button>
+            <Border Classes="vsep" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,4,0">
+            <TextBlock Classes="dim small" Text="Columns" VerticalAlignment="Center" Margin="4,0" />
+            <ToggleButton Classes="segment" Content="All" IsChecked="{Binding IsAllColumns, Mode=TwoWay}" Click="OnSegmentClick"
+                          ToolTip.Tip="Show every column with its type" />
+            <ToggleButton Classes="segment" Content="Keys" IsChecked="{Binding IsKeyColumns, Mode=TwoWay}" Click="OnSegmentClick"
+                          ToolTip.Tip="Show only the primary and foreign key columns" />
+            <ToggleButton Classes="segment" Content="Names" IsChecked="{Binding IsNamesOnly, Mode=TwoWay}" Click="OnSegmentClick"
+                          ToolTip.Tip="Show the table names only" />
+          </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding HasSchemaFilter}">
+              <Border Classes="vsep" />
+              <Button Classes="ghost" MinHeight="28" Padding="8,0" VerticalContentAlignment="Center" AutomationProperties.Name="Filter by schema" ToolTip.Tip="Choose the schemas to show">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <PathIcon Data="{StaticResource IconSchema}" Width="12" Height="12" />
+                  <TextBlock Text="{Binding SchemaFilterText}" />
+                </StackPanel>
+                <Button.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedLeft">
+                    <DockPanel MinWidth="200" MaxHeight="360">
+                      <Button DockPanel.Dock="Bottom" Classes="ghost" MinHeight="26" Padding="8,0" Margin="0,6,0,0" Content="Select all"
+                              Command="{Binding ShowAllSchemasCommand}" />
+                      <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding SchemaChoices}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DiagramSchemaChoice">
+                              <CheckBox IsChecked="{Binding IsShown, Mode=TwoWay}" Content="{Binding Label}" MinHeight="28" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </ScrollViewer>
+                    </DockPanel>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding IsFocused}">
+              <Border Classes="vsep" />
+              <TextBlock Classes="dim small" Text="Depth" VerticalAlignment="Center" Margin="4,0" />
+              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRemove}" Command="{Binding ShallowerCommand}"
+                      IsEnabled="{Binding CanGoShallower}" ToolTip.ShowOnDisabled="True" ToolTip.Tip="{Binding ShallowerTip}"
+                      AutomationProperties.Name="Smaller depth" />
+              <TextBlock Classes="num" Text="{Binding Depth}" MinWidth="14" TextAlignment="Center" VerticalAlignment="Center" />
+              <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconAdd}" Command="{Binding DeeperCommand}"
+                      IsEnabled="{Binding CanGoDeeper}" ToolTip.ShowOnDisabled="True" ToolTip.Tip="{Binding DeeperTip}"
+                      AutomationProperties.Name="Larger depth" />
+              <Button Classes="ghost" MinHeight="28" Padding="8,0" VerticalContentAlignment="Center" Content="Show all" Command="{Binding ShowAllCommand}"
+                      ToolTip.Tip="Leave the neighbourhood and show the whole database" />
+            </StackPanel>
+        </WrapPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- What is shown, and how to use it -->
+    <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,1,0,0" Padding="12,5">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Right" Classes="faint small" Margin="12,0,0,0"
+                   Text="Drag a table to move it · double-click opens its data" />
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <TextBlock Classes="dim small num" Text="{Binding Summary}" />
+          <TextBlock Classes="dim small" Text="{Binding FocusText}" IsVisible="{Binding IsFocused}" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Top" Classes="banner error" IsVisible="{Binding HasError}">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <PathIcon Classes="bi" Data="{StaticResource IconError}" Margin="0,0,10,0" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding Error}" TextWrapping="Wrap" VerticalAlignment="Center" />
+        <Button Grid.Column="2" Classes="ghost" MinHeight="26" Padding="8,0" Margin="12,0,0,0" Content="Retry" Command="{Binding ReloadCommand}" />
+      </Grid>
+    </Border>
+
+    <Panel>
+      <ScrollViewer x:Name="Scroller" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" Focusable="True"
+                    Background="{DynamicResource DbxContentBg}" AutomationProperties.Name="ER diagram">
+        <LayoutTransformControl x:Name="Zoomer" HorizontalAlignment="Left" VerticalAlignment="Top">
+          <views:DiagramSurface x:Name="Surface" Scene="{Binding Scene}" Zoom="{Binding Zoom}"
+                                SelectedTable="{Binding SelectedTable, Mode=TwoWay}" />
+        </LayoutTransformControl>
+      </ScrollViewer>
+
+      <StackPanel Classes="empty" IsVisible="{Binding IsEmpty}">
+        <PathIcon Data="{StaticResource IconDiagram}" />
+        <TextBlock Classes="h2" Text="Nothing to draw" />
+        <TextBlock Classes="dim" Text="{Binding EmptyText}" />
+      </StackPanel>
+
+      <Border Classes="surface" Padding="14,10" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,16,0,0" IsVisible="{Binding IsBusy}">
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <PathIcon Classes="spin" Data="{StaticResource IconRefresh}" Width="14" Height="14" VerticalAlignment="Center" IsVisible="{Binding IsBusy}" />
+          <TextBlock Text="Drawing the diagram…" VerticalAlignment="Center" />
+          <Button Classes="ghost" MinHeight="26" Padding="8,0" Content="Cancel" Command="{Binding CancelCommand}" />
+        </StackPanel>
+      </Border>
+    </Panel>
+  </DockPanel>
+</UserControl>
