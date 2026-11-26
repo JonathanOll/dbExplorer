@@ -164,9 +164,9 @@
           <ToggleButton x:Name="StackedButton" Classes="segment" Content="Stacked" IsChecked="{Binding Stacked, Mode=OneWay}" Click="OnStackedClick"
                         ToolTip.Tip="Baseline above, new plan below: each gets the full width" />
           <Border Classes="vsep" />
-          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRemove}" Click="OnZoomOutClick" AutomationProperties.Name="Zoom out" ToolTip.Tip="Zoom out" />
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRemove}" Click="OnZoomOutClick" AutomationProperties.Name="Zoom out" ToolTip.Tip="Zoom out (or mouse wheel)" />
           <TextBlock Classes="dim num" Text="{Binding ZoomText}" MinWidth="38" TextAlignment="Center" VerticalAlignment="Center" />
-          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconAdd}" Click="OnZoomInClick" AutomationProperties.Name="Zoom in" ToolTip.Tip="Zoom in" />
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconAdd}" Click="OnZoomInClick" AutomationProperties.Name="Zoom in" ToolTip.Tip="Zoom in (or mouse wheel)" />
           <Button Classes="ghost" MinHeight="28" Padding="8,0" Content="Fit" Click="OnFitClick" AutomationProperties.Name="Fit both plans to the window"
                   ToolTip.Tip="Fit the whole plans in the window" />
           <Border Classes="vsep" />
@@ -225,7 +225,7 @@
               <TextBlock Classes="dim num" Text="{Binding BaselineDetail}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
             </StackPanel>
           </Border>
-          <ScrollViewer x:Name="BaselineScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Baseline plan">
+          <ScrollViewer x:Name="BaselineScroller" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" Background="Transparent" Focusable="True" AutomationProperties.Name="Baseline plan">
             <LayoutTransformControl x:Name="BaselineZoomer" HorizontalAlignment="Left" VerticalAlignment="Top">
               <Grid Width="{Binding Baseline.CanvasWidth}" Height="{Binding Baseline.CanvasHeight}">
                 <views:PlanEdges Statement="{Binding Baseline}" />
@@ -251,7 +251,7 @@
               <TextBlock Classes="dim num" Text="{Binding CandidateDetail}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
             </StackPanel>
           </Border>
-          <ScrollViewer x:Name="CandidateScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="New plan">
+          <ScrollViewer x:Name="CandidateScroller" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" Background="Transparent" Focusable="True" AutomationProperties.Name="New plan">
             <LayoutTransformControl x:Name="CandidateZoomer" HorizontalAlignment="Left" VerticalAlignment="Top">
               <Grid Width="{Binding Candidate.CanvasWidth}" Height="{Binding Candidate.CanvasHeight}">
                 <views:PlanEdges Statement="{Binding Candidate}" />

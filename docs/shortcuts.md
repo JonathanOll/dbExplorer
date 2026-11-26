@@ -14,6 +14,9 @@ Every shortcut of the app. The same list is in the app (`F1`, and Settings > Sho
 | `Ctrl+L` | table tab | Fuzzy-search a column and scroll to it |
 | `Ctrl+L` | script tab | Show the estimated execution plan of the selection / the statement under the cursor (nothing runs) |
 | `Ctrl+M` | script tab | Include the actual execution plan in the next runs (switch) |
+| `Mouse wheel` / `Ctrl+wheel` | execution plan | Zoom around the cursor |
+| `Drag` / `Shift+wheel` | execution plan | Pan the plan / pan it sideways |
+| `Ctrl++` / `Ctrl+-` / `Ctrl+0` | execution plan | Zoom in / zoom out / fit the whole plan |
 | `Ctrl+N` | anywhere | New script tab on the active (or selected) connection |
 | `Ctrl+O` | anywhere | Open a script file in a script tab |
 | `Enter` / `F2` / `Delete` | navigator, a script or script folder | Open / rename / delete it (see [Script library](scripts.md#script-library)) |

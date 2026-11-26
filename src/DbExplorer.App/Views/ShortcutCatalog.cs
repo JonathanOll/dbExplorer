@@ -61,6 +61,12 @@ public static class ShortcutCatalog
             new("Ctrl+K, Ctrl+C", "Comment the selected lines"),
             new("Ctrl+K, Ctrl+U", "Uncomment the selected lines"),
         ]),
+        new("Execution plan", [
+            new("Mouse wheel", "Zoom around the cursor (with or without Ctrl)"),
+            new("Drag", "Pan the plan (Shift+wheel pans sideways)"),
+            new("Ctrl++ / Ctrl+-", "Zoom in or out"),
+            new("Ctrl+0", "Fit the whole plan in the window"),
+        ]),
         new("Linked databases", [
             new("Ctrl+Alt+PageDown", "Next database of the group"),
             new("Ctrl+Alt+PageUp", "Previous database of the group"),

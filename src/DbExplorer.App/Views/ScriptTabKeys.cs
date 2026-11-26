@@ -99,6 +99,7 @@ public static class ScriptTabKeys
         new("Run the whole script on the group", "Ctrl+Shift+F5"),
         new("Show the estimated execution plan (nothing runs)", "Ctrl+L"),
         new("Include the actual execution plan in the next runs", "Ctrl+M"),
+        new("Zoom the execution plan (drag it to pan)", "Mouse wheel"),
         new("Stop the run", "Esc"),
         new("Save the script", "Ctrl+S"),
         new("Open a script file", "Ctrl+O"),

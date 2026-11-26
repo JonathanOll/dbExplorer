@@ -22,8 +22,9 @@ The plan tab, one chip per statement when a run has several (with its share of t
 - **Canvas**: the root on the left, data flowing right to left, one card per operator (icon of its family, object, rows
   actual / estimated, a cost bar and its share of the statement). Arrows are as thick as the rows they carry and show the
   count; the path from the selected operator to the root is lit. Colour the bars by **Cost**, **Time** or **Rows**.
-  Click to select, arrow keys walk the tree, `Ctrl+wheel` or `Ctrl +` / `Ctrl -` zoom, `Ctrl+0` or **Fit** shows it all,
-  drag the background to pan. It opens on the costliest operator.
+  Click to select, arrow keys walk the tree, the mouse wheel (or `Ctrl +` / `Ctrl -`) zooms around the cursor, `Ctrl+0` or
+  **Fit** shows it all. It is a free canvas: drag the background (or `Shift+wheel`) to pan, well past the edges of the plan, so
+  any operator can be brought to the middle; a part of the plan area always stays on screen. It opens on the costliest operator.
 - **Properties**: everything the server says about the selected operator (costs, rows, times, I/O, object, predicates, seek
   predicates, output columns, buffers...) plus the statement's own (parallelism, memory grant, parameters, timings).
 - **Top operators**: the costliest first; a click finds it in the plan.

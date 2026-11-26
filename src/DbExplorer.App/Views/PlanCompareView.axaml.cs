@@ -4,7 +4,6 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Media;
 using Avalonia.Threading;
 using DbExplorer.App.ViewModels;
 
@@ -18,10 +17,15 @@ public partial class PlanCompareView : UserControl
 {
     private PlanCompareViewModel? _vm;
     private bool _fitPending;
+    private readonly PlanCanvas _baseline;
+    private readonly PlanCanvas _candidate;
+    private Point? _zoomAnchor;
 
     public PlanCompareView()
     {
         InitializeComponent();
+        _baseline = new PlanCanvas(BaselineScroller, BaselineZoomer, OnWheelZoom);
+        _candidate = new PlanCanvas(CandidateScroller, CandidateZoomer, OnWheelZoom);
         DataContextChanged += (_, _) => Attach();
         SizeChanged += (_, _) => { if (_fitPending && BaselineScroller.Bounds.Width > 50) { _fitPending = false; Fit(auto: true); } };
     }
@@ -66,7 +70,7 @@ public partial class PlanCompareView : UserControl
     private void OnSelectionChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(PlanStatementViewModel.SelectedNode) || sender is not PlanStatementViewModel statement || statement.SelectedNode is not { } node) return;
-        BringIntoView(statement == _vm?.Baseline ? BaselineScroller : CandidateScroller, node);
+        (statement == _vm?.Baseline ? _baseline : _candidate).BringIntoView(node);
     }
 
     // ---- layout ----
@@ -97,8 +101,17 @@ public partial class PlanCompareView : UserControl
     private void ApplyZoom()
     {
         var z = _vm?.Zoom ?? 1;
-        BaselineZoomer.LayoutTransform = new ScaleTransform(z, z);
-        CandidateZoomer.LayoutTransform = new ScaleTransform(z, z);
+        _baseline.SetZoom(z, _zoomAnchor);
+        _candidate.SetZoom(z, _zoomAnchor);
+    }
+
+    // Both panes zoom around the same spot of their viewport, so they stay aligned.
+    private void OnWheelZoom(double step, Point cursor)
+    {
+        if (_vm is null) return;
+        _zoomAnchor = cursor;
+        _vm.Zoom += step;
+        _zoomAnchor = null;
     }
 
     /// <param name="auto">On opening: never smaller than 70%, where the text stays readable.</param>
@@ -110,13 +123,13 @@ public partial class PlanCompareView : UserControl
         var width = Math.Max(_vm.Baseline.CanvasWidth, _vm.Candidate.CanvasWidth);
         var height = Math.Max(_vm.Baseline.CanvasHeight, _vm.Candidate.CanvasHeight);
         _vm.Zoom = Math.Clamp(Math.Min(Math.Min((view.Width - 4) / width, (view.Height - 4) / height), 1), auto ? 0.7 : 0.25, 1);
-        BaselineScroller.Offset = default;
-        CandidateScroller.Offset = default;
+        _baseline.Home();
+        _candidate.Home();
         if (auto && _vm.SelectedPair is { } pair)
             Dispatcher.UIThread.Post(() =>
             {
-                if (pair.Before is { } b && _vm.Baseline.Nodes.FirstOrDefault(n => n.Node == b) is { } left) BringIntoView(BaselineScroller, left);
-                if (pair.After is { } a && _vm.Candidate.Nodes.FirstOrDefault(n => n.Node == a) is { } right) BringIntoView(CandidateScroller, right);
+                if (pair.Before is { } b && _vm.Baseline.Nodes.FirstOrDefault(n => n.Node == b) is { } left) _baseline.BringIntoView(left);
+                if (pair.After is { } a && _vm.Candidate.Nodes.FirstOrDefault(n => n.Node == a) is { } right) _candidate.BringIntoView(right);
             }, DispatcherPriority.Loaded);
     }
 
@@ -125,22 +138,6 @@ public partial class PlanCompareView : UserControl
     private void OnZoomOutClick(object? sender, RoutedEventArgs e) { if (_vm is not null) _vm.Zoom -= 0.1; }
 
     private void OnFitClick(object? sender, RoutedEventArgs e) => Fit();
-
-    private void BringIntoView(ScrollViewer scroller, PlanNodeViewModel node)
-    {
-        var z = _vm?.Zoom ?? 1;
-        var box = new Rect(node.X * z, node.Y * z, node.Width * z, node.Height * z);
-        var view = new Rect(scroller.Offset.X, scroller.Offset.Y, scroller.Viewport.Width, scroller.Viewport.Height);
-        if (view.Contains(box)) return;
-        var x = scroller.Offset.X;
-        var y = scroller.Offset.Y;
-        const double pad = 24;
-        if (box.Left < view.Left) x = box.Left - pad;
-        else if (box.Right > view.Right) x = box.Right - view.Width + pad;
-        if (box.Top < view.Top) y = box.Top - pad;
-        else if (box.Bottom > view.Bottom) y = box.Bottom - view.Height + pad;
-        scroller.Offset = new Vector(Math.Max(0, x), Math.Max(0, y));
-    }
 
     // ---- selection ----
 

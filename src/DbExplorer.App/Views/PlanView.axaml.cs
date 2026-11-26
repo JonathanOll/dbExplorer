@@ -4,10 +4,8 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
-using Avalonia.VisualTree;
 using DbExplorer.App.ViewModels;
 
 namespace DbExplorer.App.Views;
@@ -21,19 +19,16 @@ public partial class PlanView : UserControl
 {
     private PlanResultTab? _tab;
     private PlanStatementViewModel? _statement;
-    private Point? _panStart;
-    private Vector _panOffset;
+    private readonly PlanCanvas _canvas;
+    private Point? _zoomAnchor;
 
     public PlanView()
     {
         InitializeComponent();
         DataContextChanged += (_, _) => Attach();
-        Scroller.AddHandler(PointerPressedEvent, OnScrollerPressed, RoutingStrategies.Bubble, handledEventsToo: false);
-        Scroller.PointerMoved += OnScrollerMoved;
-        Scroller.PointerReleased += OnScrollerReleased;
-        Scroller.PointerWheelChanged += OnWheel;
+        _canvas = new PlanCanvas(Scroller, Zoomer, OnWheelZoom);
         Scroller.KeyDown += OnKeyDown;
-        Scroller.SizeChanged += (_, _) => { if (_fitPending) { _fitPending = false; Fit(auto: true); } };
+        Scroller.SizeChanged += (_, _) => Dispatcher.UIThread.Post(() => { if (_fitPending) { _fitPending = false; Fit(auto: true); } }, DispatcherPriority.Loaded);
     }
 
     private bool _fitPending;
@@ -50,7 +45,11 @@ public partial class PlanView : UserControl
         ApplyZoom();
         // A big plan opens fitted; a small one at 100%.
         _fitPending = _statement is { } s && (s.CanvasWidth > 1100 || s.CanvasHeight > 700);
-        Dispatcher.UIThread.Post(() => { if (_fitPending && Scroller.Bounds.Width > 0) { _fitPending = false; Fit(); } }, DispatcherPriority.Loaded);
+        Dispatcher.UIThread.Post(() =>
+        {
+            _canvas.Home();
+            if (_fitPending && Scroller.Bounds.Width > 0) { _fitPending = false; Fit(); }
+        }, DispatcherPriority.Loaded);
     }
 
     private void OnTabChanged(object? sender, PropertyChangedEventArgs e)
@@ -61,7 +60,6 @@ public partial class PlanView : UserControl
             if (_statement is not null) _statement.PropertyChanged -= OnStatementChanged;
             _statement = _tab?.Selected;
             if (_statement is not null) _statement.PropertyChanged += OnStatementChanged;
-            Scroller.Offset = default;
             Dispatcher.UIThread.Post(() => Fit(auto: true), DispatcherPriority.Loaded);
         }
         else if (e.PropertyName == nameof(PlanResultTab.ShowSidePanel))
@@ -80,11 +78,7 @@ public partial class PlanView : UserControl
 
     // ---- zoom and fit ----
 
-    private void ApplyZoom()
-    {
-        var z = _tab?.Zoom ?? 1;
-        Zoomer.LayoutTransform = new ScaleTransform(z, z);
-    }
+    private void ApplyZoom() => _canvas.SetZoom(_tab?.Zoom ?? 1, _zoomAnchor);
 
     /// <param name="auto">On opening: never smaller than 70%, where the text stays readable (the Fit button shows the whole plan whatever the size).</param>
     private void Fit(bool auto = false)
@@ -93,7 +87,7 @@ public partial class PlanView : UserControl
         var view = Scroller.Bounds.Size;
         if (view.Width < 50 || view.Height < 50) { _fitPending = auto; return; }
         _tab.Zoom = Math.Clamp(Math.Min(Math.Min((view.Width - 4) / s.CanvasWidth, (view.Height - 4) / s.CanvasHeight), 1), auto ? 0.7 : 0.25, 1);
-        Scroller.Offset = default;
+        _canvas.Home();
         // Opening: show the operator that is selected (the costliest), not the empty corner next to the root.
         if (auto && _statement?.SelectedNode is { } hot) Dispatcher.UIThread.Post(() => BringIntoView(hot), DispatcherPriority.Loaded);
     }
@@ -106,41 +100,12 @@ public partial class PlanView : UserControl
 
     private void OnFitClick(object? sender, RoutedEventArgs e) => Fit();
 
-    private void OnWheel(object? sender, PointerWheelEventArgs e)
+    // The zoom changes through the tab: the anchor is remembered while it does, so the canvas zooms around the cursor.
+    private void OnWheelZoom(double step, Point cursor)
     {
-        if (e.KeyModifiers != KeyModifiers.Control || _tab is null) return;
-        SetZoom(_tab.Zoom + (e.Delta.Y > 0 ? 0.1 : -0.1));
-        e.Handled = true;
-    }
-
-    // ---- pan: drag the background ----
-
-    private void OnScrollerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        Scroller.Focus();
-        var point = e.GetCurrentPoint(Scroller);
-        if (!point.Properties.IsLeftButtonPressed && !point.Properties.IsMiddleButtonPressed) return;
-        if (e.Source is Visual v && v.FindAncestorOfType<Border>(true) is { } b && b.Classes.Contains("plannode")) return;   // a card handles its own press
-        if (e.Source is ScrollBar || (e.Source as Visual)?.FindAncestorOfType<ScrollBar>() is not null) return;
-        _panStart = e.GetPosition(Scroller);
-        _panOffset = Scroller.Offset;
-        e.Pointer.Capture(Scroller);
-        Scroller.Cursor = new Cursor(StandardCursorType.SizeAll);
-    }
-
-    private void OnScrollerMoved(object? sender, PointerEventArgs e)
-    {
-        if (_panStart is not { } start) return;
-        var d = start - e.GetPosition(Scroller);
-        Scroller.Offset = new Vector(Math.Max(0, _panOffset.X + d.X), Math.Max(0, _panOffset.Y + d.Y));
-    }
-
-    private void OnScrollerReleased(object? sender, PointerReleasedEventArgs e)
-    {
-        if (_panStart is null) return;
-        _panStart = null;
-        e.Pointer.Capture(null);
-        Scroller.Cursor = null;
+        _zoomAnchor = cursor;
+        SetZoom((_tab?.Zoom ?? 1) + step);
+        _zoomAnchor = null;
     }
 
     // ---- selection ----
@@ -203,22 +168,7 @@ public partial class PlanView : UserControl
         if (sender is ToggleButton { IsChecked: not true } button) button.IsChecked = true;
     }
 
-    /// <summary>Scrolls so the operator's card is fully visible (the zoom is taken into account).</summary>
-    private void BringIntoView(PlanNodeViewModel node)
-    {
-        var z = _tab?.Zoom ?? 1;
-        var box = new Rect(node.X * z, node.Y * z, node.Width * z, node.Height * z);
-        var view = new Rect(Scroller.Offset.X, Scroller.Offset.Y, Scroller.Viewport.Width, Scroller.Viewport.Height);
-        if (view.Contains(box)) return;
-        var x = Scroller.Offset.X;
-        var y = Scroller.Offset.Y;
-        const double pad = 24;
-        if (box.Left < view.Left) x = box.Left - pad;
-        else if (box.Right > view.Right) x = box.Right - view.Width + pad;
-        if (box.Top < view.Top) y = box.Top - pad;
-        else if (box.Bottom > view.Bottom) y = box.Bottom - view.Height + pad;
-        Scroller.Offset = new Vector(Math.Max(0, x), Math.Max(0, y));
-    }
+    private void BringIntoView(PlanNodeViewModel node) => _canvas.BringIntoView(node);
 
     // ---- keyboard: arrows walk the tree, Ctrl +/-/0 zoom ----
 
