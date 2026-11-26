@@ -49,6 +49,23 @@ Table tabs are labelled `connection · table` with a colour chip per connection,
 **Copy and export**: table and script grids copy the selected rows, cells or columns (also as CSV, JSON, Markdown or SQL)
 and export them, or every row of the query, to a file. [Copy and export](export.md)
 
+## Command palette
+
+`Ctrl+Shift+K` (or View > Command palette...) lists every command of the app in one searchable box.
+
+![Command palette, dark](ui/after/command-palette-dark.png)
+
+- The search tolerates typos (the quick open ranking), also matches the category and keywords ("dark" finds Change theme),
+  and takes words in any order. The matched letters are in bold.
+- Each row shows its category and keyboard shortcut. A command that cannot run now stays listed, greyed, with the reason
+  ("Open a script tab first").
+- With an empty box: the commands used last (remembered), then what fits the current tab (script, plan, table, diagram),
+  then the rest.
+- The grid on screen can be copied and exported from it (Copy, Copy with headers, Advanced copy, Copy as, Export).
+- A command that needs a choice (Connect to..., Switch to tab..., Change theme...) lists it inside the palette; `Backspace` on
+  an empty box goes back.
+- `Up` / `Down`, `PageUp` / `PageDown`, `Home` / `End`, `Enter`, `Esc`, or the mouse. Closing gives the focus back to where it was.
+
 ## Quick open
 
 ![Quick open, dark](ui/after/quick-open-dark.png)

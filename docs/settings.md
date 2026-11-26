@@ -33,7 +33,7 @@ Everything lives in `%APPDATA%\dbExplorer`:
 
 | Path | Content |
 | --- | --- |
-| `config.json` | folders, connections (passwords DPAPI-encrypted for the current Windows user), virtual keys, linked groups, the automatic-update setting, the dbupdate folder (`DbUpdatePath`, empty = upgrade off), the SQL formatting style (`Format`), the query-history switch (`RecordHistory`), the copy and export choices (`Export`), the Settings dialog values (`Settings`) |
+| `config.json` | folders, connections (passwords DPAPI-encrypted for the current Windows user), virtual keys, linked groups, the automatic-update setting, the dbupdate folder (`DbUpdatePath`, empty = upgrade off), the SQL formatting style (`Format`), the query-history switch (`RecordHistory`), the recently used palette commands (`RecentCommands`), the copy and export choices (`Export`), the Settings dialog values (`Settings`) |
 | `cache\` | per-connection metadata cache (schema/table/column names) used by `Ctrl+Shift+P` |
 | `scripts\` | unsaved script tabs, restored at the next start |
 | `library\` | the script library: your saved `.sql` scripts and their folders ([Script library](scripts.md#script-library)) |

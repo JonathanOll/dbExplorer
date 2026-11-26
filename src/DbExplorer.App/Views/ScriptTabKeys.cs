@@ -115,6 +115,7 @@ public static class ScriptTabKeys
         new("Results: copy / with column names", "Ctrl+C / Ctrl+Shift+C"),
         new("Results: advanced copy / export", "Ctrl+Alt+C / Ctrl+E"),
         new("Next or previous database of the group", "Ctrl+Alt+PageDown / PageUp"),
+        new("Command palette: run any command", "Ctrl+Shift+K"),
     ];
 
     /// <summary>Ctrl+1 to Ctrl+9 select the 1st to 9th result tab: the 0-based index, or null for any other chord.</summary>

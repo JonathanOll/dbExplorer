@@ -39,6 +39,12 @@ public record AppConfig(
     /// <summary>Settings dialog values (appearance, editor, results...). Missing in old files: the defaults.</summary>
     public AppSettings Settings { get; set; } = new();
 
+    /// <summary>Command palette: ids of the commands run last, newest first. Missing in old files: none.</summary>
+    public List<string> RecentCommands { get; init; } = new();
+
+    /// <summary>How many ids <see cref="RecentCommands"/> keeps.</summary>
+    public const int MaxRecentCommands = 20;
+
     /// <summary>What the copy and export dialogs remember. Missing in old files: the defaults.</summary>
     public ExportPreferences Export { get; set; } = new();
 

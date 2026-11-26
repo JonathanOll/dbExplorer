@@ -5,6 +5,11 @@ Every shortcut of the app. The same list is in the app (`F1`, and Settings > Sho
 
 | Shortcut | Where | Action |
 | --- | --- | --- |
+| `Ctrl+Shift+K` | anywhere | Command palette: every command of the app, searchable (View > Command palette...; press again to close) |
+| `Up` / `Down`, `PageUp` / `PageDown`, `Home` / `End` | command palette | Move the selection |
+| `Enter` / `Tab` | command palette | Run the command / open the choices of a command that asks for one |
+| `Backspace` (empty search box) / `Shift+Tab` | command palette, second step | Back to the previous step |
+| `Esc` | command palette | Close it |
 | `Ctrl+Alt+F` | anywhere | Search in scripts (open tabs and library) and in the data of a connection |
 | `Ctrl+T` | anywhere | Quick open a table, view, procedure, function or column of the active connection |
 | `Ctrl+Shift+P` | anywhere | Quick open the same across all connections (metadata cache) |

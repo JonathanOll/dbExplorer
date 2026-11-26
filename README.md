@@ -34,6 +34,7 @@ All switches, install locations, GitHub rate limit (`$env:GITHUB_TOKEN`) and man
 - **Explore and edit data**: connection tree with folders, table tabs with paging, per-column filters and a raw `WHERE`,
   follow foreign keys with `Ctrl+click`, staged row editing applied in one transaction, and tabs restored at the next start.
   [Features](docs/features.md)
+- **Command palette** (`Ctrl+Shift+K`): every command of the app, searchable, with the reason when one is not available.
 - **Copy and export**: select rows, cells or columns; copy as CSV, JSON, Markdown, SQL or an `IN` list; export to CSV,
   TSV, JSON, XLSX, SQL or Markdown, the whole query streamed to disk. [Copy and export](docs/export.md)
 - **Quick open**: fuzzy search of tables, views, procedures, functions and columns, on one connection or across all of them,
@@ -68,6 +69,7 @@ Limits and edge cases: [docs/limitations.md](docs/limitations.md).
 
 | Shortcut | Action |
 | --- | --- |
+| `Ctrl+Shift+K` | Command palette |
 | `Ctrl+T` | Quick open a table, view, routine or column of the active connection |
 | `Ctrl+Shift+P` | Quick open across all connections |
 | `Ctrl+L` | Table tab: jump to a column. Script tab: estimated execution plan |

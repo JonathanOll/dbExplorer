@@ -38,7 +38,7 @@ no real window and no input). See "Screenshots" below.
    ring (`FocusAdorner`, keyboard only); TextBox / ComboBox get an accent border plus a soft glow; tabs an inset ring. Do not set
    `Focusable="False"` or your own focus visuals on a control a user can tab to.
 8. **Keep startup lean**: no heavy templates, effects, large fonts or images. Transitions are 120 ms on Background / BorderBrush
-   only. The AvaloniaEdit theme stays inside `ScriptTabView` (lazy). A drop shadow only on the quick-open card.
+   only. The AvaloniaEdit theme stays inside `ScriptTabView` (lazy). A drop shadow only on the overlay cards (quick open, search, command palette).
 9. **Settings override tokens: views must not hard-code what a setting changes.** These values are replaced at run time by
    `AppearanceApplier` (Settings dialog, `Appearance/`): the accent family (`DbxAccent`, `DbxAccentStrong`, `DbxAccentButtonBg`,
    `DbxAccentButtonHover`, `DbxOnAccent`, `DbxAccentSoft`, `DbxAccentSoftHover`, `DbxFocusRing`, `DbxLink`, plus the tinted
@@ -198,6 +198,12 @@ current-cell frame: 2 px accent, inside the cell).
   relations, the others dimmed. A footer counts tables and relations and says how to move and open them.
 - **Quick open**: shadowed card, search box, table name (matched letters in bold) + schema, a connection badge, an empty state, a
   result counter ("50 of 1,284"), keyboard-hint footer. `Ctrl+T` connects first when needed.
+- **Command palette** (`Ctrl+Shift+K`, `CommandPaletteOverlay`): a card like quick open (660 wide): search box (with the
+  chosen command as a "back" chip on a second step), section captions (Recently used, Commands, Not available here), 34 px rows
+  with icon, title (matched letters bold), a faint detail or the reason a command is greyed, category, key cap, chevron when a
+  choice follows; keyboard-hint footer with a count. Commands live in `MainViewModel.Registry`
+  (`MainViewModel.Commands.Catalog.cs`): a feature adds an `AppCommand` there or calls `Registry.Add`; providers read memory only.
+  Scenes: `command-palette`, `command-palette-search`, `command-palette-matches`, `command-palette-choices`.
 - **Search** (`Ctrl+Alt+F`, `SearchOverlay`): a card like quick open that stays up while a search runs: search box with the `Aa` /
   `ab` / `.*` toggles (scripts) or the match-mode combo (data), one accent Search button that becomes Stop while running, scope
   chips (Scripts | Data), the data filters (connection, schema, table name) and an info banner about long searches, a thin progress

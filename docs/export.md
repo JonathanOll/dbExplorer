@@ -15,6 +15,8 @@ A rectangle or column selection replaces the row selection, and `Esc` drops it. 
 In a table grid, `Delete` (and **Delete row**) marks every row the selection touches, and `Ctrl+0` sets the selected cells
 to NULL. Both are only staged until you review and save.
 
+Copy, Copy as, Advanced copy and Export are also in the [command palette](features.md#command-palette) (category Grid).
+
 ## Copy
 
 - **Copy** (`Ctrl+C`): one cell gives its value; a selection gives tab separated text, which a spreadsheet pastes as cells.

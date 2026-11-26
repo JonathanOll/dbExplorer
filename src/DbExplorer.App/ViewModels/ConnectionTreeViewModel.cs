@@ -628,6 +628,19 @@ public partial class ConnectionTreeViewModel : ObservableObject
         return SaveSetting();
     }
 
+    /// <summary>
+    /// Moves a command to the top of the palette's "recently used" list. Saved quietly: running a command must not replace its
+    /// own status message with a config warning.
+    /// </summary>
+    public void AddRecentCommand(string id)
+    {
+        var recent = Config.RecentCommands;
+        recent.Remove(id);
+        recent.Insert(0, id);
+        if (recent.Count > AppConfig.MaxRecentCommands) recent.RemoveRange(AppConfig.MaxRecentCommands, recent.Count - AppConfig.MaxRecentCommands);
+        if (_persistenceEnabled) SaveSetting();
+    }
+
     private bool SaveSetting()
     {
         if (!_persistenceEnabled)

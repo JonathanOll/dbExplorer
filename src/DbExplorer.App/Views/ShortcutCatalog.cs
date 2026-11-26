@@ -12,6 +12,7 @@ public static class ShortcutCatalog
 {
     public static readonly IReadOnlyList<ShortcutItem> Highlights =
     [
+        new("Ctrl+Shift+K", "Command palette: run any command"),
         new("Ctrl+T", "Go to a table or object of the selected connection"),
         new("Ctrl+Shift+P", "Go to a table or object in any connection"),
         new("Ctrl+N", "New SQL script"),
@@ -22,6 +23,7 @@ public static class ShortcutCatalog
     public static readonly IReadOnlyList<ShortcutSection> Sections =
     [
         new("Navigate", [
+            new("Ctrl+Shift+K", "Command palette: run any command"),
             new("Ctrl+T", "Go to a table or object of the selected connection"),
             new("Ctrl+Shift+P", "Go to a table or object in any connection"),
             new("Alt+1 … Alt+5", "In the quick open: search tables, views, procedures, functions, columns (on / off)"),
@@ -90,6 +92,11 @@ public static class ShortcutCatalog
         ]),
         new("Search box", [
             new("Tab", "Switch between this connection and all connections"),
+        ]),
+        new("Command palette", [
+            new("Enter", "Run the command, or open its choices"),
+            new("Backspace", "Back from the choices (empty search box)"),
+            new("Home / End", "First or last command"),
         ]),
         new("Help", [
             new("Ctrl+,", "Open the settings"),

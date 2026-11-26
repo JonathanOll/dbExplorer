@@ -17,8 +17,12 @@ public sealed class HighlightText : TextBlock
     public static readonly AttachedProperty<string?> QueryProperty =
         AvaloniaProperty.RegisterAttached<HighlightText, Control, string?>("Query", null, inherits: true);
 
+    public static readonly StyledProperty<IReadOnlyList<int>?> PositionsProperty =
+        AvaloniaProperty.Register<HighlightText, IReadOnlyList<int>?>(nameof(Positions));
+
     static HighlightText()
     {
+        PositionsProperty.Changed.AddClassHandler<HighlightText>((t, _) => t.Rebuild());
         SourceProperty.Changed.AddClassHandler<HighlightText>((t, _) => t.Rebuild());
         QueryProperty.Changed.AddClassHandler<HighlightText>((t, _) => t.Rebuild());
     }
@@ -29,6 +33,13 @@ public sealed class HighlightText : TextBlock
     {
         get => GetValue(SourceProperty);
         set => SetValue(SourceProperty, value);
+    }
+
+    /// <summary>The characters to mark, when the caller already knows them (command palette); null: matched against the query.</summary>
+    public IReadOnlyList<int>? Positions
+    {
+        get => GetValue(PositionsProperty);
+        set => SetValue(PositionsProperty, value);
     }
 
     public static string? GetQuery(Control control) => control.GetValue(QueryProperty);
@@ -56,7 +67,7 @@ public sealed class HighlightText : TextBlock
     {
         var text = Source ?? "";
         Inlines?.Clear();
-        var hits = Match(text, GetQuery(this));
+        var hits = Positions ?? Match(text, GetQuery(this));
         if (hits.Count == 0)
         {
             Text = text;

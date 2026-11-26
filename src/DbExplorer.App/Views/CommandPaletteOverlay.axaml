@@ -1,0 +1,136 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DbExplorer.App.ViewModels"
+             xmlns:views="using:DbExplorer.App.Views"
+             x:Class="DbExplorer.App.Views.CommandPaletteOverlay"
+             x:DataType="vm:CommandPaletteViewModel"
+             HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+
+  <UserControl.Styles>
+    <!-- Driven from the search box: rows never take the focus. The item itself draws nothing, so a section caption stays
+         outside the highlight of its first row (Border.cmdRow draws hover and selection). -->
+    <Style Selector="ListBoxItem">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" />
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="Border.cmdRow">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="{DynamicResource DbxRadius}" />
+      <Setter Property="Margin" Value="8,1" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="MinHeight" Value="34" />
+    </Style>
+    <Style Selector="ListBoxItem:pointerover Border.cmdRow">
+      <Setter Property="Background" Value="{DynamicResource DbxHover}" />
+    </Style>
+    <Style Selector="ListBoxItem:selected Border.cmdRow">
+      <Setter Property="Background" Value="{DynamicResource DbxAccentSoft}" />
+    </Style>
+    <Style Selector="Border.cmdRow PathIcon">
+      <Setter Property="Foreground" Value="{DynamicResource DbxIcon}" />
+    </Style>
+    <Style Selector="ListBoxItem:selected Border.cmdRow PathIcon.lead">
+      <Setter Property="Foreground" Value="{DynamicResource DbxAccent}" />
+    </Style>
+    <Style Selector="Border.cmdRow.off TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource DbxTextFaint}" />
+    </Style>
+    <Style Selector="Border.cmdRow.off PathIcon, Border.cmdRow.off Border.kbd">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+  </UserControl.Styles>
+
+  <!-- Scrim: catches clicks outside the card (closes the palette) -->
+  <Border x:Name="Scrim" Background="{DynamicResource DbxScrim}">
+    <Border x:Name="Card" Width="660" MaxHeight="520" VerticalAlignment="Top" HorizontalAlignment="Center"
+            Margin="12,72,12,12" CornerRadius="{DynamicResource DbxCardRadius}" BorderThickness="1"
+            Background="{DynamicResource DbxSurface}" BorderBrush="{DynamicResource DbxBorder}"
+            BoxShadow="{DynamicResource DbxCardShadow}">
+      <DockPanel>
+        <!-- search box; in a second step, the chosen command as a chip before it -->
+        <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1" Padding="18,8">
+          <Grid ColumnDefinitions="Auto,Auto,*">
+            <PathIcon Data="{StaticResource IconSearch}" Width="18" Height="18" Foreground="{DynamicResource DbxAccent}" Margin="0,0,10,0" />
+            <Button x:Name="StepChip" Grid.Column="1" Classes="subtle" Focusable="False" Padding="8,2" MinHeight="26" Margin="0,0,10,0"
+                    VerticalAlignment="Center" IsVisible="{Binding InStep}" AutomationProperties.Name="Back to all commands"
+                    ToolTip.Tip="Back (Backspace)">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <PathIcon Data="{StaticResource IconChevronLeft}" Width="11" Height="11" />
+                <TextBlock Text="{Binding StepTitle}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <TextBox x:Name="QueryBox" Grid.Column="2" Classes="bare" Text="{Binding Query, Mode=TwoWay}" Watermark="{Binding Watermark}"
+                     FontSize="16" MinHeight="40" Padding="0,8" VerticalContentAlignment="Center" AutomationProperties.Name="Command search" />
+          </Grid>
+        </Border>
+        <!-- keyboard hints and the count -->
+        <Border DockPanel.Dock="Bottom" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,1,0,0" Padding="18,8">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Border Classes="kbd"><TextBlock Text="↑↓" /></Border>
+              <TextBlock Classes="dim small" Text="navigate" VerticalAlignment="Center" />
+              <Border Classes="kbd" Margin="6,0,0,0"><TextBlock Text="Enter" /></Border>
+              <TextBlock Classes="dim small" Text="{Binding ConfirmHint}" VerticalAlignment="Center" />
+              <StackPanel Orientation="Horizontal" Spacing="6" Margin="6,0,0,0" IsVisible="{Binding InStep}">
+                <Border Classes="kbd"><TextBlock Text="Backspace" /></Border>
+                <TextBlock Classes="dim small" Text="back" VerticalAlignment="Center" />
+              </StackPanel>
+              <Border Classes="kbd" Margin="6,0,0,0"><TextBlock Text="Esc" /></Border>
+              <TextBlock Classes="dim small" Text="close" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Grid.Column="1" Classes="faint small" Text="{Binding CountText}" VerticalAlignment="Center"
+                       IsVisible="{Binding !IsEmpty}" />
+          </Grid>
+        </Border>
+        <Panel>
+          <ListBox x:Name="CommandList" Padding="0,4" Background="Transparent" BorderThickness="0" AutomationProperties.Name="Commands"
+                   ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:PaletteRow">
+                <StackPanel AutomationProperties.Name="{Binding AutomationName}">
+                  <TextBlock Classes="section faint" Text="{Binding Header}" Margin="18,8,18,4" IsVisible="{Binding HasHeader}" />
+                  <Border Classes="cmdRow" Classes.off="{Binding !IsEnabled}">
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+                      <PathIcon Classes="lead" Data="{Binding Icon, Converter={x:Static views:Icons.ByKey}}" Width="15" Height="15"
+                                Margin="0,0,12,0" />
+                      <!-- title, then the detail or the reason it is greyed -->
+                      <Grid Grid.Column="1" ColumnDefinitions="Auto,*" VerticalAlignment="Center">
+                        <views:HighlightText Source="{Binding Title}" Positions="{Binding Matches}" FontSize="13.5"
+                                             TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Classes="faint small" Text="{Binding Note}" Margin="10,1,0,0" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Note}" IsVisible="{Binding HasNote}" />
+                      </Grid>
+                      <TextBlock Grid.Column="2" Classes="faint small" Text="{Binding Category}" Width="80" Margin="12,0,0,0" VerticalAlignment="Center"
+                                 IsVisible="{Binding ShowCategory}" />
+                      <!-- fixed width: shortcuts line up and the categories stay in one column -->
+                      <Panel Grid.Column="3" MinWidth="128" Margin="12,0,0,0">
+                        <Border Classes="kbd" HorizontalAlignment="Right" VerticalAlignment="Center" IsVisible="{Binding HasShortcut}">
+                          <TextBlock Text="{Binding Shortcut}" />
+                        </Border>
+                      </Panel>
+                      <Panel Grid.Column="4" Width="12" Margin="8,0,0,0">
+                        <PathIcon Data="{StaticResource IconChevronRight}" Width="10" Height="10" IsVisible="{Binding HasChoices}" />
+                      </Panel>
+                    </Grid>
+                  </Border>
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <!-- nothing to show -->
+          <StackPanel Classes="empty" Margin="0,28" IsVisible="{Binding IsEmpty}">
+            <PathIcon Data="{StaticResource IconSearch}" />
+            <TextBlock Classes="dim" Text="{Binding EmptyText}" />
+          </StackPanel>
+        </Panel>
+      </DockPanel>
+    </Border>
+  </Border>
+</UserControl>

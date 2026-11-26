@@ -20,10 +20,14 @@ public static class MainShortcuts
     /// (Ctrl+W, Ctrl+Tab, F5); a refused commit swallows the chord and does nothing.</param>
     public static bool Handle(MainViewModel main, Key key, KeyModifiers modifiers, Func<bool>? commitOpenEdit = null)
     {
-        var overlay = main.QuickOpen is not null || main.SearchOverlay is not null;
+        var overlay = main.QuickOpen is not null || main.SearchOverlay is not null || main.CommandPalette is not null;
         bool Ready() => commitOpenEdit?.Invoke() ?? true;
         switch (key, modifiers)
         {
+            // The command palette (also closes it). A cell edit is staged first: the command may leave or reload the tab.
+            case (Key.K, KeyModifiers.Control | KeyModifiers.Shift):
+                if (main.CommandPalette is not null || Ready()) main.ToggleCommandPaletteCommand.Execute(null);
+                return true;
             case (Key.B, KeyModifiers.Control):
                 main.ToggleNavigatorCommand.Execute(null);
                 return true;

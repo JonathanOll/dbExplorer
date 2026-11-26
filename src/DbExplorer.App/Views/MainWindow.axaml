@@ -104,6 +104,10 @@
           </MenuItem>
 
           <MenuItem Header="_View">
+            <MenuItem Header="Command _palette…" Command="{Binding ShowCommandPaletteCommand}" InputGesture="Ctrl+Shift+K">
+              <MenuItem.Icon><PathIcon Data="{StaticResource IconSearch}" /></MenuItem.Icon>
+            </MenuItem>
+            <Separator />
             <MenuItem Header="_Navigator" ToggleType="CheckBox" IsChecked="{Binding IsNavigatorVisible, Mode=OneWay}" Command="{Binding ToggleNavigatorCommand}" InputGesture="Ctrl+B" />
             <MenuItem Header="Show active item in _navigator" Command="{Binding RevealActiveTabCommand}" />
             <MenuItem Header="Show _folders" ToggleType="CheckBox" IsChecked="{Binding Tree.ShowFolders, Mode=OneWay}" Command="{Binding Tree.ToggleFoldersCommand}"
@@ -830,6 +834,15 @@
       <ContentControl.DataTemplates>
         <DataTemplate DataType="vm:SearchViewModel">
           <views:SearchOverlay />
+        </DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
+
+    <!-- Command palette (Ctrl+Shift+K): created on demand -->
+    <ContentControl Content="{Binding CommandPalette}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+      <ContentControl.DataTemplates>
+        <DataTemplate DataType="vm:CommandPaletteViewModel">
+          <views:CommandPaletteOverlay />
         </DataTemplate>
       </ContentControl.DataTemplates>
     </ContentControl>

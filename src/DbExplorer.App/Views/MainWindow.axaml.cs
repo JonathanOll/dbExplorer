@@ -43,9 +43,24 @@ public partial class MainWindow : Window
                     if (e.PropertyName == nameof(MainViewModel.IsNavigatorVisible)) ShowNavigator(main.IsNavigatorVisible);
                 };
                 main.Tree.NodeRevealed += ScrollNodeIntoView;
+                main.ExitRequested = Close;
+                main.FindActiveGrid = ActiveGrid;
+                main.FocusNavigatorFilter = () => Avalonia.Threading.Dispatcher.UIThread.Post(
+                    () => this.FindControl<TextBox>("FilterBox")?.Focus(), Avalonia.Threading.DispatcherPriority.Background);
             }
         };
         this.FindControl<TabControl>("DocTabs")!.AddHandler(PointerReleasedEvent, OnDocTabsPointerReleased, RoutingStrategies.Tunnel);
+    }
+
+    // The grid the palette acts on: the focused one (a script can show several results), else one with a selection, else
+    // the first on screen. Only the selected tab has its views in the tree.
+    private ResultGrid? ActiveGrid()
+    {
+        var grids = this.GetVisualDescendants().OfType<ResultGrid>()
+            .Where(g => g.IsEffectivelyVisible && g.Columns is { Count: > 0 }).ToList();
+        return grids.FirstOrDefault(g => g.IsKeyboardFocusWithin)
+               ?? grids.FirstOrDefault(g => g.CurrentSlice() is not null)
+               ?? grids.FirstOrDefault();
     }
 
     // Middle-click on a document tab header closes it, through the same path as the x button (unsaved work is asked about).

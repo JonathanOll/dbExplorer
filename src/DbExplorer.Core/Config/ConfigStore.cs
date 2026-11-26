@@ -39,6 +39,8 @@ public class ConfigStore(string path, ISecretProtector protector)
             DbUpdatePath = config.DbUpdatePath,
             RecordHistory = config.RecordHistory,
             QuickOpenHidden = config.QuickOpenHidden,
+            RecentCommands = (config.RecentCommands ?? new()).Where(id => !string.IsNullOrWhiteSpace(id))
+                .Take(AppConfig.MaxRecentCommands).ToList(),
             Format = (config.Format ?? new()).Normalized(),
             Settings = (config.Settings ?? new()).Normalized(),
             Export = (config.Export ?? new()).Normalized()
