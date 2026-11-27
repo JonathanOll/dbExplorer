@@ -40,7 +40,11 @@ public static class ProductionWrites
     public static bool MayWrite(string sql, DbKind kind)
     {
         if (ReadOnlyGuard.IsWrite(sql, kind)) return true;
-        var tokens = SqlLexer.Tokenize(sql, SqlLexOptions.For(kind));
+        return SqlLexOptions.Readings(kind).Any(reading => CallsWriter(sql, kind, SqlLexer.Tokenize(sql, reading)));
+    }
+
+    private static bool CallsWriter(string sql, DbKind kind, List<SqlToken> tokens)
+    {
         for (var i = 0; i < tokens.Count; i++)
         {
             var t = tokens[i];

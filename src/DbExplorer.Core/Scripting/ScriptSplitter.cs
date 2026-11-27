@@ -196,7 +196,8 @@ public static class ScriptSplitter
         {
             if (firstToken >= 0)
             {
-                var start = SkipWhitespace(script, segmentStart);
+                // PostgreSQL reads a non-breaking space and the like as part of a word: never trim into the first token.
+                var start = Math.Min(SkipWhitespace(script, segmentStart), tokens[firstToken].Start);
                 result.Add(new ScriptStatement(script[start..lastEnd], start, lastEnd));
             }
             firstToken = -1;

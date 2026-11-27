@@ -74,6 +74,11 @@ public static class ReadOnlyGuard
         "mysql_firewall_flush_status", "set_firewall_mode", "set_firewall_group_mode",
     };
 
+    private static readonly HashSet<string> SqlServerVerbs = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "RECONFIGURE", "WRITETEXT", "UPDATETEXT", "SETUSER",
+    };
+
     // SQLite pragmas that only read, whatever their arguments.
     private static readonly HashSet<string> ReadPragmas = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -106,9 +111,10 @@ public static class ReadOnlyGuard
     /// </summary>
     public static bool IsWrite(string sql, DbKind kind)
     {
-        // A NUL may end a comment or the text for the server: what follows cannot be judged.
-        if (kind == DbKind.MySql && sql.Contains('\0')) return true;
-        // MySQL reads quotes as its sql_mode says: a write under any reading is a write.
+        // A NUL may end a comment or the text for the server: what follows cannot be judged. SQLite's provider never
+        // returns from some of them.
+        if (kind is DbKind.MySql or DbKind.Sqlite && sql.Contains('\0')) return true;
+        // Where the text can be read in several ways (see Readings), a write under any of them is a write.
         return SqlLexOptions.Readings(kind).Any(reading => IsWrite(sql, kind, reading));
     }
 
@@ -201,11 +207,13 @@ public static class ReadOnlyGuard
         for (var i = from; i < to; i++)
         {
             if (IsSideEffectCall(sql, tokens, i, to, kind)) return true;
+            if (kind == DbKind.Postgres && IsEscapedCall(sql, tokens, i, to)) return true;
             if (tokens[i].Kind != SqlTokenKind.Word) continue;
             var word = Word(sql, tokens[i]);
             // INTO OUTFILE writes a file on the server; "INTO" may be glued to a number ("1e1into"), these never are.
             if (kind == DbKind.MySql && (word.Equals("OUTFILE", StringComparison.OrdinalIgnoreCase)
                 || word.Equals("DUMPFILE", StringComparison.OrdinalIgnoreCase))) return true;
+            if (kind == DbKind.SqlServer && IsSqlServerVerb(sql, tokens, i, to, word)) return true;
             if (!WriteVerbs.Contains(word)) continue;
 
             // "SELECT ... FOR UPDATE" / "FOR NO KEY UPDATE" only lock rows; they are not writes.
@@ -219,6 +227,20 @@ public static class ReadOnlyGuard
         }
         return false;
     }
+
+    // T-SQL needs few separators: refused anywhere in a statement, as one of these could follow a COMMIT that ends the
+    // transaction protecting a read-only connection (SQL Server 17 wants a ";" before DISABLE TRIGGER; kept strict).
+    private static bool IsSqlServerVerb(string sql, List<SqlToken> tokens, int i, int to, string word) =>
+        SqlServerVerbs.Contains(word)
+        || (word.Equals("DISABLE", StringComparison.OrdinalIgnoreCase) || word.Equals("ENABLE", StringComparison.OrdinalIgnoreCase))
+        && i + 1 < to && tokens[i + 1].Kind == SqlTokenKind.Word && Word(sql, tokens[i + 1]).Equals("TRIGGER", StringComparison.OrdinalIgnoreCase);
+
+    // U&"..." spells a name with escapes: a call to one cannot be checked against the deny list.
+    private static bool IsEscapedCall(string sql, List<SqlToken> tokens, int i, int to) =>
+        i + 3 < to && tokens[i].Kind == SqlTokenKind.Word && tokens[i].End - tokens[i].Start == 1 && sql[tokens[i].Start] is 'U' or 'u'
+        && IsChar(sql, tokens[i + 1], '&') && tokens[i + 2].Kind == SqlTokenKind.Quoted && sql[tokens[i + 2].Start] == '"'
+        && (IsChar(sql, tokens[i + 3], '(')
+            || tokens[i + 3].Kind == SqlTokenKind.Word && Word(sql, tokens[i + 3]).Equals("UESCAPE", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>A deny-listed function name followed by "(" (plain or double-quoted / bracketed / backticked), or NEXT VALUE FOR.</summary>
     private static bool IsSideEffectCall(string sql, List<SqlToken> tokens, int i, int to, DbKind kind)

@@ -29,26 +29,35 @@ internal readonly record struct SqlLexOptions(
     bool MySqlComments = false,
     bool BackslashEscapesInSingleQuotes = false,
     bool BackslashEscapesInDoubleQuotes = false,
-    bool Delimiters = false)
+    bool Delimiters = false,
+    bool LineCommentsEndAtLineFeed = false,
+    bool PostgresWords = false)
 {
     /// <summary>The lexing rules of each database; shared by the splitter and the read-only guard.</summary>
     public static SqlLexOptions For(DbKind kind) => kind switch
     {
-        DbKind.Postgres => new SqlLexOptions(DollarQuotes: true, NestedBlockComments: true, BackslashEscapesInEStrings: true),
+        // PostgresWords: blanks are ASCII only, every character above 0x7F belongs to an identifier, '@' and '#' are
+        // operators and an E'' string continued on a later line keeps its escapes (scan.l).
+        DbKind.Postgres => new SqlLexOptions(DollarQuotes: true, NestedBlockComments: true, BackslashEscapesInEStrings: true,
+            PostgresWords: true),
         DbKind.SqlServer => new SqlLexOptions(NestedBlockComments: true, BracketIdentifiers: true),
         // MySqlComments: '#' comments, "--" only before a blank, line comments ending at '\n' only, executable comments.
         DbKind.MySql => new SqlLexOptions(MySqlComments: true, BackslashEscapesInSingleQuotes: true, BackslashEscapesInDoubleQuotes: true),
-        _ => new SqlLexOptions(BracketIdentifiers: true),
+        // SQLite ends a "--" comment at '\n' only: a lone '\r' is part of it.
+        _ => new SqlLexOptions(BracketIdentifiers: true, LineCommentsEndAtLineFeed: true),
     };
 
     /// <summary>
-    /// Every way a server of this kind may read the quotes of a text. MySQL's depends on the session's sql_mode
-    /// (NO_BACKSLASH_ESCAPES, ANSI_QUOTES, MariaDB's MSSQL brackets) and on its version ($$ strings), which the text
-    /// alone does not say.
+    /// Every way the read-only guard lexes a text of this kind: a write under any of them is a write. MySQL's quotes
+    /// depend on the session's sql_mode (NO_BACKSLASH_ESCAPES, ANSI_QUOTES, MariaDB's MSSQL brackets) and on its version
+    /// ($$ strings), which the text alone does not say. PostgreSQL and SQLite keep their former, looser rules as a second
+    /// reading, so the guard never accepts a text it used to refuse.
     /// </summary>
     public static IReadOnlyList<SqlLexOptions> Readings(DbKind kind)
     {
         var usual = For(kind);
+        if (kind == DbKind.Postgres) return [usual, usual with { PostgresWords = false }];
+        if (kind == DbKind.Sqlite) return [usual, usual with { LineCommentsEndAtLineFeed = false }];
         if (kind != DbKind.MySql) return [usual];
         var ansi = usual with { BackslashEscapesInDoubleQuotes = false };
         var raw = ansi with { BackslashEscapesInSingleQuotes = false };
@@ -75,7 +84,7 @@ internal static class SqlLexer
         while (i < s.Length)
         {
             var c = s[i];
-            if (char.IsWhiteSpace(c)) { i++; continue; }
+            if (o.PostgresWords ? IsPostgresBlank(c) : char.IsWhiteSpace(c)) { i++; continue; }
 
             if (o.Delimiters)
             {
@@ -111,8 +120,11 @@ internal static class SqlLexer
             {
                 var escapes = o.BackslashEscapesInSingleQuotes
                               || o.BackslashEscapesInEStrings && start > 0 && s[start - 1] is 'E' or 'e'
-                              && (start < 2 || !IsWordChar(s[start - 2]));
+                              && (start < 2 || !(o.PostgresWords ? IsPostgresWordChar(s[start - 2]) : IsWordChar(s[start - 2])));
                 i = SkipQuoted(s, i, '\'', escapes);
+                // The continued part of an E'' string is still read with its escapes.
+                if (escapes && o.PostgresWords)
+                    while (TryQuoteContinuation(s, i, out var quote)) i = SkipQuoted(s, quote, '\'', true);
                 tokens.Add(new SqlToken(SqlTokenKind.Quoted, start, i));
             }
             else if (c is '"' or '`')
@@ -125,16 +137,16 @@ internal static class SqlLexer
                 i = SkipBracketIdentifier(s, i);
                 tokens.Add(new SqlToken(SqlTokenKind.Quoted, start, i));
             }
-            else if (c == '$' && o.DollarQuotes && TryDollarQuote(s, i, out var end))
+            else if (c == '$' && o.DollarQuotes && TryDollarQuote(s, i, out var end, o.PostgresWords))
             {
                 i = end;
                 tokens.Add(new SqlToken(SqlTokenKind.Quoted, start, i));
             }
-            else if (IsWordStart(c))
+            else if (o.PostgresWords ? IsPostgresWordStart(c) : IsWordStart(c))
             {
                 i++;
                 // '#' starts a comment in MySQL even against a word; a custom delimiter ("END$$") ends one.
-                while (i < s.Length && IsWordChar(s[i]) && !(o.MySqlComments && s[i] == '#')
+                while (i < s.Length && (o.PostgresWords ? IsPostgresWordChar(s[i]) : IsWordChar(s[i])) && !(o.MySqlComments && s[i] == '#')
                        && !(delimiter != ";" && Matches(s, i, delimiter))) i++;
                 tokens.Add(new SqlToken(SqlTokenKind.Word, start, i));
             }
@@ -152,6 +164,26 @@ internal static class SqlLexer
     internal static bool IsWordStart(char c) => char.IsLetter(c) || c == '_';
 
     internal static bool IsWordChar(char c) => char.IsLetterOrDigit(c) || c is '_' or '$' or '#' or '@';
+
+    private static bool IsPostgresBlank(char c) => c is ' ' or '\t' or '\n' or '\r' or '\f' or '\v';
+
+    private static bool IsPostgresWordStart(char c) => char.IsAsciiLetter(c) || c == '_' || c >= 0x80;
+
+    private static bool IsPostgresWordChar(char c) => IsPostgresWordStart(c) || char.IsAsciiDigit(c) || c == '$';
+
+    /// <summary>Blanks and "--" comments holding at least one line break, then a quote: the string before goes on.</summary>
+    private static bool TryQuoteContinuation(string s, int i, out int quote)
+    {
+        var newline = false;
+        while (i < s.Length)
+        {
+            if (IsPostgresBlank(s[i])) { newline |= s[i] is '\n' or '\r'; i++; }
+            else if (s[i] == '-' && Peek(s, i + 1) == '-') i = SkipLineComment(s, i);
+            else break;
+        }
+        quote = i;
+        return newline && i < s.Length && s[i] == '\'';
+    }
 
     private static bool Matches(string s, int i, string text) => string.CompareOrdinal(s, i, text, 0, text.Length) == 0;
 
@@ -197,7 +229,17 @@ internal static class SqlLexer
             }
             if (IsExecutableComment(s, i)) return false;
         }
-        else if (c == '-' && Peek(s, i + 1) == '-') { end = SkipLineComment(s, i); return true; }
+        else if (c == '-' && Peek(s, i + 1) == '-')
+        {
+            if (!o.LineCommentsEndAtLineFeed) end = SkipLineComment(s, i);
+            else
+            {
+                var eol = s.IndexOf('\n', i);
+                // The '\r' of a CRLF stays outside, as for the other engines.
+                end = eol < 0 ? s.Length : s[eol - 1] == '\r' ? eol - 1 : eol;
+            }
+            return true;
+        }
 
         if (c != '/' || Peek(s, i + 1) != '*') return false;
         end = SkipBlockComment(s, i, o.NestedBlockComments);
@@ -287,15 +329,16 @@ internal static class SqlLexer
     /// Recognises a PostgreSQL dollar-quoted string ($$...$$ or $tag$...$tag$) starting at <paramref name="i"/>.
     /// Requires a closing delimiter; $1-style parameters and $ inside identifiers are not dollar quotes.
     /// </summary>
-    internal static bool TryDollarQuote(string s, int i, out int end)
+    internal static bool TryDollarQuote(string s, int i, out int end, bool postgresWords = false)
     {
         end = i;
-        if (i > 0 && IsWordChar(s[i - 1])) return false;
+        // With PostgreSQL's words, a '$' inside an identifier was already taken with it.
+        if (!postgresWords && i > 0 && IsWordChar(s[i - 1])) return false;
 
         var j = i + 1;
-        if (j < s.Length && IsWordStart(s[j]))
+        if (j < s.Length && (postgresWords ? IsPostgresWordStart(s[j]) : IsWordStart(s[j])))
         {
-            while (j < s.Length && (char.IsLetterOrDigit(s[j]) || s[j] == '_')) j++;
+            while (j < s.Length && (postgresWords ? s[j] != '$' && IsPostgresWordChar(s[j]) : char.IsLetterOrDigit(s[j]) || s[j] == '_')) j++;
         }
         if (j >= s.Length || s[j] != '$') return false;
 
