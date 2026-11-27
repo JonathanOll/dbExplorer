@@ -12,6 +12,10 @@
   Run 1 is reported as "first" (cold: first launch after a build/publish, OS file cache not primed by this script);
   runs 2..N are the "warm" series (median / min / max).
 
+  The app also writes its own timing trace (env DBEXPLORER_STARTUP_TRACE): milliseconds from process start to the first
+  painted frame and to "interactive" (restored tabs laid out, UI thread idle). The script FAILS when a database
+  provider, SSH or Azure sign-in assembly was already loaded at the first frame.
+
 .PARAMETER ExePath   Path to DbExplorer.exe (default: the Release build output of this repo).
 .PARAMETER Runs      Number of launches (default 10, including the cold first one).
 .PARAMETER SettleSeconds  Seconds to wait after the window is visible before sampling the working set (default 3).
@@ -126,6 +130,12 @@ function Get-Stat($values) {
     [pscustomobject]@{ Median = $median; Min = $s[0]; Max = $s[-1] }
 }
 
+# Must not be loaded before the first frame: each is only needed once a connection of its kind opens.
+$heavy = '^(Microsoft\.Data\.|Npgsql$|SQLitePCLRaw|Renci\.|BouncyCastle|Azure\.|Microsoft\.Identity)'
+$frame = New-Object System.Collections.Generic.List[double]
+$ready = New-Object System.Collections.Generic.List[double]
+$early = New-Object System.Collections.Generic.SortedSet[string]
+
 $times = New-Object System.Collections.Generic.List[double]
 $wsMb = New-Object System.Collections.Generic.List[double]
 $privMb = New-Object System.Collections.Generic.List[double]
@@ -139,6 +149,8 @@ for ($i = 1; $i -le $Runs; $i++) {
         $psi.WorkingDirectory = Split-Path -Parent $ExePath
         $psi.UseShellExecute = $false
         foreach ($a in '--data-dir', $dirs.Root, '--dbeaver-dir', $dirs.DBeaver) { $psi.ArgumentList.Add($a) }
+        $trace = Join-Path $dirs.Root 'startup-trace.txt'
+        $psi.Environment['DBEXPLORER_STARTUP_TRACE'] = $trace
         foreach ($k in $Env.Keys) { $psi.Environment[$k] = [string]$Env[$k] }
         $proc = New-Object System.Diagnostics.Process
         $proc.StartInfo = $psi
@@ -150,6 +162,16 @@ for ($i = 1; $i -le $Runs; $i++) {
         $ws = $proc.WorkingSet64 / 1MB
         $pv = $proc.PrivateMemorySize64 / 1MB
         $times.Add($ms); $wsMb.Add($ws); $privMb.Add($pv)
+        if (Test-Path $trace) {   # absent with a build that predates the trace
+            foreach ($line in Get-Content $trace) {
+                $name, $value = ($line -split "`t")[0, 1]
+                if ($name -eq 'first-frame') { $frame.Add([double]::Parse($value, [cultureinfo]::InvariantCulture)) }
+                if ($name -eq 'interactive') { $ready.Add([double]::Parse($value, [cultureinfo]::InvariantCulture)) }
+                if ($name -eq 'assemblies@first-frame') {
+                    foreach ($a in $value -split ',') { if ($a -match $heavy) { [void]$early.Add($a) } }
+                }
+            }
+        }
         Write-Host ('run {0,2}: {1,7:N0} ms   WS {2,6:N1} MB  private {3,6:N1} MB' -f $i, $ms, $ws, $pv)
     }
     finally {
@@ -171,6 +193,12 @@ Write-Host ''
 Write-Host "== $Label  ($ExePath) env: $envText"
 Write-Host ('cold (run 1)      : {0,7:N0} ms' -f $first)
 Write-Host ('warm (runs 2..N)  : median {0:N0} ms   min {1:N0}   max {2:N0}   (n={3})' -f $warm.Median, $warm.Min, $warm.Max, $warmTimes.Count)
+foreach ($series in @(@('first frame (trace)', $frame), @('interactive (trace)', $ready))) {
+    if ($series[1].Count -gt 1) {
+        $st = Get-Stat $series[1].GetRange(1, $series[1].Count - 1)
+        Write-Host ('{0,-18}: median {1:N0} ms   min {2:N0}   max {3:N0}' -f $series[0], $st.Median, $st.Min, $st.Max)
+    }
+}
 Write-Host ('working set @{0}s : median {1:N1} MB  min {2:N1}  max {3:N1}' -f $SettleSeconds, $wsStat.Median, $wsStat.Min, $wsStat.Max)
 Write-Host ('private bytes     : median {0:N1} MB' -f $pvStat.Median)
 
@@ -179,3 +207,5 @@ Write-Host ('private bytes     : median {0:N1} MB' -f $pvStat.Median)
     WarmMinMs = [math]::Round($warm.Min); WarmMaxMs = [math]::Round($warm.Max)
     WorkingSetMB = [math]::Round($wsStat.Median, 1); PrivateMB = [math]::Round($pvStat.Median, 1)
 }
+
+if ($early.Count) { throw "Loaded before the first frame, but only needed by a connection: $($early -join ', ')" }

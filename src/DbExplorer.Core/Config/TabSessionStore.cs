@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace DbExplorer.Core.Config;
 
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(JsonStringEnumConverter<SavedTabKind>))]
 public enum SavedTabKind { Table, Script }
 
 /// <summary>
@@ -39,8 +39,6 @@ public sealed record TabSessionLoad(SavedTabs? Session, string? Notice, bool Unr
 /// </summary>
 public sealed class TabSessionStore(string path)
 {
-    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
-
     public string FilePath => path;
 
     /// <summary>A missing file or one that cannot be read (locked) is "no session"; a corrupt one is moved aside, with a notice.</summary>
@@ -52,7 +50,7 @@ public sealed class TabSessionStore(string path)
             var json = File.ReadAllText(path);
             try
             {
-                var session = JsonSerializer.Deserialize<SavedTabs>(json, Options);
+                var session = JsonSerializer.Deserialize(json, SessionJsonContext.Default.SavedTabs);
                 if (session?.Tabs is null || session.Tabs.Any(t => t is null)) throw new JsonException("The session contains null entries.");
                 return new TabSessionLoad(session, null);
             }
@@ -77,7 +75,7 @@ public sealed class TabSessionStore(string path)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
             var temp = path + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(session, Options));
+            File.WriteAllText(temp, JsonSerializer.Serialize(session, SessionJsonContext.Default.SavedTabs));
             File.Move(temp, path, overwrite: true);
             return true;
         }

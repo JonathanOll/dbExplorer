@@ -4,13 +4,18 @@ using DbExplorer.Core.Scripting;
 namespace DbExplorer.Core.Model;
 
 /// <summary>Application configuration. VirtualKeys: connection id -> "schema.table" -> key columns.</summary>
+/// <remarks>
+/// A property with a default value, here or in a type the config holds, is declared <c>set</c>, never <c>init</c>: the
+/// source-generated serializer gives an <c>init</c> property that the file lacks the type's zero value instead of the
+/// default (<c>StartupJsonTests</c>).
+/// </remarks>
 public record AppConfig(
     List<string> Folders,
     List<ConnectionConfig> Connections,
     Dictionary<Guid, Dictionary<string, string[]>> VirtualKeys)
 {
-    /// <summary>Connection groups. Init property (not positional) so old configs without it load with an empty list.</summary>
-    public List<ConnectionGroup> Groups { get; init; } = new();
+    /// <summary>Connection groups. Not positional, so old configs without it load with an empty list.</summary>
+    public List<ConnectionGroup> Groups { get; set; } = new();
 
     /// <summary>Whether the app looks for a newer release in the background after start. Missing in old files: on.</summary>
     public bool AutoUpdateCheck { get; set; } = true;
@@ -40,7 +45,7 @@ public record AppConfig(
     public AppSettings Settings { get; set; } = new();
 
     /// <summary>Command palette: ids of the commands run last, newest first. Missing in old files: none.</summary>
-    public List<string> RecentCommands { get; init; } = new();
+    public List<string> RecentCommands { get; set; } = new();
 
     /// <summary>How many ids <see cref="RecentCommands"/> keeps.</summary>
     public const int MaxRecentCommands = 20;

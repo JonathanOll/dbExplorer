@@ -15,6 +15,7 @@ public class App : Application
 {
     public override void Initialize()
     {
+        StartupTrace.Mark("platform-ready");
         AvaloniaXamlLoader.Load(this);
         Appearance.UiScaleHost.Install();   // every window wraps its content in the UI scale host
     }
@@ -23,6 +24,7 @@ public class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            StartupTrace.Mark("app-xaml");
             // Config was read on a worker thread while Avalonia initialised (see StartupPrefetch).
             var prefetched = StartupPrefetch.Take(desktop.Args ?? []);
             var paths = prefetched.Paths;
@@ -39,7 +41,9 @@ public class App : Application
             if (settings.Current != new Core.Model.AppSettings()) Appearance.AppearanceApplier.Apply(settings.Current, this);
             settings.Changed += changed => Appearance.AppearanceApplier.Apply(changed, this);
 
+            StartupTrace.Mark("config");
             var window = new MainWindow();
+            StartupTrace.Mark("window-xaml");
             var dialogs = new DialogService(window);
             var cache = new MetadataCache(paths.CacheDir);
             var sessions = new SessionManager(store, cache, protector, hostKeyPrompt: new HostKeyDialog(window));
@@ -83,6 +87,8 @@ public class App : Application
                 AppPaths.UpdateCheckDisabled(launchArgs) || !startup.PersistenceEnabled, enabled => tree.SetAutoUpdateCheck(enabled));
             window.RestorePlacement(paths.WindowStateFile);
             window.DataContext = main;
+            StartupTrace.Mark("data-context");
+            StartupTrace.Attach(window);
             desktop.MainWindow = window;
         }
 

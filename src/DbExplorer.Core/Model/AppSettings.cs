@@ -15,10 +15,10 @@ public sealed record AppearanceSettings
 {
     public const int MinScalePercent = 90, MaxScalePercent = 150;
 
-    public ThemeChoice Theme { get; init; } = ThemeChoice.System;
-    public int UiScalePercent { get; init; } = 100;
-    public AccentPreset Accent { get; init; } = AccentPreset.Blue;
-    public GridDensity Density { get; init; } = GridDensity.Comfortable;
+    public ThemeChoice Theme { get; set; } = ThemeChoice.System;
+    public int UiScalePercent { get; set; } = 100;
+    public AccentPreset Accent { get; set; } = AccentPreset.Blue;
+    public GridDensity Density { get; set; } = GridDensity.Comfortable;
 
     public AppearanceSettings Normalized() => this with
     {
@@ -37,16 +37,16 @@ public sealed record EditorSettings
 {
     public const double MinFontSize = 10, MaxFontSize = 24;
 
-    public string FontFamily { get; init; } = "";
-    public double FontSize { get; init; } = 13;
-    public bool LineNumbers { get; init; } = true;
-    public bool WordWrap { get; init; }
-    public bool ShowWhitespace { get; init; }
-    public bool HighlightCurrentLine { get; init; } = true;
-    public int TabSize { get; init; } = 4;
+    public string FontFamily { get; set; } = "";
+    public double FontSize { get; set; } = 13;
+    public bool LineNumbers { get; set; } = true;
+    public bool WordWrap { get; set; }
+    public bool ShowWhitespace { get; set; }
+    public bool HighlightCurrentLine { get; set; } = true;
+    public int TabSize { get; set; } = 4;
 
     /// <summary>Typing an opening bracket or quote also adds the closing one. Surrounding a selection works either way.</summary>
-    public bool AutoCloseBrackets { get; init; } = true;
+    public bool AutoCloseBrackets { get; set; } = true;
 
     public EditorSettings Normalized() => this with
     {
@@ -62,13 +62,13 @@ public sealed record ResultsSettings
     public const double MinGridFontSize = 9, MaxGridFontSize = 20;
     public const int MinRowLimit = 1, MaxRowLimit = 100_000, MinCellChars = 20, MaxCellChars = 2000;
 
-    public double GridFontSize { get; init; } = 12.5;
-    public bool Zebra { get; init; } = true;
-    public int DefaultRowLimit { get; init; } = 1000;
-    public NullDisplay NullText { get; init; } = NullDisplay.Null;
-    public bool ThousandsSeparator { get; init; }
-    public DateDisplay DateFormat { get; init; } = DateDisplay.Iso;
-    public int MaxCellLength { get; init; } = 200;
+    public double GridFontSize { get; set; } = 12.5;
+    public bool Zebra { get; set; } = true;
+    public int DefaultRowLimit { get; set; } = 1000;
+    public NullDisplay NullText { get; set; } = NullDisplay.Null;
+    public bool ThousandsSeparator { get; set; }
+    public DateDisplay DateFormat { get; set; } = DateDisplay.Iso;
+    public int MaxCellLength { get; set; } = 200;
 
     public ResultsSettings Normalized() => this with
     {
@@ -89,9 +89,9 @@ public sealed record ResultsSettings
 /// </summary>
 public sealed record AppSettings
 {
-    public AppearanceSettings Appearance { get; init; } = new();
-    public EditorSettings Editor { get; init; } = new();
-    public ResultsSettings Results { get; init; } = new();
+    public AppearanceSettings Appearance { get; set; } = new();
+    public EditorSettings Editor { get; set; } = new();
+    public ResultsSettings Results { get; set; } = new();
 
     /// <summary>A copy that is safe to use: null sections (hand-edited file) become defaults and numbers are clamped.</summary>
     public AppSettings Normalized() => this with

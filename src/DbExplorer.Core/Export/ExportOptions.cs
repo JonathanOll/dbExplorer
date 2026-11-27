@@ -12,27 +12,27 @@ public enum ExportEncoding { Automatic, Utf8, Utf8Bom, Utf16, Windows1252 }
 /// <summary>How delimited text is written (CSV, TSV, "Advanced copy").</summary>
 public sealed record DelimitedOptions
 {
-    public string Delimiter { get; init; } = "\t";
+    public string Delimiter { get; set; } = "\t";
 
-    public string RowSeparator { get; init; } = "\r\n";
+    public string RowSeparator { get; set; } = "\r\n";
 
-    public bool Header { get; init; } = true;
+    public bool Header { get; set; } = true;
 
-    public bool RowNumbers { get; init; }
+    public bool RowNumbers { get; set; }
 
-    public QuoteMode Quoting { get; init; } = QuoteMode.WhenNeeded;
+    public QuoteMode Quoting { get; set; } = QuoteMode.WhenNeeded;
 
     /// <summary>What a NULL is written as; empty by default.</summary>
-    public string NullText { get; init; } = "";
+    public string NullText { get; set; } = "";
 
     /// <summary>.NET format of dates and timestamps; empty means ISO 8601.</summary>
-    public string DateFormat { get; init; } = "";
+    public string DateFormat { get; set; } = "";
 
     /// <summary>
     /// Puts an apostrophe before a text that a spreadsheet would run as a formula (it starts with =, +, - or @). Off by
     /// default because it changes the data.
     /// </summary>
-    public bool GuardFormulas { get; init; }
+    public bool GuardFormulas { get; set; }
 
     /// <summary>A hand-edited config may hold nulls or unknown values: they become the defaults.</summary>
     public DelimitedOptions Normalized() => this with
@@ -48,21 +48,21 @@ public sealed record DelimitedOptions
 /// <summary>What the "Advanced copy" and "Export" dialogs remember between uses (stored in the app config).</summary>
 public sealed record ExportPreferences
 {
-    public DelimitedOptions Copy { get; init; } = new();
+    public DelimitedOptions Copy { get; set; } = new();
 
-    public ExportKind Format { get; init; } = ExportKind.Csv;
+    public ExportKind Format { get; set; } = ExportKind.Csv;
 
-    public ExportEncoding Encoding { get; init; } = ExportEncoding.Automatic;
+    public ExportEncoding Encoding { get; set; } = ExportEncoding.Automatic;
 
-    public string CsvDelimiter { get; init; } = ",";
+    public string CsvDelimiter { get; set; } = ",";
 
-    public bool Header { get; init; } = true;
+    public bool Header { get; set; } = true;
 
-    public string NullText { get; init; } = "";
+    public string NullText { get; set; } = "";
 
-    public string DateFormat { get; init; } = "";
+    public string DateFormat { get; set; } = "";
 
-    public bool GuardFormulas { get; init; }
+    public bool GuardFormulas { get; set; }
 
     public ExportPreferences Normalized() => this with
     {

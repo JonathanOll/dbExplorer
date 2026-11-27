@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DbExplorer.Core.Config;
 
 namespace DbExplorer.Core.Scripting;
 
@@ -30,7 +31,8 @@ public sealed class ScriptSessionStore(string dir)
     public void Save(Guid tabId, Guid connectionId, string text, string? filePath)
     {
         Directory.CreateDirectory(dir);
-        var json = JsonSerializer.Serialize(new SavedScript(tabId, connectionId, text, filePath));
+        var json = JsonSerializer.Serialize(new SavedScript(tabId, connectionId, text, filePath),
+            ScriptJsonContext.Default.SavedScript);
         var target = PathOf(tabId);
         var temp = target + ".tmp";
         File.WriteAllText(temp, json);
@@ -46,7 +48,7 @@ public sealed class ScriptSessionStore(string dir)
         {
             try
             {
-                var script = JsonSerializer.Deserialize<SavedScript>(File.ReadAllText(file));
+                var script = JsonSerializer.Deserialize(File.ReadAllText(file), ScriptJsonContext.Default.SavedScript);
                 if (script is { Text: not null } && script.TabId != Guid.Empty) result.Add(script);
             }
             catch (Exception e) when (e is JsonException or IOException or UnauthorizedAccessException)

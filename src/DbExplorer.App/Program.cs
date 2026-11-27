@@ -9,6 +9,8 @@ internal static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        StartupTrace.Mark("main");
+
         // A flag without a value is reported in a message box (and exits) instead of crashing inside the startup prefetch.
         if (AppPaths.CheckArguments(args) is { } problem)
         {

@@ -16,7 +16,7 @@ public sealed class GitHubHttpRunner : IGhRunner
     private const string ApiHost = "api.github.com";
     private const int MaxRedirects = 5;
 
-    private readonly HttpClient _http;
+    private readonly Lazy<HttpClient> _http;
     private readonly Func<string, string?> _env;
 
     /// <param name="handler">Test seam. The default handler never follows redirects itself (this class does, so the token never leaves api.github.com).</param>
@@ -24,11 +24,16 @@ public sealed class GitHubHttpRunner : IGhRunner
     public GitHubHttpRunner(HttpMessageHandler? handler = null, Func<string, string?>? env = null)
     {
         _env = env ?? Environment.GetEnvironmentVariable;
-        _http = new HttpClient(handler ?? new SocketsHttpHandler { AllowAutoRedirect = false }, disposeHandler: true)
+        // Built by the first request: the runner is created during start-up, the network stack must not be loaded there.
+        _http = new Lazy<HttpClient>(() =>
         {
-            Timeout = System.Threading.Timeout.InfiniteTimeSpan, // each call has its own timeout
-        };
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("dbExplorer-updater");
+            var http = new HttpClient(handler ?? new SocketsHttpHandler { AllowAutoRedirect = false }, disposeHandler: true)
+            {
+                Timeout = System.Threading.Timeout.InfiniteTimeSpan, // each call has its own timeout
+            };
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("dbExplorer-updater");
+            return http;
+        });
     }
 
     public async Task<GhResult> RunAsync(IReadOnlyList<string> args, TimeSpan timeout, CancellationToken ct)
@@ -162,7 +167,7 @@ public sealed class GitHubHttpRunner : IGhRunner
             if (token is not null && uri.Host.Equals(ApiHost, StringComparison.OrdinalIgnoreCase))
                 req.Headers.TryAddWithoutValidation("Authorization", "Bearer " + token);
 
-            var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            var resp = await _http.Value.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
             var code = (int)resp.StatusCode;
             if (code is 301 or 302 or 303 or 307 or 308 && resp.Headers.Location is { } loc && hop < MaxRedirects)
             {

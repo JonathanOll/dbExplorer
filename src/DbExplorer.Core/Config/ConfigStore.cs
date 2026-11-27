@@ -1,17 +1,10 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using DbExplorer.Core.Model;
 
 namespace DbExplorer.Core.Config;
 
 public class ConfigStore(string path, ISecretProtector protector)
 {
-    private static readonly JsonSerializerOptions Options = new()
-    {
-        WriteIndented = true,
-        Converters = { new JsonStringEnumConverter() }
-    };
-
     /// <summary>Path of the config file.</summary>
     public string FilePath => path;
 
@@ -23,7 +16,7 @@ public class ConfigStore(string path, ISecretProtector protector)
     {
         if (!File.Exists(path)) return AppConfig.Empty();
         var json = File.ReadAllText(path);
-        var config = JsonSerializer.Deserialize<AppConfig>(json, Options);
+        var config = JsonSerializer.Deserialize(json, ConfigJsonContext.Default.AppConfig);
         if (config is null) return AppConfig.Empty();
         // A hand-edited file may contain explicit nulls, which the record constructor does not reject.
         // An explicit "Groups": null is treated as corrupt (a missing property keeps the init default).
@@ -81,7 +74,7 @@ public class ConfigStore(string path, ISecretProtector protector)
         var dir = Path.GetDirectoryName(Path.GetFullPath(path))!;
         Directory.CreateDirectory(dir);
         var tmp = path + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(config, Options));
+        File.WriteAllText(tmp, JsonSerializer.Serialize(config, ConfigJsonContext.Default.AppConfig));
         if (File.Exists(path)) File.Replace(tmp, path, null);
         else File.Move(tmp, path);
     }

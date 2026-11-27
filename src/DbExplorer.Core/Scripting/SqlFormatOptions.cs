@@ -21,17 +21,17 @@ public enum CommaPosition
 /// <summary>Style of <see cref="SqlFormatter"/>. Persisted in the app config (<c>AppConfig.Format</c>); every property has a default so old files load.</summary>
 public sealed record SqlFormatOptions
 {
-    public KeywordCase KeywordCase { get; init; } = KeywordCase.Upper;
+    public KeywordCase KeywordCase { get; set; } = KeywordCase.Upper;
 
     /// <summary>Spaces per indent level (1 to 8). Also measures a tab when <see cref="UseTabs"/> is on.</summary>
-    public int IndentSize { get; init; } = 4;
+    public int IndentSize { get; set; } = 4;
 
-    public bool UseTabs { get; init; }
+    public bool UseTabs { get; set; }
 
-    public CommaPosition CommaPosition { get; init; } = CommaPosition.Trailing;
+    public CommaPosition CommaPosition { get; set; } = CommaPosition.Trailing;
 
     /// <summary>Lists (IN (...), boolean groups, argument lists) wrap past this width.</summary>
-    public int MaxLineWidth { get; init; } = 100;
+    public int MaxLineWidth { get; set; } = 100;
 
     public static SqlFormatOptions Default { get; } = new();
 

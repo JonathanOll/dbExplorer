@@ -114,3 +114,30 @@ What was tried, and what was kept:
   database), and the run, switch, schema-check, reopen and quick-open code only runs on a command. A/B of the published exe
   against the build before this work, interleaved on the same (noisier than above) machine: 316 / 318 ms vs 303 / 323 ms.
 - **Trimming / single-file: not used** (Avalonia bindings and the providers use reflection, and it did not look necessary).
+
+### Timing trace and later measurements
+
+With env `DBEXPLORER_STARTUP_TRACE=<file>` the app writes, about half a second after it is idle, one line per milestone
+(milliseconds since process start, JIT-ed method count) and the assemblies loaded at the first frame and at
+"interactive" (restored tabs laid out, UI thread idle). `measure-startup.ps1` sets it, prints both medians and fails when
+a database provider, SSH or Azure sign-in assembly is loaded before the first frame.
+
+Windows 10, 8 logical processors, published self-contained exe, medians of 12 warm launches, interleaved, `--data-dir` on
+synthetic data ("small": 8 connections; "large": 60 connections, 16 restored tabs, a 400-line script active):
+
+| Milliseconds (small / large) | Before the features since 66b23bc | With them | With source-generated JSON |
+| --- | --- | --- | --- |
+| Window visible | 327 / 352 | 339 / 365 | 325 / 350 |
+| First frame | 354 / 377 | 366 / 414 | 350 / 383 |
+| Interactive | 355 / 534 | 368 / 566 | 351 / 543 |
+| JIT-ed methods at the first frame | 1161 / 1283 | 1392 / 1511 | 557 / 558 |
+
+- **Source-generated JSON for the config, the tab session and the unsaved scripts: kept.** Reflection metadata cost about
+  75 ms on the worker thread, longer than Avalonia's platform setup, so the UI thread waited for it. A file read before
+  the window is usable belongs in `Config/StartupJsonContexts.cs`. A property with a default value in those types must be
+  `set`, not `init` (the generator drops the default of a missing `init` property; `StartupJsonTests` checks it).
+- **First launch after an update**: with only the app's own binaries new, about 3.0 s with the composite image against
+  1.0 s with plain ReadyToRun (7 launches each), while a warm launch is about 165 ms faster with the composite (365 vs
+  529 ms). Composite is kept. Taking SSH, Azure sign-in and crypto libraries out of the composite
+  (`PublishReadyToRunCompositeExclusions`, 114 to 84 MB) changed neither number; taking only the app's two assemblies
+  out gained 0.2 s on the first launch and lost 15 ms on warm ones. Neither was kept.
