@@ -45,6 +45,9 @@ public sealed record EditorSettings
     public bool HighlightCurrentLine { get; init; } = true;
     public int TabSize { get; init; } = 4;
 
+    /// <summary>Typing an opening bracket or quote also adds the closing one. Surrounding a selection works either way.</summary>
+    public bool AutoCloseBrackets { get; init; } = true;
+
     public EditorSettings Normalized() => this with
     {
         FontFamily = (FontFamily ?? "").Trim(),

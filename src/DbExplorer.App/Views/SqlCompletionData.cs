@@ -45,6 +45,10 @@ internal sealed class SqlCompletionData(CompletionItem item) : ICompletionData
         // start before the segment: a quote that closes the previous name stays.
         if (item.ReplaceStart == start - 1 && document.GetCharAt(start - 1) is '"' or '[') start--;
         var end = Math.Max(start, completionSegment.EndOffset);
+        // The quote or bracket already closed after the caret (added by the editor) is replaced too: the item brings its own.
+        if (start == item.ReplaceStart && start < end && end < document.TextLength
+            && document.GetCharAt(start) is var opener and ('"' or '[') && document.GetCharAt(end) == (opener == '"' ? '"' : ']'))
+            end++;
         document.Replace(start, end - start, item.Text);
         textArea.Caret.Offset = start + item.Text.Length;
     }

@@ -5,6 +5,17 @@ namespace DbExplorer.Core.Tests;
 
 public class AppSettingsTests : IDisposable
 {
+    [Fact]
+    public void AutoCloseBrackets_IsOnByDefault_AndSwitchedOffSurvivesAReload()
+    {
+        var store = new ConfigStore(ConfigPath, new PlainProtector());
+        Assert.True(store.Load().Settings.Editor.AutoCloseBrackets);
+
+        store.Save(AppConfig.Empty() with { Settings = new() { Editor = new() { AutoCloseBrackets = false } } });
+
+        Assert.False(store.Load().Settings.Editor.AutoCloseBrackets);
+    }
+
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "dbExplorer-settings-" + Guid.NewGuid().ToString("N"));
     private string ConfigPath => Path.Combine(_dir, "config.json");
 

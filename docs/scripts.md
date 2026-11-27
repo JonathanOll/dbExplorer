@@ -45,6 +45,19 @@ means nothing is remembered. Tools > Settings > **Query history** switches the r
 (asks for a second click; shows the number of entries and the file size).
 Group runs (one statement on every database) are not recorded.
 
+## Typing in the editor
+
+- **Arrows on a selection** (without `Shift` or `Ctrl`): `Left` puts the caret at the start of the selection, `Right` at its
+  end; `Up` and `Down` move one line from the start and from the end. After `Ctrl+A`, `Left` goes back to the top of the script.
+- **Surround**: with text selected, typing `(`, `[`, `{`, `'` or `"` puts the pair around it. The text stays selected, so a
+  second character wraps it again. One `Ctrl+Z` undoes it. A rectangular selection is replaced as usual.
+- **Auto-close**: the same characters, typed without a selection, also add the closing one, with the caret between the two.
+  Not before a word, a string or an opening bracket; for quotes, not after a word (except the `N'...'`, `E'...'` and `X'...'`
+  prefixes), inside a string, a comment or a quoted identifier. `[` is not closed on PostgreSQL.
+- Typing the closing character over one the editor added steps over it; `Backspace` in a still empty pair added by the
+  editor removes both. Characters you typed yourself are never skipped or removed.
+- **Tools > Settings > Editor > Close brackets and quotes** switches the auto-close off. Surrounding a selection stays.
+
 ## SQL formatting
 
 `Ctrl+Shift+F` (or `Ctrl+K, Ctrl+D`), the toolbar button next to Save and **Script > Format SQL** format the selection, or the whole script when

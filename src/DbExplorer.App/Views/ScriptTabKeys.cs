@@ -86,6 +86,21 @@ public static class ScriptTabKeys
             _ => ScriptKeyAction.None,
         };
 
+    /// <summary>
+    /// An arrow pressed without modifiers while text is selected: the caret goes to the start (Left, Up) or the end (Right,
+    /// Down) of the selection, and Up / Down then move one line from there. AvaloniaEdit alone would move from the caret,
+    /// which Ctrl+A leaves at the end. Null for any other key.
+    /// </summary>
+    public static (bool ToStart, bool ThenMove)? CollapseSelection(Key key, KeyModifiers modifiers) =>
+        modifiers != KeyModifiers.None ? null : key switch
+        {
+            Key.Left => (true, false),
+            Key.Right => (false, false),
+            Key.Up => (true, true),
+            Key.Down => (false, true),
+            _ => null,
+        };
+
     /// <summary>A modifier key on its own: pressing it again between the two keys of a chord does not end the chord.</summary>
     public static bool IsModifier(Key key) =>
         key is Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift or Key.LeftAlt or Key.RightAlt or Key.LWin or Key.RWin;

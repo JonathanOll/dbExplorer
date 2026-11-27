@@ -15,7 +15,7 @@ status bar says the setting is not saved (it still applies for the run).
 | --- | --- |
 | General | Navigator: folders, Groups section, Scripts section (same flags as the View menu) |
 | Appearance | Theme (System / Light / Dark, live), UI scale 90 to 150 %, accent colour (blue, teal, green, orange, pink, purple, both themes, button text keeps 4.5:1), row density (Comfortable 28 / Compact 24 / Spacious 32 px) |
-| Editor | Font family (installed code fonts) and size 10 to 24, line numbers, word wrap, show whitespace, current line highlight, tab size 2 / 4 / 8. Open editors follow at once |
+| Editor | Font family (installed code fonts) and size 10 to 24, line numbers, word wrap, show whitespace, current line highlight, [closing brackets and quotes](scripts.md#typing-in-the-editor) (on by default), tab size 2 / 4 / 8. Open editors follow at once |
 | Results | Grid font size, alternate row shading, default row limit of new scripts, NULL text (`NULL`, `(null)`, empty), thousands separator, date format (ISO or locale), longest cell text. Display only: filters, sorting, copy and edits keep the plain values |
 | Query history | Record the query history on or off, **Clear history** (confirmed), entry count and file size |
 | SQL formatting | Keyword case, indent (2, 4, 8 spaces or tab), comma position, maximum line width, live preview of a sample statement |

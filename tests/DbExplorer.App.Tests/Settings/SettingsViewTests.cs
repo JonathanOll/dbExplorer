@@ -91,7 +91,7 @@ public class SettingsViewTests : IDisposable
 
         vm.Select("editor");
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal(4, window.GetVisualDescendants().OfType<CheckBox>().Count());
+        Assert.Equal(5, window.GetVisualDescendants().OfType<CheckBox>().Count());
         Assert.Single(window.GetVisualDescendants().OfType<ComboBox>().Where(c => c.IsVisible));
         window.Close();
     }

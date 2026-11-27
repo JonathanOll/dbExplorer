@@ -28,6 +28,7 @@ namespace DbExplorer.App.Views;
 public partial class ScriptTabView : UserControl
 {
     private readonly StatementMarkRenderer _marks = new();
+    private readonly EditorPairing _pairing;
     private DispatcherTimer? _elapsedTimer;
     private ScriptTabViewModel? _vm;
     private bool _syncing;
@@ -47,6 +48,9 @@ public partial class ScriptTabView : UserControl
         Editor.TextArea.LeftMargins.Add(_marks.Margin);   // the bars of the statements that ran, after the line numbers
         SearchPanel.Install(Editor);   // Ctrl+F, F3 / Shift+F3, case and whole-word options
         InitCompletion();
+        // After the completion: a character that ends the word closes the list first, then it is paired.
+        _pairing = new EditorPairing(Editor.TextArea, () => _vm?.Connection.Kind, () => SettingsService.Instance.Current.Editor.AutoCloseBrackets);
+        Editor.TextArea.TextEntering += _pairing.OnTextEntering;
         ActualThemeVariantChanged += (_, _) => ApplyEditorTheme();
         AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
         // A click, or the focus going elsewhere, gives up a pending chord: a key typed much later must not be eaten.
@@ -477,7 +481,11 @@ public partial class ScriptTabView : UserControl
             resolved = ScriptTabKeys.ResolveChord(e.Key, e.KeyModifiers);
             if (resolved == ScriptKeyAction.None) return;
         }
-        else resolved = ScriptTabKeys.Resolve(e.Key, e.KeyModifiers);
+        else
+        {
+            if (Editor.TextArea.IsFocused && HandleEditingKey(e)) return;
+            resolved = ScriptTabKeys.Resolve(e.Key, e.KeyModifiers);
+        }
 
         Func<Task>? action = null;
         switch (resolved)
@@ -536,6 +544,19 @@ public partial class ScriptTabView : UserControl
 
         e.Handled = true;
         _ = RunSafe(vm, action);
+    }
+
+    // The keys that edit differently from AvaloniaEdit; true when nothing else has to look at the key.
+    private bool HandleEditingKey(KeyEventArgs e)
+    {
+        if (e.Key == Key.Back && e.KeyModifiers is KeyModifiers.None or KeyModifiers.Shift) return e.Handled = _pairing.Backspace();
+        if (ScriptTabKeys.CollapseSelection(e.Key, e.KeyModifiers) is not { } collapse || Editor.TextArea.Selection.IsEmpty) return false;
+        if (Editor.TextArea.Selection.SurroundingSegment is not { } selected) return false;
+        Editor.TextArea.ClearSelection();
+        Editor.CaretOffset = collapse.ToStart ? selected.Offset : selected.EndOffset;
+        if (collapse.ThenMove) return false;   // Up / Down: the editor moves one line from that edge
+        Editor.TextArea.Caret.BringCaretToView();
+        return e.Handled = true;
     }
 
     // The view-model reports its own failures; this only keeps an unexpected one from crashing the app.

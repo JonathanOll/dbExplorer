@@ -27,6 +27,9 @@ public sealed class EditorSettingsPage : SettingsPageViewModel
                 s => s.Editor.ShowWhitespace, (s, v) => s with { Editor = s.Editor with { ShowWhitespace = v } }, d.ShowWhitespace, "spaces tabs invisible"),
             Make.Toggle(ctx, "Highlight the current line", null,
                 s => s.Editor.HighlightCurrentLine, (s, v) => s with { Editor = s.Editor with { HighlightCurrentLine = v } }, d.HighlightCurrentLine, "caret"));
+        AddGroup("Typing",
+            Make.Toggle(ctx, "Close brackets and quotes", "Typing ( [ { ' or \" also adds the closing character. A selection is surrounded either way.",
+                s => s.Editor.AutoCloseBrackets, (s, v) => s with { Editor = s.Editor with { AutoCloseBrackets = v } }, d.AutoCloseBrackets, "auto pair parenthesis quote"));
         AddGroup("Indentation",
             Make.Choice(ctx, "Tab size", "Width of a tab character, in spaces.",
                 [new("2", 2), new("4", 4), new("8", 8)],

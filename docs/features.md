@@ -102,6 +102,8 @@ the limit says so, raise the limit and run again. Honours the connection read-on
 unsaved editor contents are restored at the next start: from the saved tab list, plus any autosave copy written after it
 (e.g. after a crash); older copies the list does not mention stay in `scripts\` and the status bar says how many.
 
+Brackets and quotes surround the selection or close themselves: [Typing in the editor](scripts.md#typing-in-the-editor).
+
 More on scripts (library, history, formatting, search): [Scripts](scripts.md). Plans and statistics: [Execution plans and statistics](plans.md).
 
 ## ER diagrams

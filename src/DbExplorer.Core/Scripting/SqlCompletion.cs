@@ -112,7 +112,12 @@ public static class SqlCompletion
 
         // The whole statement (aliases are often declared after the caret), without the word being typed.
         var all = text[stmtStart..Math.Max(stmtEnd, caret)];
-        if (quoted) all = all[..replaceStart] + " " + all[(replaceStart + 1)..];
+        if (quoted)
+        {
+            all = all[..replaceStart] + " " + all[(replaceStart + 1)..];
+            // So does a quote already closing it at the caret, which would otherwise open a string over the rest.
+            if (caretInStmt < all.Length && all[caretInStmt] == '"') all = all[..caretInStmt] + " " + all[(caretInStmt + 1)..];
+        }
         var stmtTokens = SqlLexer.Tokenize(all, options);
         // A dollar-quoted body is only recognised with its closing delimiter, which lies after the caret.
         if (kind == DbKind.Postgres && stmtTokens.Any(t => t.Kind == SqlTokenKind.Quoted && all[t.Start] == '$' && t.Start < caretInStmt && caretInStmt < t.End))

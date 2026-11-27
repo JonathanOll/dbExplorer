@@ -225,7 +225,8 @@ public class SqlCompletionViewTests : IDisposable
 
         Type(window, typed);
 
-        Assert.Equal("SELECT * FROM bi" + typed, editor.Text);   // "bi" was not completed to "big"
+        var closer = typed == "(" ? ")" : "";   // the editor closes the parenthesis
+        Assert.Equal("SELECT * FROM bi" + typed + closer, editor.Text);   // "bi" was not completed to "big"
         Assert.Null(view.OpenCompletion);
         window.Close();
     }
