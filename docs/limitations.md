@@ -64,4 +64,6 @@ What dbExplorer does not do, and the edges of what it does. Linked groups and th
   temporary tables or an open transaction of the tab are not seen. A cell or column selection covers loaded rows only.
   Excel files were not checked in Excel itself (the tests read the package back). See [Copy and export](export.md).
 - Quick open: columns are matched without typo tolerance. Across connections, procedures and functions are found for the
-  connections opened since this feature exists (the cache is written after connecting).
+  connections opened since this feature exists (the cache is written after connecting). Objects of other connections come
+  from that cache, so they can be older than the database. A word found only in a folder or group name is not highlighted
+  (the row does not show it).

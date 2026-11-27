@@ -42,7 +42,12 @@ public partial class MainViewModel
     private QuickOpenObjects SearchObjects => new(Tree.OpenRoutineDefinitionAsync, OpenColumn, Tree.LoadRoutinesAsync);
 
     private QuickOpenViewModel TablesPicker(Session session, string query = "") =>
-        QuickOpenViewModel.ForTables(session, OpenTable, Status, query, SearchObjects);
+        QuickOpenViewModel.ForTables(session, OpenTable, Status, query, SearchObjects, SearchElsewhere);
+
+    /// <summary>Lets the search of one connection reach the cached objects of the others; null without a cache.</summary>
+    private QuickOpenElsewhere? SearchElsewhere => _cache is { } cache
+        ? new(cache, Tree.Config.Connections.ToList(), Tree.Config.Groups.ToList(), Tree.EnsureConnectedAsync)
+        : null;
 
     /// <summary>Adds the type chips, remembered in the settings.</summary>
     private QuickOpenViewModel Filtered(QuickOpenViewModel picker) =>

@@ -110,6 +110,23 @@ connections (`Ctrl+Shift+P`, served from an on-disk metadata cache, never connec
 in the current table. **Enter** opens a table or view, the definition of a procedure or function, or the table of a column,
 positioned on that column. Each row shows its kind's icon and its parent (schema, table, connection).
 
+Type several words, separated by spaces, in any order: `accounts resto2` and `resto2 accounts` both find the table
+`accounts` of the database `resto2`. Each word must match something of a row: the name of the object, its schema, the
+table of a column, the database (the file name for SQLite), the connection, its folder, its linked groups or its
+environment (`prod`, `staging`...). Partial words work (`acc resto2`), `schema.table` still works as one word, and typing
+mistakes are forgiven in object, connection, database, folder and group names. Rows whose name is a typed word come first,
+then rows whose name contains one, then the others: a database name alone lists the objects of that database, tables first.
+A column is listed only when one word matches its own name. A connection holds one database: databases that go together are
+the members of a [linked group](groups.md), found by their database, connection or group name.
+
+![Quick open extended to other connections](ui/after/quick-open-extended-dark.png)
+
+`Ctrl+T` stays on the active connection until a word names another connection or database (or folder, group, environment)
+that this one cannot satisfy: no name here contains it, or the query finds nothing here. It then also searches the cached
+objects of the other connections, says so above the list, and shows where each row is. It connects only when you choose a
+row, which opens in its own connection. At equal match quality the active connection comes first. A connection never opened
+has no cache and the banner says so.
+
 The chips under the search box switch each kind off and on (mouse, `Alt+1` to `Alt+5`, or `Shift+Tab` then `Space`); the
 choice is remembered. Columns show once you type, and never push the tables out: at equal match quality objects come first,
 and a column rises above them only when its name fits what you typed better. Type `orders.total` to search a column within a

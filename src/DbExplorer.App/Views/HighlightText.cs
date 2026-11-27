@@ -20,8 +20,16 @@ public sealed class HighlightText : TextBlock
     public static readonly StyledProperty<IReadOnlyList<int>?> PositionsProperty =
         AvaloniaProperty.Register<HighlightText, IReadOnlyList<int>?>(nameof(Positions));
 
+    public static readonly StyledProperty<bool> WholeWordsProperty =
+        AvaloniaProperty.Register<HighlightText, bool>(nameof(WholeWords));
+
+    public static readonly StyledProperty<string?> ElsewhereProperty =
+        AvaloniaProperty.Register<HighlightText, string?>(nameof(Elsewhere));
+
     static HighlightText()
     {
+        WholeWordsProperty.Changed.AddClassHandler<HighlightText>((t, _) => t.Rebuild());
+        ElsewhereProperty.Changed.AddClassHandler<HighlightText>((t, _) => t.Rebuild());
         PositionsProperty.Changed.AddClassHandler<HighlightText>((t, _) => t.Rebuild());
         SourceProperty.Changed.AddClassHandler<HighlightText>((t, _) => t.Rebuild());
         QueryProperty.Changed.AddClassHandler<HighlightText>((t, _) => t.Rebuild());
@@ -42,32 +50,73 @@ public sealed class HighlightText : TextBlock
         set => SetValue(PositionsProperty, value);
     }
 
+    /// <summary>Marks only words the text contains as typed (a context chip, where scattered letters would be noise).</summary>
+    public bool WholeWords
+    {
+        get => GetValue(WholeWordsProperty);
+        set => SetValue(WholeWordsProperty, value);
+    }
+
+    /// <summary>Another text of the row: a word read there is not marked letter by letter here.</summary>
+    public string? Elsewhere
+    {
+        get => GetValue(ElsewhereProperty);
+        set => SetValue(ElsewhereProperty, value);
+    }
+
     public static string? GetQuery(Control control) => control.GetValue(QueryProperty);
 
     public static void SetQuery(Control control, string? value) => control.SetValue(QueryProperty, value);
 
-    /// <summary>Indexes of <paramref name="text"/> that match the query as a case-insensitive subsequence, greedily from the left; empty when there is none.</summary>
-    public static IReadOnlyList<int> Match(string text, string? query)
+    /// <summary>
+    /// Indexes of <paramref name="text"/> to mark for the query. Each word (split on spaces and dots) is marked on its own, in
+    /// any order: where the text contains it (at the start of a part first), else, unless <paramref name="wholeOnly"/> or the
+    /// word is read in <paramref name="elsewhere"/>, as a case-insensitive subsequence from the left. A word that matches
+    /// neither way marks nothing.
+    /// </summary>
+    public static IReadOnlyList<int> Match(string text, string? query, bool wholeOnly = false, string? elsewhere = null)
     {
         if (string.IsNullOrWhiteSpace(query)) return [];
-        var found = new List<int>();
-        var at = 0;
-        foreach (var c in query)
+        var found = new SortedSet<int>();
+        foreach (var word in query.Split([' ', '\t', '.'], StringSplitOptions.RemoveEmptyEntries))
         {
-            if (char.IsWhiteSpace(c)) continue;
-            var i = text.IndexOf(c.ToString(), at, StringComparison.OrdinalIgnoreCase);
-            if (i < 0) return [];
-            found.Add(i);
-            at = i + 1;
+            var at = Find(text, word);
+            if (at >= 0)
+            {
+                for (var i = 0; i < word.Length; i++) found.Add(at + i);
+                continue;
+            }
+
+            if (wholeOnly || elsewhere?.Contains(word, StringComparison.OrdinalIgnoreCase) == true) continue;
+            var letters = new List<int>(word.Length);
+            var from = 0;
+            foreach (var c in word)
+            {
+                var i = text.IndexOf(c.ToString(), from, StringComparison.OrdinalIgnoreCase);
+                if (i < 0) break;
+                letters.Add(i);
+                from = i + 1;
+            }
+
+            if (letters.Count == word.Length) found.UnionWith(letters);
         }
-        return found;
+
+        return [.. found];
+    }
+
+    private static int Find(string text, string word)
+    {
+        var first = text.IndexOf(word, StringComparison.OrdinalIgnoreCase);
+        for (var at = first; at >= 0; at = text.IndexOf(word, at + 1, StringComparison.OrdinalIgnoreCase))
+            if (at == 0 || !char.IsLetterOrDigit(text[at - 1])) return at;
+        return first;
     }
 
     private void Rebuild()
     {
         var text = Source ?? "";
         Inlines?.Clear();
-        var hits = Positions ?? Match(text, GetQuery(this));
+        var hits = Positions ?? Match(text, GetQuery(this), WholeWords, Elsewhere);
         if (hits.Count == 0)
         {
             Text = text;

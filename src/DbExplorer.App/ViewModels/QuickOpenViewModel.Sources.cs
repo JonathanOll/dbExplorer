@@ -23,21 +23,25 @@ public sealed partial class QuickOpenViewModel
 
     /// <summary>
     /// Tables and views of the LIVE schema of an open session, labelled <c>schema.table</c>; with
-    /// <paramref name="objects"/>, its procedures, functions and columns too.
+    /// <paramref name="objects"/>, its procedures, functions and columns too. With <paramref name="elsewhere"/>, a query
+    /// naming another connection searches the cached objects of the others as well.
     /// </summary>
     public static QuickOpenViewModel ForTables(Session session, Func<Session, TableRef, Task> openTable, StatusModel? status = null,
-        string initialQuery = "", QuickOpenObjects? objects = null)
+        string initialQuery = "", QuickOpenObjects? objects = null, QuickOpenElsewhere? elsewhere = null)
     {
         var name = session.Config.Name;
         var schema = session.Schema;
-        var items = schema.Select(t => TableItem(t.Ref, t.IsView, t.Ref.ToString(), () => openTable(session, t.Ref), name, null)).ToList();
+        var here = QuickOpenScope.For(session.Config, elsewhere?.Groups, isActive: true);
+        var items = schema.Select(t => TableItem(t.Ref, t.IsView, t.Ref.ToString(), () => openTable(session, t.Ref), name, null)
+            with { Scope = here }).ToList();
         Lazy<QuickOpenColumn[]>? columns = null;
         if (objects is not null)
         {
-            if (session.Routines is { } known) items.AddRange(RoutineItems(session, known, objects));
+            if (session.Routines is { } known) items.AddRange(RoutineItems(session, known, objects, here));
             columns = new Lazy<QuickOpenColumn[]>(() => schema.SelectMany(t =>
             {
-                var owner = new QuickOpenColumnOwner(t.Ref.ToString(), null, name, column => objects.OpenColumn(session, t.Ref, column));
+                var owner = new QuickOpenColumnOwner(t.Ref.ToString(), null, name, column => objects.OpenColumn(session, t.Ref, column))
+                    { Scope = here };
                 return t.Columns.Select(c => new QuickOpenColumn(owner, c.Name));
             }).ToArray());
         }
@@ -45,13 +49,14 @@ public sealed partial class QuickOpenViewModel
         var title = objects is null ? $"Go to table in {name}" : $"Go to table or object in {name}";
         if (session.Config.Environment != DbEnvironment.None) title += $" ({session.Config.Environment.Label()})";
         var vm = new QuickOpenViewModel(title, items, status, initialQuery: initialQuery);
-        if (columns is null) return vm;
+        if (columns is null && elsewhere is null) return vm;
 
         var source = new QuickOpenSource(vm._source.Items, columns);
+        if (elsewhere is not null) source.Extension = Extension(here, session.Config.Id, elsewhere, openTable, status, objects);
         vm.Use(source);
         vm.Rank();
-        if (session.Routines is null && session.Driver.HasRoutines && objects!.LoadRoutines is { } load)
-            vm.Loading = AppendRoutinesAsync(source, session, load, objects);
+        if (objects is not null && session.Routines is null && session.Driver.HasRoutines && objects.LoadRoutines is { } load)
+            vm.Loading = AppendRoutinesAsync(source, session, load, objects, here);
         return vm;
     }
 
@@ -63,57 +68,82 @@ public sealed partial class QuickOpenViewModel
     public static QuickOpenViewModel ForAllConnections(
         MetadataCache cache, IEnumerable<ConnectionConfig> configs,
         Func<ConnectionConfig, Task<Session?>> connect, Func<Session, TableRef, Task> openTable, StatusModel? status = null,
-        QuickOpenObjects? objects = null)
+        QuickOpenObjects? objects = null, IReadOnlyList<ConnectionGroup>? groups = null)
+    {
+        var rows = CachedRows(cache, configs, groups, connect, openTable, status, objects);
+        var notice = rows.Uncached.Count switch
+        {
+            0 => null,
+            1 => "1 connection has no cache yet — open it once",
+            var n => $"{n} connections have no cache yet — open them once",
+        };
+        var title = objects is null ? "Go to table in any connection" : "Go to table or object in any connection";
+        var vm = new QuickOpenViewModel(title, rows.Items, status, notice);
+        if (objects is null) return vm;
+
+        vm.Use(new QuickOpenSource(rows.Items, rows.Columns));
+        vm.Rank();
+        return vm;
+    }
+
+    private static QuickOpenExtension Extension(
+        QuickOpenScope here, Guid id, QuickOpenElsewhere elsewhere, Func<Session, TableRef, Task> openTable, StatusModel? status,
+        QuickOpenObjects? objects)
+    {
+        var others = elsewhere.Configs.Where(c => c.Id != id).ToList();
+        return new QuickOpenExtension(here, others.Select(c => QuickOpenScope.For(c, elsewhere.Groups)).ToList(), () =>
+        {
+            var rows = CachedRows(elsewhere.Cache, others, elsewhere.Groups, elsewhere.Connect, openTable, status, objects);
+            _ = rows.Columns.Value; // listed here too, off the UI thread
+            return rows;
+        });
+    }
+
+    private static QuickOpenElsewhereRows CachedRows(
+        MetadataCache cache, IEnumerable<ConnectionConfig> configs, IReadOnlyList<ConnectionGroup>? groups,
+        Func<ConnectionConfig, Task<Session?>> connect, Func<Session, TableRef, Task> openTable, StatusModel? status,
+        QuickOpenObjects? objects)
     {
         var items = new List<QuickOpenItem>();
-        var cached = new List<(ConnectionConfig Config, IReadOnlyList<CachedTable> Tables)>();
-        var withoutCache = 0;
+        var cached = new List<(ConnectionConfig Config, QuickOpenScope Scope, IReadOnlyList<CachedTable> Tables)>();
+        var uncached = new List<QuickOpenScope>();
         foreach (var config in configs)
         {
+            var scope = QuickOpenScope.For(config, groups);
             var tables = cache.Load(config.Id);
             var routines = objects is null ? [] : cache.LoadRoutines(config.Id);
             if (tables.Count == 0 && routines.Count == 0)
             {
-                withoutCache++;
+                uncached.Add(scope);
                 continue;
             }
 
-            cached.Add((config, tables));
+            cached.Add((config, scope, tables));
             foreach (var table in tables)
             {
                 var (cfg, tableRef) = (config, table.Ref);
                 items.Add(TableItem(tableRef, table.IsView, $"{cfg.Name} · {tableRef}",
-                    () => ConnectThenOpen(cfg, tableRef, connect, openTable, status), cfg.Name, cfg.Name) with { Environment = cfg.Environment });
+                        () => ConnectThenOpen(cfg, tableRef, connect, openTable, status), cfg.Name, scope.Badge)
+                    with { Environment = cfg.Environment, Scope = scope });
             }
 
             foreach (var routine in routines)
             {
                 var (cfg, wanted) = (config, routine);
                 items.Add(RoutineItem(wanted, $"{cfg.Name} · {wanted.Ref}",
-                    () => ConnectThenOpenRoutine(cfg, wanted, connect, objects!, status), cfg.Name, cfg.Name) with { Environment = cfg.Environment });
+                        () => ConnectThenOpenRoutine(cfg, wanted, connect, objects!, status), cfg.Name, scope.Badge)
+                    with { Environment = cfg.Environment, Scope = scope });
             }
         }
 
-        var notice = withoutCache switch
+        var columns = new Lazy<QuickOpenColumn[]>(() => objects is null ? [] : cached.SelectMany(x => x.Tables.SelectMany(t =>
         {
-            0 => null,
-            1 => "1 connection has no cache yet — open it once",
-            _ => $"{withoutCache} connections have no cache yet — open them once",
-        };
-        var title = objects is null ? "Go to table in any connection" : "Go to table or object in any connection";
-        var vm = new QuickOpenViewModel(title, items, status, notice);
-        if (objects is null) return vm;
-
-        var columns = new Lazy<QuickOpenColumn[]>(() => cached.SelectMany(x => x.Tables.SelectMany(t =>
-        {
-            var owner = new QuickOpenColumnOwner(t.Ref.ToString(), x.Config.Name, x.Config.Name,
+            var owner = new QuickOpenColumnOwner(t.Ref.ToString(), x.Scope.Badge, x.Config.Name,
                 column => ConnectThenOpen(x.Config, t.Ref, connect, (s, table) => objects.OpenColumn(s, table, column), status, column))
-                { Environment = x.Config.Environment };
+                { Environment = x.Config.Environment, Scope = x.Scope };
             return t.Columns.Select(c => new QuickOpenColumn(owner, c));
         })).ToArray());
-        vm.Use(new QuickOpenSource(vm._source.Items, columns));
-        vm.Rank();
-        return vm;
+        return new QuickOpenElsewhereRows([.. items], columns, uncached);
     }
 
     private static QuickOpenItem TableItem(
@@ -144,15 +174,18 @@ public sealed partial class QuickOpenViewModel
         };
     }
 
-    private static IEnumerable<QuickOpenItem> RoutineItems(Session session, IEnumerable<RoutineInfo> routines, QuickOpenObjects objects) =>
-        routines.Select(r => RoutineItem(r, r.Ref.ToString(), () => objects.OpenRoutine(session, r), session.Config.Name, null));
+    private static IEnumerable<QuickOpenItem> RoutineItems(
+        Session session, IEnumerable<RoutineInfo> routines, QuickOpenObjects objects, QuickOpenScope scope) =>
+        routines.Select(r => RoutineItem(r, r.Ref.ToString(), () => objects.OpenRoutine(session, r), session.Config.Name, null)
+            with { Scope = scope });
 
     private static async Task AppendRoutinesAsync(
-        QuickOpenSource source, Session session, Func<Session, Task<IReadOnlyList<RoutineInfo>>> load, QuickOpenObjects objects)
+        QuickOpenSource source, Session session, Func<Session, Task<IReadOnlyList<RoutineInfo>>> load, QuickOpenObjects objects,
+        QuickOpenScope scope)
     {
         try
         {
-            source.Append(RoutineItems(session, await load(session), objects));
+            source.Append(RoutineItems(session, await load(session), objects, scope));
         }
         catch (Exception)
         {

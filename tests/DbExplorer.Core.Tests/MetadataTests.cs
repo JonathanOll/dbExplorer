@@ -185,4 +185,28 @@ public class MetadataTests : IDisposable
     {
         Assert.Empty(FuzzyMatcher.Rank("u", new[] { "users" }, n => n, take: 0));
     }
+
+    [Theory]
+    [InlineData("usr", "users")]
+    [InlineData("ord", "public.order_items")]
+    [InlineData("pd", "ProductDetail")]
+    [InlineData("sch2", "schema2.table")]
+    [InlineData("xyz", "users")]
+    [InlineData("sru", "users")]
+    [InlineData("userss", "users")]
+    public void ScoreFast_MatchesWhatScoreMatches_NeverAboveIt(string query, string candidate)
+    {
+        var best = FuzzyMatcher.Score(query, candidate);
+        var fast = FuzzyMatcher.ScoreFast(query, candidate);
+
+        Assert.Equal(best is null, fast is null);
+        if (best is not null) Assert.True(fast <= best);
+    }
+
+    [Fact]
+    public void ScoreFast_WordAsWritten_ScoresLikeScore()
+    {
+        Assert.Equal(FuzzyMatcher.Score("users", "users"), FuzzyMatcher.ScoreFast("USERS", "users"));
+        Assert.Equal(FuzzyMatcher.Score("ord", "orders"), FuzzyMatcher.ScoreFast("ord", "orders"));
+    }
 }

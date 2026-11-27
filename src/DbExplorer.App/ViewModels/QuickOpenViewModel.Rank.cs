@@ -1,4 +1,3 @@
-using DbExplorer.Core.Metadata;
 using DbExplorer.Core.Model;
 
 namespace DbExplorer.App.ViewModels;
@@ -9,8 +8,9 @@ public sealed partial class QuickOpenViewModel
     /// <summary>Rows kept for columns when objects alone would fill the list.</summary>
     private const int ColumnShare = 15;
 
-    /// <summary>Scores this low come from the typo-tolerant match only.</summary>
-    private const int TypoScore = -50_000;
+    // What the current ranking looks through: the rows of the source, with those of the other connections when extended.
+    private QuickOpenItem[] _items = [];
+    private QuickOpenColumn[] _columns = [];
 
     private void Use(QuickOpenSource source)
     {
@@ -20,33 +20,35 @@ public sealed partial class QuickOpenViewModel
     }
 
     /// <summary>
-    /// Top <see cref="MaxResults"/> by fuzzy score, then label, then connection name, then input position (so the
-    /// order never depends on an unstable sort). Keeps a small sorted window instead of scoring into a big list.
+    /// Top <see cref="MaxResults"/> by score, then label, then connection name, then input position (so the order never
+    /// depends on an unstable sort). Keeps a small sorted window instead of scoring into a big list.
     /// </summary>
     private void Rank()
     {
-        var query = Query;
-        var items = _source.Items;
-        var main = new Window(ItemOrder);
-        for (var i = 0; i < items.Length; i++)
+        var source = _source;
+        var extension = source.Extension;
+        var query = new QuickOpenQuery(Query, extension is null ? ScopesOf(source) : extension.Places.Append(extension.Here));
+        var columnsWanted = source.HasColumns && Shows(QuickOpenTypes.Columns);
+
+        var (main, columns) = Match(query, source.Items, columnsWanted ? source.Columns : null);
+        string? because = null;
+        if (extension is not null)
         {
-            if (!Shows(items[i].Type)) continue;
-            if (FuzzyMatcher.ScoreTolerant(query, items[i].Label) is { } score) main.Add(score, i);
+            because = WordForElsewhere(source, extension, query, main.Matched + columns.Matched == 0);
+            if (because is not null)
+            {
+                if (source.Elsewhere is null) Extending = source.Reading ??= ReadElsewhereAsync(source, extension);
+                else (main, columns) = Match(query, source.AllItems, columnsWanted ? source.AllColumns : null);
+            }
         }
 
-        // Columns wait for a query (unless there is nothing else to list), and match strictly: no typo search over so many.
-        var columns = new Window(ColumnOrder);
-        var all = _source.HasColumns && Shows(QuickOpenTypes.Columns) && (query.Length > 0 || main.Count == 0)
-            ? _source.Columns
-            : [];
-        var qualified = query.AsSpan().IndexOfAny('.', ' ') >= 0;   // "orders.total": the table is part of what is typed
-        for (var i = 0; i < all.Length; i++)
-        {
-            var text = qualified ? string.Concat(all[i].Owner.Prefix, ".", all[i].Name) : all[i].Name;
-            if (FuzzyMatcher.Score(query, text) is { } score) columns.Add(score, i);
-        }
+        var results = Interleave(query, main, columns);
+        // Once other connections are listed, the rows of this one say where they are too.
+        if (because is not null && source.Elsewhere is not null)
+            for (var i = 0; i < results.Length; i++)
+                if (results[i] is { Context: null, Scope: { } scope } row) results[i] = row with { Context = scope.Badge };
 
-        var results = Interleave(query, items, main, all, columns);
+        ExtensionText = because is null ? null : ExtensionMessage(source, extension!, because);
         Results = results;
         MatchCount = main.Matched + columns.Matched;
         OnPropertyChanged(nameof(CountText));
@@ -55,33 +57,58 @@ public sealed partial class QuickOpenViewModel
         SelectedIndex = results.Length == 0 ? -1 : 0;
     }
 
+    // The connections a list spans (rows of one connection follow each other).
+    private static IEnumerable<QuickOpenScope> ScopesOf(QuickOpenSource source)
+    {
+        var seen = new HashSet<QuickOpenScope>(ReferenceEqualityComparer.Instance);
+        QuickOpenScope? last = null;
+        foreach (var item in source.Items)
+        {
+            if (item.Scope is not { } scope || ReferenceEquals(scope, last)) continue;
+            last = scope;
+            seen.Add(scope);
+        }
+
+        return seen;
+    }
+
+    private (Window Main, Window Columns) Match(QuickOpenQuery query, QuickOpenItem[] items, QuickOpenColumn[]? allColumns)
+    {
+        _items = items;
+        var main = new Window(ItemOrder);
+        for (var i = 0; i < items.Length; i++)
+        {
+            if (!Shows(items[i].Type)) continue;
+            if (query.Score(items[i]) is { } score) main.Add(score, i);
+        }
+
+        // Columns wait for a query (unless there is nothing else to list).
+        _columns = allColumns is not null && (query.Words.Length > 0 || main.Count == 0) ? allColumns : [];
+        var columns = new Window(ColumnOrder);
+        for (var i = 0; i < _columns.Length; i++)
+            if (query.Score(in _columns[i]) is { } score) columns.Add(score, i);
+
+        return (main, columns);
+    }
+
     // Both lists keep their own order. A column goes first only when its name matches what was typed better than the
     // object's name does (exact, then start, then inside, then scattered letters, then typo): at equal quality objects win.
-    private static QuickOpenItem[] Interleave(
-        string query, QuickOpenItem[] items, Window main, QuickOpenColumn[] all, Window columns)
+    private QuickOpenItem[] Interleave(QuickOpenQuery query, Window main, Window columns)
     {
         var columnTake = Math.Min(columns.Count, Math.Max(ColumnShare, MaxResults - main.Count));
         var mainTake = Math.Min(main.Count, MaxResults - columnTake);
-        var term = query[(query.LastIndexOfAny(['.', ' ']) + 1)..];
 
         var results = new QuickOpenItem[mainTake + columnTake];
         for (int n = 0, m = 0, c = 0; n < results.Length; n++)
         {
             var takeColumn = c < columnTake
-                && (m >= mainTake || Quality(all[columns.Index(c)].Name, term, columns.ScoreAt(c))
-                    > Quality(items[main.Index(m)].Name ?? items[main.Index(m)].Label, term, main.ScoreAt(m)));
-            results[n] = takeColumn ? ColumnItem(all[columns.Index(c++)]) : items[main.Index(m++)];
+                && (m >= mainTake || query.Quality(_columns[columns.Index(c)].Name)
+                    > query.Quality(_items[main.Index(m)].Name ?? _items[main.Index(m)].Label));
+            results[n] = takeColumn ? ColumnItem(_columns[columns.Index(c++)]) : _items[main.Index(m++)];
         }
 
         return results;
     }
-
-    private static int Quality(string name, string term, int score) =>
-        score <= TypoScore ? -1
-        : name.Equals(term, StringComparison.OrdinalIgnoreCase) ? 3
-        : name.StartsWith(term, StringComparison.OrdinalIgnoreCase) ? 2
-        : name.Contains(term, StringComparison.OrdinalIgnoreCase) ? 1
-        : 0;
 
     private static QuickOpenItem ColumnItem(QuickOpenColumn column)
     {
@@ -91,6 +118,7 @@ public sealed partial class QuickOpenViewModel
             Title = name,
             Name = name,
             Context = owner.Context,
+            Scope = owner.Scope,
             Environment = owner.Environment,
             Group = owner.Group,
             Icon = "IconColumn",
@@ -100,14 +128,14 @@ public sealed partial class QuickOpenViewModel
 
     private int ItemOrder(int a, int b)
     {
-        var (x, y) = (_source.Items[a], _source.Items[b]);
+        var (x, y) = (_items[a], _items[b]);
         var byLabel = StringComparer.OrdinalIgnoreCase.Compare(x.Label, y.Label);
         return byLabel != 0 ? byLabel : StringComparer.OrdinalIgnoreCase.Compare(x.Group, y.Group);
     }
 
     private int ColumnOrder(int a, int b)
     {
-        var (x, y) = (_source.Columns[a], _source.Columns[b]);
+        var (x, y) = (_columns[a], _columns[b]);
         var byName = StringComparer.OrdinalIgnoreCase.Compare(x.Name, y.Name);
         return byName != 0 ? byName : StringComparer.OrdinalIgnoreCase.Compare(x.Owner.Prefix, y.Owner.Prefix);
     }

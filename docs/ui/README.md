@@ -209,8 +209,11 @@ current-cell frame: 2 px accent, inside the cell).
   reload and "Export PNG…". The canvas is `FreeCanvas`, shared with the execution plan; `DiagramSurface` paints the cards
   (surface fill, header band, key icon, `FK` in link colour) from the theme tokens, accent for the selection and the hovered
   relations, the others dimmed. A footer counts tables and relations and says how to move and open them.
-- **Quick open**: shadowed card, search box, table name (matched letters in bold) + schema, a connection badge, an empty state, a
-  result counter ("50 of 1,284"), keyboard-hint footer. `Ctrl+T` connects first when needed.
+- **Quick open**: shadowed card, search box, table name (matched letters in bold) + schema, a connection badge ("connection /
+  database" when they differ), an empty state, a result counter ("50 of 1,284"), keyboard-hint footer. Every typed word is
+  marked on its own, in the name and in the context (`HighlightText`; the context chip marks only words it contains).
+  `Ctrl+T` connects first when needed; when its search extends to the other connections, a `banner info` above the list says
+  why and the rows of this connection get the badge too. Scenes: `quick-open`, `quick-open-extended`, `quick-open-words`.
 - **Command palette** (`Ctrl+Shift+K`, `CommandPaletteOverlay`): a card like quick open (660 wide): search box (with the
   chosen command as a "back" chip on a second step), section captions (Recently used, Commands, Not available here), 34 px rows
   with icon, title (matched letters bold), a faint detail or the reason a command is greyed, category, key cap, chevron when a
@@ -243,7 +246,7 @@ dotnet run --project tools/UiShots -- <outDir> [scene,scene...|all] [light|dark]
 dotnet run --project tools/UiShots -- --scroll 3        # scroll benchmark of a 200 x 20 grid, prints ms per frame
 ```
 
-Scenes: `er-diagram`, `er-diagram-focus`, `er-diagram-hover`, `er-diagram-large`, `er-diagram-export`, `empty`, `main-table`, `table-edit`, `table-structure`, `table-structure-wide`, `script`, `script-error`, `quick-open`, `connection-dialog`, `connection-dialog-entra`, `connection-dialog-ssh`, `host-key-dialog`,
+Scenes: `er-diagram`, `er-diagram-focus`, `er-diagram-hover`, `er-diagram-large`, `er-diagram-export`, `empty`, `main-table`, `table-edit`, `table-structure`, `table-structure-wide`, `script`, `script-error`, `quick-open`, `quick-open-extended`, `quick-open-words`, `connection-dialog`, `connection-dialog-entra`, `connection-dialog-ssh`, `host-key-dialog`,
 `sql-preview`, `virtual-key`, `history` (the Query history window), `search`, `search-data`, `format-sql`, `confirm-dialog`, `live-theme-switch` (flips the theme while the window shows),
 `main-table-125` (1024x640 DIP, the 1280x800 window at 125 percent scaling), the Settings dialog (`settings-appearance`,
 `settings-editor`, `settings-results`, `settings-history`, `settings-format`, `settings-shortcuts`, `settings-upgrade`, `settings-search`, `settings-appearance-125`),

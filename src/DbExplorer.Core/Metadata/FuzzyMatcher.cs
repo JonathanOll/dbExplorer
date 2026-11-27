@@ -40,12 +40,14 @@ public static class FuzzyMatcher
         for (var i = 1; i < m; i++)
         {
             var q = query[i];
+            var lower = char.ToLowerInvariant(q);   // once per row: this is the hot loop of every keystroke
             // gapBest = max over k < j-1 of prev[k] - GapPenalty * (j-1-k): best predecessor with at least one skipped char.
             var gapBest = NoMatch;
             for (var j = 0; j < n; j++)
             {
                 var best = NoMatch;
-                if (Eq(candidate[j], q))
+                var c = candidate[j];
+                if (c == q || char.ToLowerInvariant(c) == lower)
                 {
                     if (j > 0 && prev[j - 1] > NoMatch) best = prev[j - 1] + ConsecutiveBonus;
                     if (gapBest > best) best = gapBest;
@@ -70,6 +72,44 @@ public static class FuzzyMatcher
         return result > NoMatch ? result - LengthPenalty * n : null;
     }
 
+    /// <summary>
+    /// A cheaper <see cref="Score"/> on the same scale, for callers that score several words per candidate: the same
+    /// matches, but one alignment only (the word as written when the candidate contains it, else the first occurrence of each
+    /// letter) instead of the best of all.
+    /// </summary>
+    public static int? ScoreFast(string query, string candidate)
+    {
+        var m = query.Length;
+        if (m == 0) return 0;
+        var n = candidate.Length;
+        if (m > n) return null;
+
+        var at = candidate.IndexOf(query, StringComparison.OrdinalIgnoreCase);
+        if (at >= 0)
+        {
+            var whole = MatchScore * m + ConsecutiveBonus * (m - 1) - GapPenalty * at - LengthPenalty * n;
+            for (var k = at; k < at + m; k++) whole += PositionBonus(candidate, k);
+            return whole;
+        }
+
+        // The first occurrence of each letter, on the framework's vectorised search.
+        var score = -LengthPenalty * n;
+        var last = -1;
+        for (var qi = 0; qi < m; qi++)
+        {
+            var c = query[qi];
+            var skip = candidate.AsSpan(last + 1).IndexOfAny(char.ToLowerInvariant(c), char.ToUpperInvariant(c));
+            if (skip < 0) return null;
+            var i = last + 1 + skip;
+            score += MatchScore + PositionBonus(candidate, i);
+            if (qi > 0 && skip == 0) score += ConsecutiveBonus;
+            else score -= GapPenalty * skip;
+            last = i;
+        }
+
+        return score;
+    }
+
     // Typo tolerance: below every strict score (those stay above about -1000), then closer matches first.
     private const int TolerantBase = -100_000;
     private const int TolerantErrorPenalty = 1_000;
@@ -83,7 +123,12 @@ public static class FuzzyMatcher
     /// </summary>
     public static int? ScoreTolerant(string query, string candidate)
     {
-        if (Score(query, candidate) is { } strict) return strict;
+        return Score(query, candidate) ?? Typo(query, candidate);
+    }
+
+    /// <summary>The typo-tolerant half of <see cref="ScoreTolerant"/>, for a caller that already knows the strict score is null.</summary>
+    public static int? Typo(string query, string candidate)
+    {
         var m = query.Length;
         var allowed = m <= 3 || m > MaxTolerantLength ? 0 : m <= 6 ? 1 : 2;
         if (allowed == 0) return null;

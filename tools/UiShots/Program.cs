@@ -342,6 +342,8 @@ internal static partial class Scenes
         ("plan-sqlserver", PlanSqlServer),
         ("plan-compare", PlanCompare),
         ("quick-open", QuickOpen),
+        ("quick-open-extended", d => QuickOpenWords(d, "billing ord", everywhere: false)),
+        ("quick-open-words", d => QuickOpenWords(d, "stg inv", everywhere: true)),
         ("command-palette", d => CommandPaletteScene(d, "")),
         ("command-palette-search", d => CommandPaletteScene(d, "clsoe")),
         ("command-palette-matches", d => CommandPaletteScene(d, "ta")),
@@ -648,6 +650,22 @@ internal static partial class Scenes
         await OpenTable(d, "customers");
         d.Main.ShowTablePicker();
         d.Main.QuickOpen!.Query = "ord";
+        await Settle();
+        return null;
+    }
+
+    /// <summary>Several words: Ctrl+T naming another database (the scope extends), or the search of all connections.</summary>
+    private static async Task<Window?> QuickOpenWords(Demo d, string query, bool everywhere)
+    {
+        await Open(d);
+        await OpenTable(d, "customers");
+        var cache = new MetadataCache(Path.Combine(d.Dir, "cache"));
+        foreach (var node in d.AllConnectionNodes().Where(n => n.Config.Name is "Billing" or "Staging billing"))
+            cache.Save(node.Config.Id, SampleRoutineDriver.Tables);
+        if (everywhere) await d.Main.ShowAllTablesPickerAsync();
+        else d.Main.ShowTablePicker();
+        d.Main.QuickOpen!.Query = query;
+        await d.Main.QuickOpen.Extending;
         await Settle();
         return null;
     }

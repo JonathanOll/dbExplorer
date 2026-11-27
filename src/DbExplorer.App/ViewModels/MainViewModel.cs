@@ -703,7 +703,7 @@ public partial class MainViewModel : ObservableObject
     }
 
     private QuickOpenViewModel? BuildAllTablesPicker() =>
-        _cache is { } cache ? QuickOpenViewModel.ForAllConnections(cache, Tree.Config.Connections.ToList(), Tree.EnsureConnectedAsync, OpenTable, Status, SearchObjects) : null;
+        _cache is { } cache ? QuickOpenViewModel.ForAllConnections(cache, Tree.Config.Connections.ToList(), Tree.EnsureConnectedAsync, OpenTable, Status, SearchObjects, Tree.Config.Groups.ToList()) : null;
 
     private static QuickOpenViewModel Hinted(QuickOpenViewModel vm, string hint)
     {
@@ -724,7 +724,7 @@ public partial class MainViewModel : ObservableObject
             {
                 ShowTablePicker(session);
                 return Task.CompletedTask;
-            }, Status);
+            }, Status, Tree.Config.Groups.ToList());
         Show(picker);
     }
 
@@ -741,8 +741,9 @@ public partial class MainViewModel : ObservableObject
             }
 
             var configs = Tree.Config.Connections.ToList(); // snapshot on the UI thread; the pool thread must not read the live list
+            var groups = Tree.Config.Groups.ToList();
             var vm = await Task.Run(() =>
-                QuickOpenViewModel.ForAllConnections(cache, configs, Tree.EnsureConnectedAsync, OpenTable, Status, SearchObjects));
+                QuickOpenViewModel.ForAllConnections(cache, configs, Tree.EnsureConnectedAsync, OpenTable, Status, SearchObjects, groups));
             if ((ActiveTab?.Connection ?? Tree.SelectedConnection) is { } current && Tree.FindSession(current.Id) is { } session)
             {
                 vm.ScopeHint = "Search this connection only";

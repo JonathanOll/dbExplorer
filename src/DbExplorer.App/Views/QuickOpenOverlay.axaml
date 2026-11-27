@@ -73,6 +73,13 @@
                        IsVisible="{Binding !IsEmpty}" />
           </Grid>
         </Border>
+        <!-- rows of other connections are listed too: said in words, above them -->
+        <Border DockPanel.Dock="Top" Classes="banner info" IsVisible="{Binding ExtensionText, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <Grid ColumnDefinitions="Auto,*">
+            <PathIcon Classes="bi" Data="{StaticResource IconInfo}" Margin="0,1,10,0" VerticalAlignment="Top" />
+            <TextBlock Grid.Column="1" Text="{Binding ExtensionText}" TextWrapping="Wrap" />
+          </Grid>
+        </Border>
         <Panel>
           <ListBox x:Name="ResultList" Margin="0,6" Background="Transparent" BorderThickness="0" AutomationProperties.Name="Results">
             <ListBox.ItemTemplate>
@@ -80,12 +87,12 @@
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
                   <views:EnvironmentBadge Grid.Column="4" Environment="{Binding Environment}" Margin="6,0,0,0" />
                   <PathIcon Classes="dim" Data="{Binding Icon, Converter={x:Static views:Icons.ByKey}}" Width="15" Height="15" Margin="0,0,10,0" />
-                  <views:HighlightText Grid.Column="1" Source="{Binding DisplayLabel}" FontSize="13.5" TextTrimming="CharacterEllipsis"
-                                       VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="2" Classes="faint small" Text="{Binding Detail}" Margin="12,0,0,0" VerticalAlignment="Center"
-                             IsVisible="{Binding HasDetail}" />
+                  <views:HighlightText Grid.Column="1" Source="{Binding DisplayLabel}" Elsewhere="{Binding Context}" FontSize="13.5"
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  <views:HighlightText Grid.Column="2" Classes="faint small" Source="{Binding Detail}" WholeWords="True" Margin="12,0,0,0"
+                                       VerticalAlignment="Center" IsVisible="{Binding HasDetail}" />
                   <Border Grid.Column="3" Classes="badge" Margin="10,0,0,0" IsVisible="{Binding HasContext}">
-                    <TextBlock Classes="small" Text="{Binding Context}" />
+                    <views:HighlightText Classes="small" Source="{Binding Context}" WholeWords="True" />
                   </Border>
                 </Grid>
               </DataTemplate>

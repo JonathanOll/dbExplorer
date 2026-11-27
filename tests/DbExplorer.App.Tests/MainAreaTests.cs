@@ -342,7 +342,7 @@ public class MainAreaTests : IDisposable
 
         var row = vm.Results.Single();
         Assert.Equal("invoices", row.DisplayLabel);
-        Assert.Equal("Billing", row.Context);
+        Assert.Equal("Billing / x", row.Context);
         Assert.True(row.HasContext);
         vm.Query = "billing inv";
         Assert.Single(vm.Results);

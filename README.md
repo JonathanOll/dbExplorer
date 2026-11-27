@@ -38,7 +38,7 @@ All switches, install locations, GitHub rate limit (`$env:GITHUB_TOKEN`) and man
 - **Copy and export**: select rows, cells or columns; copy as CSV, JSON, Markdown, SQL or an `IN` list; export to CSV,
   TSV, JSON, XLSX, SQL or Markdown, the whole query streamed to disk. [Copy and export](docs/export.md)
 - **Quick open**: fuzzy search of tables, views, procedures, functions and columns, on one connection or across all of them,
-  forgiving typos.
+  forgiving typos. Words in any order narrow it down (`accounts resto2`: the table in that database).
 - **Views and routines**: browse views, procedures and functions in the navigator and open their definition as text.
   [Features](docs/features.md#quick-open)
 - **Linked database groups**: group databases that share a schema, switch a tab between them with one key, run a read-only

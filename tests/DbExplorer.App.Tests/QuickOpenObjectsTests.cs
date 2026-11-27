@@ -185,7 +185,7 @@ public class QuickOpenObjectsTests : IDisposable
 
         var routine = New();
         routine.Query = "order_total";
-        Assert.Equal("Alpha", routine.Results[0].Context);
+        Assert.Equal("Alpha / db", routine.Results[0].Context);
         var column = New();
         column.Query = "email";
         Assert.Equal("email", column.Results[0].DisplayLabel);

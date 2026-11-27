@@ -19,6 +19,9 @@ public record QuickOpenItem(string Label, string? Detail, Func<Task> Open)
     /// <summary>Faint chip at the right of the row (the connection of a table found in every connection).</summary>
     public string? Context { get; init; }
 
+    /// <summary>The connection the row lives in, for what a word of the query can name besides the object.</summary>
+    public QuickOpenScope? Scope { get; init; }
+
     /// <summary>Environment of the row's connection, shown as a badge; None when the row names no connection.</summary>
     public DbEnvironment Environment { get; init; }
 
@@ -35,7 +38,7 @@ public record QuickOpenItem(string Label, string? Detail, Func<Task> Open)
 }
 
 /// <summary>
-/// State of the quick-open overlay: a query, the top <see cref="MaxResults"/> fuzzy matches (re-ranked
+/// State of the quick-open overlay: a query of words (see <see cref="QuickOpenQuery"/>), the top <see cref="MaxResults"/> fuzzy matches (re-ranked
 /// synchronously on every keystroke) and a selection. Opening an item never throws: failures go to the status bar.
 /// </summary>
 public sealed partial class QuickOpenViewModel : ObservableObject
@@ -130,7 +133,8 @@ public sealed partial class QuickOpenViewModel : ObservableObject
     /// <summary>Every connection, to connect to it (Ctrl+T with nothing selected): connected ones are marked in the detail column.</summary>
     public static QuickOpenViewModel ForConnections(
         IEnumerable<ConnectionConfig> configs, Func<ConnectionConfig, bool> isConnected,
-        Func<ConnectionConfig, Task<Session?>> connect, Func<Session, Task> afterConnect, StatusModel? status = null)
+        Func<ConnectionConfig, Task<Session?>> connect, Func<Session, Task> afterConnect, StatusModel? status = null,
+        IReadOnlyList<ConnectionGroup>? groups = null)
     {
         var items = configs
             .OrderBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
@@ -142,6 +146,7 @@ public sealed partial class QuickOpenViewModel : ObservableObject
                 Icon = "IconDatabase",
                 Environment = c.Environment,
                 Group = c.Folder,
+                Scope = QuickOpenScope.For(c, groups),
             })
             .ToList();
         return new QuickOpenViewModel("Go to connection", items, status) { EmptyListText = "No connections yet. Add one from the navigator." };

@@ -11,7 +11,7 @@ Every shortcut of the app. The same list is in the app (`F1`, and Settings > Sho
 | `Backspace` (empty search box) / `Shift+Tab` | command palette, second step | Back to the previous step |
 | `Esc` | command palette | Close it |
 | `Ctrl+Alt+F` | anywhere | Search in scripts (open tabs and library) and in the data of a connection |
-| `Ctrl+T` | anywhere | Quick open a table, view, procedure, function or column of the active connection |
+| `Ctrl+T` | anywhere | Quick open a table, view, procedure, function or column of the active connection; words in any order, and naming another database searches the others too ([Quick open](features.md#quick-open)) |
 | `Ctrl+Shift+P` | anywhere | Quick open the same across all connections (metadata cache) |
 | `Alt+1` ... `Alt+5` | quick open overlay | Switch tables / views / procedures / functions / columns on or off (remembered) |
 | `Shift+Tab` | quick open overlay | Move to the type chips (`Tab` / arrows between them, `Space` or `Enter` toggles) |
