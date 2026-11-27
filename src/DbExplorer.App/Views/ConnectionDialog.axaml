@@ -186,6 +186,77 @@
           </Grid>
         </StackPanel>
 
+        <!-- TLS (PostgreSQL): the mode, then only the files that mode can use -->
+        <StackPanel x:Name="TlsSection" Spacing="12" IsVisible="{Binding IsPostgres}">
+          <TextBlock Classes="section" Text="TLS" Margin="0" />
+
+          <Grid ColumnDefinitions="92,*">
+            <Label Classes="cap" Content="SSL _mode" Target="{Binding #TlsModeBox}" />
+            <StackPanel Grid.Column="1" Spacing="4">
+              <ComboBox x:Name="TlsModeBox" HorizontalAlignment="Stretch" ItemsSource="{Binding TlsModes}"
+                        SelectedItem="{Binding TlsMode}" AutomationProperties.Name="SSL mode" />
+              <TextBlock Classes="optdesc" Text="{Binding TlsHint}" />
+            </StackPanel>
+          </Grid>
+
+          <Border x:Name="TlsWarningBanner" Classes="banner warn" CornerRadius="6" BorderThickness="1" Margin="92,0,0,0"
+                  IsVisible="{Binding HasTlsWarning}">
+            <Grid ColumnDefinitions="Auto,*">
+              <PathIcon Classes="bi" Data="{StaticResource IconWarning}" VerticalAlignment="Top" Margin="0,2,8,0" />
+              <TextBlock Grid.Column="1" Text="{Binding TlsWarning}" TextWrapping="Wrap" />
+            </Grid>
+          </Border>
+
+          <Grid ColumnDefinitions="92,*" IsVisible="{Binding ShowRootCertificate}">
+            <Label Classes="cap" Content="Root C_A" Target="{Binding #TlsRootBox}" />
+            <StackPanel Grid.Column="1" Spacing="4">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBox x:Name="TlsRootBox" Text="{Binding TlsRootFile}" Watermark="Optional: ca.crt (PEM)"
+                         AutomationProperties.Name="Root CA file" />
+                <Button Grid.Column="1" Content="Browse…" Margin="8,0,0,0" Tag="root" Click="OnBrowseCertificateClick"
+                        ToolTip.Tip="Choose the CA certificate that signed the server's" />
+              </Grid>
+              <TextBlock Classes="optdesc" Text="Empty: %APPDATA%\postgresql\root.crt if present, else the authorities Windows trusts." />
+            </StackPanel>
+          </Grid>
+
+          <CheckBox x:Name="ClientCertificateCheck" Margin="92,0,0,0" IsChecked="{Binding UseClientCertificate}"
+                    IsVisible="{Binding ShowClientCertificateChoice}" Content="Sign in with a client certificate" />
+
+          <StackPanel Spacing="12" IsVisible="{Binding ShowClientCertificate}">
+            <Grid ColumnDefinitions="92,*">
+              <Label Classes="cap" Content="Certificate" Target="{Binding #TlsCertificateBox}" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBox x:Name="TlsCertificateBox" Text="{Binding TlsCertificateFile}" Watermark="client.crt (PEM) or client.pfx"
+                           AutomationProperties.Name="Client certificate file"
+                           Classes.error="{Binding TlsCertificateError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <Button Grid.Column="1" Content="Browse…" Margin="8,0,0,0" Tag="certificate" Click="OnBrowseCertificateClick"
+                          ToolTip.Tip="Choose the client certificate file" />
+                </Grid>
+                <TextBlock Classes="fielderror" Text="{Binding TlsCertificateError}"
+                           IsVisible="{Binding TlsCertificateError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              </StackPanel>
+            </Grid>
+
+            <Grid ColumnDefinitions="92,*">
+              <Label Classes="cap" Content="Key file" Target="{Binding #TlsKeyBox}" />
+              <Grid Grid.Column="1" ColumnDefinitions="*,Auto">
+                <TextBox x:Name="TlsKeyBox" Text="{Binding TlsKeyFile}" Watermark="client.key; empty if in the certificate file"
+                         AutomationProperties.Name="Client key file" />
+                <Button Grid.Column="1" Content="Browse…" Margin="8,0,0,0" Tag="key" Click="OnBrowseCertificateClick"
+                        ToolTip.Tip="Choose the private key of the client certificate" />
+              </Grid>
+            </Grid>
+
+            <Grid ColumnDefinitions="92,*">
+              <Label Classes="cap" Content="Passphrase" Target="{Binding #TlsPassphraseBox}" />
+              <TextBox x:Name="TlsPassphraseBox" Grid.Column="1" Text="{Binding TlsPassphrase}" PasswordChar="•"
+                       Watermark="{Binding TlsPassphraseHint}" AutomationProperties.Name="Client key passphrase" />
+            </Grid>
+          </StackPanel>
+        </StackPanel>
+
         <!-- SSH tunnel: one check box until it is wanted -->
         <StackPanel Spacing="12" IsVisible="{Binding IsNetwork}">
           <TextBlock Classes="section" Text="SSH TUNNEL" Margin="0" />

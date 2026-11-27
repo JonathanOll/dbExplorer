@@ -11,6 +11,10 @@ Entra authentication modes and Windows / Kerberos authentication on PostgreSQL. 
 is kept as a private-key tunnel without a key file, with a warning: choose the key in the connection. The connection never
 silently becomes a direct one. SSH jump chains and SSH profiles shared between connections are not read.
 
+PostgreSQL SSL settings are imported: the mode, root CA, client certificate, key and passphrase. SSL switched on in
+DBeaver without a mode becomes **VerifyFull**, as its driver does. A Java keystore is not imported, and a DER / PK8 client
+key must be converted to PEM: both are reported as warnings.
+
 Connections that DBeaver marks `read-only`, or whose connection type is `prod` / `production` (or a custom type with
 "prod" in its name or one that forbids data edits), are imported **read-only**, on purpose: an imported production database
 never silently becomes editable. The status bar names them after the import; untick **Read-only** in the connection's

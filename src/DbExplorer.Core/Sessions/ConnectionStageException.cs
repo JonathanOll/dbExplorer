@@ -18,6 +18,9 @@ public enum ConnectionStage
     /// <summary>The SSH server reaching the database server.</summary>
     SshForward,
 
+    /// <summary>Setting up TLS with the database server, certificates included.</summary>
+    Tls,
+
     /// <summary>Signing in to the database.</summary>
     DatabaseSignIn,
 
@@ -37,6 +40,7 @@ public class ConnectionStageException(ConnectionStage stage, string detail, Exce
         ConnectionStage.SshHostKey => "SSH tunnel, host key check failed",
         ConnectionStage.SshSignIn => "SSH tunnel, sign-in failed",
         ConnectionStage.SshForward => "SSH tunnel, the SSH server cannot reach the database",
+        ConnectionStage.Tls => "TLS, the secure connection failed",
         ConnectionStage.DatabaseSignIn => "Database sign-in failed",
         _ => "Database connection failed",
     };

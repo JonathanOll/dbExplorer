@@ -54,6 +54,7 @@ public partial class ConnectionDialogViewModel : ObservableObject
         Auth = existing.Auth;
         Encrypt = existing.Encrypt;   // choosing the mode above may have ticked it: the saved value wins
         LoadSsh(existing.Ssh);
+        LoadTls(existing.Tls);
     }
 
     public IReadOnlyList<DbKind> Kinds { get; } = [DbKind.Postgres, DbKind.SqlServer, DbKind.Sqlite];
@@ -88,7 +89,7 @@ public partial class ConnectionDialogViewModel : ObservableObject
     [ObservableProperty] private string _name = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSqlite), nameof(IsNetwork), nameof(IsSqlServer), nameof(DatabaseLabel), nameof(DatabasePlaceholder), nameof(ShowSsh))]
+    [NotifyPropertyChangedFor(nameof(IsSqlite), nameof(IsNetwork), nameof(IsSqlServer), nameof(DatabaseLabel), nameof(DatabasePlaceholder), nameof(ShowSsh), nameof(IsPostgres))]
     private DbKind _kind = DbKind.Postgres;
 
     [ObservableProperty] private string _host = "";
@@ -129,7 +130,8 @@ public partial class ConnectionDialogViewModel : ObservableObject
 
     private bool HasConnectionFieldError =>
         HostError is not null || PortError is not null || DatabaseError is not null || UserError is not null || AuthError is not null
-        || SshHostError is not null || SshPortError is not null || SshUserError is not null || SshKeyError is not null;
+        || SshHostError is not null || SshPortError is not null || SshUserError is not null || SshKeyError is not null
+        || TlsCertificateError is not null;
 
     [ObservableProperty] private bool _isTesting;
     [ObservableProperty] private bool _testSucceeded;
@@ -212,6 +214,7 @@ public partial class ConnectionDialogViewModel : ObservableObject
         SshPortError = _showConnectionErrors ? SshPortProblem() : null;
         SshUserError = _showConnectionErrors ? SshUserProblem() : null;
         SshKeyError = _showConnectionErrors ? SshKeyProblem() : null;
+        TlsCertificateError = _showConnectionErrors ? TlsCertificateProblem() : null;
         if (Error is not null && NameError is null && !HasConnectionFieldError) Error = null;
     }
 
@@ -219,7 +222,7 @@ public partial class ConnectionDialogViewModel : ObservableObject
     public string? Validate() => NameProblem(includeEmpty: true) ?? ConnectionProblem();
 
     private string? ConnectionProblem() =>
-        HostProblem() ?? PortProblem() ?? DatabaseProblem() ?? AuthProblem() ?? UserProblem()
+        HostProblem() ?? PortProblem() ?? DatabaseProblem() ?? AuthProblem() ?? UserProblem() ?? TlsCertificateProblem()
         ?? SshHostProblem() ?? SshPortProblem() ?? SshUserProblem() ?? SshKeyProblem();
 
     public bool TryConfirm()
@@ -320,6 +323,7 @@ public partial class ConnectionDialogViewModel : ObservableObject
             Environment = SelectedEnvironment,
             Auth = network ? Auth : AuthMode.Password,
             Ssh = BuildSsh(),
+            Tls = BuildTls(),
         };
     }
 }

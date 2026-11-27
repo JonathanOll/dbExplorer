@@ -10,8 +10,8 @@ where you left off. The big topics have their own page: [linked database groups]
 ## Sign-in and SSH tunnels
 
 The connection dialog shows only the fields the chosen sign-in needs. **Test connection** goes the same way as a real
-connection and says which step failed: SSH server, host key, SSH sign-in, forwarding to the database, database sign-in or
-database.
+connection and says which step failed: SSH server, host key, SSH sign-in, forwarding to the database, TLS, database
+sign-in or database.
 
 | Engine | Sign in | Asks for |
 | --- | --- | --- |
@@ -37,6 +37,34 @@ says it reconnected: an open transaction is lost). The server certificate is sti
 (`ssh_known_hosts.json`, Cancel is the default). A server that later presents another key is refused without a question; if
 it was really reinstalled, remove its entry from that file. SSH passwords, passphrases and client secrets are encrypted like
 database passwords.
+
+## PostgreSQL TLS
+
+**SSL mode** in the connection dialog. The default, **Prefer**, is what the driver does by itself: a new connection and a
+connection saved by an older version behave alike. It does not check the server certificate, so servers with a self-signed
+certificate keep working; the dialog says that the server is not verified. Choose **VerifyFull** wherever the server has a
+certificate you can check.
+
+| SSL mode | Encrypted | Server certificate |
+| --- | --- | --- |
+| Disable | no | not checked |
+| Allow | only if the server insists | not checked |
+| Prefer (default) | if the server offers it | not checked |
+| Require | always | not checked |
+| VerifyCA | always | must chain to a trusted authority; any host name |
+| VerifyFull | always | must chain to a trusted authority and name the connection's host |
+
+- **Root CA** (verifying modes): a PEM file with the authority that signed the server certificate. Empty:
+  `%APPDATA%\postgresql\root.crt` if present (or `PGSSLROOTCERT`), else the authorities Windows trusts. VerifyCA without
+  a root CA file is flagged: a certificate issued for any host name passes.
+- **Client certificate**: a PEM certificate with its key file (or both in one file), or a `.pfx`. The passphrase of an
+  encrypted key is stored like the database password. Revocation is not checked.
+- Through an SSH tunnel, TLS still names the connection's database host (not `127.0.0.1`), so VerifyFull works.
+- Require, VerifyCA and VerifyFull turn GSS (Kerberos) encryption off, which would otherwise take the place of TLS.
+  Windows sign-in still works.
+- Paths may use environment variables (`%USERPROFILE%\certs\ca.crt`).
+
+![TLS settings, light](ui/after/connection-dialog-tls-light.png)
 
 ## Connection tree
 

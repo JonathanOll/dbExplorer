@@ -8,8 +8,8 @@ public static partial class DBeaverImporter
 {
     private const string SshHandler = "ssh_tunnel";
 
-    /// <summary>Key of a connection's SSH credentials in the credentials dictionary.</summary>
-    private static string SshCredentialsKey(string dbeaverId) => dbeaverId + "\n" + SshHandler;
+    /// <summary>Key of the credentials of a connection's network handler in the credentials dictionary.</summary>
+    private static string HandlerCredentialsKey(string dbeaverId, string handler) => dbeaverId + "\n" + handler;
 
     private static ConnectionConfig WithAuthentication(ConnectionConfig connection, JsonElement node)
     {
@@ -63,7 +63,7 @@ public static partial class DBeaverImporter
         if (!IsTrue(handler, "enabled")) return connection;
 
         var properties = Child(handler, "properties");
-        credentials.TryGetValue(SshCredentialsKey(dbeaverId), out var secret);
+        credentials.TryGetValue(HandlerCredentialsKey(dbeaverId, SshHandler), out var secret);
         var host = Str(properties, "host") ?? "";
         var port = Number(properties, "port") ?? SshTunnelConfig.DefaultPort;
         var user = secret.User ?? Str(handler, "user") ?? Str(properties, "user") ?? "";

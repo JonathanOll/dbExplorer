@@ -54,6 +54,7 @@ public partial class ConnectionDialog : Window
             { DatabaseError: not null } => DatabaseBox,
             { AuthError: not null } => AuthBox,
             { UserError: not null } => UserBox,
+            { TlsCertificateError: not null } => TlsCertificateBox,
             { SshHostError: not null } => SshHostBox,
             { SshPortError: not null } => SshPortBox,
             { SshUserError: not null } => SshUserBox,
@@ -87,6 +88,37 @@ public partial class ConnectionDialog : Window
                 FileTypeFilter = [FilePickerFileTypes.All],
             });
             if (files.Count > 0 && files[0].TryGetLocalPath() is { } path) vm.SshKeyFile = path;
+        }
+        catch (Exception ex)
+        {
+            vm.Error = $"Cannot open the file picker: {ex.Message}";
+        }
+    }
+
+    private async void OnBrowseCertificateClick(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not { } vm || sender is not Button { Tag: string which }) return;
+        try
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = which switch
+                {
+                    "root" => "Select the root CA file",
+                    "key" => "Select the client key file",
+                    _ => "Select the client certificate file",
+                },
+                AllowMultiple = false,
+                FileTypeFilter =
+                [
+                    new FilePickerFileType("Certificates and keys") { Patterns = ["*.crt", "*.cer", "*.pem", "*.key", "*.pfx"] },
+                    FilePickerFileTypes.All,
+                ],
+            });
+            if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
+            if (which == "root") vm.TlsRootFile = path;
+            else if (which == "key") vm.TlsKeyFile = path;
+            else vm.TlsCertificateFile = path;
         }
         catch (Exception ex)
         {

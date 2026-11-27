@@ -48,6 +48,28 @@ internal static partial class Scenes
         return dialog;
     }
 
+    private static async Task<Window?> ConnectionTlsScene(Demo d)
+    {
+        await Open(d);
+        var vm = new ConnectionDialogViewModel(new PlainProtector(), ["Production", "Staging"], [], null, (_, _, _) =>
+            Task.FromException(new ConnectionStageException(ConnectionStage.Tls,
+                "the server certificate was refused. SSL mode VerifyFull needs a valid certificate signed by the authority in "
+                + @"C:\certs\company-ca.crt and issued for the host name 'orders-db.internal'.")))
+        {
+            Name = "Orders (verified)", Host = "orders-db.internal", Database = "orders", User = "report_ro",
+            TlsMode = TlsMode.VerifyFull, TlsRootFile = @"C:\certs\company-ca.crt",
+            UseClientCertificate = true, TlsCertificateFile = @"C:\certs\report.crt", TlsKeyFile = @"C:\certs\report.key",
+        };
+        var dialog = new ConnectionDialog { DataContext = vm };
+        dialog.Show(d.Window);
+        await Settle();
+        await vm.TestConnectionAsync();
+        await Settle();
+        dialog.GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToEnd();
+        await Settle();
+        return dialog;
+    }
+
     private static async Task<Window?> HostKeyScene(Demo d)
     {
         await Open(d);

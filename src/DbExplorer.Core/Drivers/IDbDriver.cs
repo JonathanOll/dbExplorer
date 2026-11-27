@@ -1,4 +1,5 @@
 using System.Data.Common;
+using DbExplorer.Core.Config;
 using DbExplorer.Core.Model;
 
 namespace DbExplorer.Core.Drivers;
@@ -46,6 +47,12 @@ public interface IDbDriver
     /// </summary>
     DbConnection CreateTunneledConnection(ConnectionConfig cfg, string? plainPassword, int localPort) =>
         throw new NotSupportedException($"{Kind} connections cannot use an SSH tunnel.");
+
+    /// <summary>This driver, able to decrypt the secrets some connection settings hold (a private key passphrase).</summary>
+    IDbDriver WithSecrets(ISecretProtector protector) => this;
+
+    /// <summary>What went wrong, in plain words, when <paramref name="e"/> is a TLS failure; null for any other failure.</summary>
+    string? DescribeTlsFailure(ConnectionConfig cfg, Exception e) => null;
 
     Task<IReadOnlyList<TableInfo>> LoadSchemaAsync(DbConnection c, CancellationToken ct);
 

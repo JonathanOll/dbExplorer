@@ -351,6 +351,7 @@ internal static partial class Scenes
         ("connection-dialog", ConnectionDialogScene),
         ("connection-dialog-entra", ConnectionEntraScene),
         ("connection-dialog-ssh", ConnectionSshScene),
+        ("connection-dialog-tls", ConnectionTlsScene),
         ("host-key-dialog", HostKeyScene),
         ("sql-preview", SqlPreview),
         ("virtual-key", VirtualKey),

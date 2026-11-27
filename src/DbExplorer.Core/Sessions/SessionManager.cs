@@ -22,7 +22,8 @@ public class SessionManager(
 {
     private readonly SshTunnelFactory _tunnels =
         tunnelFactory ?? SshTunnels.Factory(KnownHostsStore.NextTo(configStore.FilePath), protector, hostKeyPrompt);
-    private readonly Func<DbKind, IDbDriver> _drivers = driverFactory ?? DriverFactory.For;
+    private readonly Func<DbKind, IDbDriver> _drivers =
+        kind => (driverFactory ?? DriverFactory.For)(kind).WithSecrets(protector);
     private readonly object _gate = new();
     private readonly Dictionary<Guid, Session> _open = new();
     private readonly Dictionary<Guid, Attempt> _pending = new();
@@ -190,6 +191,8 @@ public class SessionManager(
                 }
                 catch (Exception) { /* the settings are refused outright: no pool exists */ }
                 ct.ThrowIfCancellationRequested();
+                if (link?.Driver.DescribeTlsFailure(config, e) is { } tls)
+                    throw new ConnectionStageException(ConnectionStage.Tls, tls, e);
                 throw ConnectionStageException.Database(e);
             }
             finally
@@ -210,10 +213,18 @@ public class SessionManager(
     /// is stored now. Used to decide that rows loaded from one connection may be written to another.
     /// </summary>
     public static bool SameDatabase(ConnectionConfig a, ConnectionConfig b) =>
-        SameTarget(a with { ProtectedPassword = b.ProtectedPassword, Ssh = WithSecretsOf(a.Ssh, b.Ssh) }, b);
+        SameTarget(a with
+        {
+            ProtectedPassword = b.ProtectedPassword,
+            Ssh = WithSecretsOf(a.Ssh, b.Ssh),
+            Tls = WithSecretsOf(a.Tls, b.Tls),
+        }, b);
 
     private static SshTunnelConfig? WithSecretsOf(SshTunnelConfig? a, SshTunnelConfig? b) =>
         a is null || b is null ? a : a with { ProtectedPassword = b.ProtectedPassword, ProtectedPassphrase = b.ProtectedPassphrase };
+
+    private static TlsConfig? WithSecretsOf(TlsConfig? a, TlsConfig? b) =>
+        a is null || b is null ? a : a with { ProtectedKeyPassphrase = b.ProtectedKeyPassphrase };
 
     private void TrySaveCache(Guid id, IReadOnlyList<TableInfo> schema)
     {

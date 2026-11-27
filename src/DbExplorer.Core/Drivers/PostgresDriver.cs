@@ -1,17 +1,21 @@
 using System.Collections.Concurrent;
 using System.Data.Common;
 using System.Net.Security;
+using DbExplorer.Core.Config;
 using DbExplorer.Core.Model;
 using Npgsql;
 
 namespace DbExplorer.Core.Drivers;
 
-public sealed partial class PostgresDriver : IDbDriver
+/// <param name="secrets">Decrypts the client key passphrase; only connections that have one need it.</param>
+public sealed partial class PostgresDriver(ISecretProtector? secrets = null) : IDbDriver
 {
     // System schemas never shown: pg_catalog, pg_toast, pg_temp_N (all start with "pg_") and information_schema.
     private const string UserSchemaFilter = "n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'";
 
     public DbKind Kind => DbKind.Postgres;
+
+    public IDbDriver WithSecrets(ISecretProtector protector) => new PostgresDriver(protector);
 
     public string ParamPrefix => "@";
 
@@ -56,16 +60,21 @@ public sealed partial class PostgresDriver : IDbDriver
     // One delegate per host: every connection of a pool must be configured the same way.
     private static readonly ConcurrentDictionary<string, Action<SslClientAuthenticationOptions>> TlsTargets = new();
 
-    private static NpgsqlConnectionStringBuilder Builder(ConnectionConfig cfg, string? plainPassword) => new()
+    private NpgsqlConnectionStringBuilder Builder(ConnectionConfig cfg, string? plainPassword)
     {
-        Host = cfg.Host ?? "localhost",
-        Port = cfg.Port ?? 5432,
-        Database = cfg.Database,
-        Username = cfg.User,
-        // Integrated: no password is sent, Npgsql answers the server's SSPI / GSS request with the Windows account.
-        Password = cfg.Auth == AuthMode.Integrated ? null : plainPassword,
-        Timeout = 10,
-    };
+        var builder = new NpgsqlConnectionStringBuilder
+        {
+            Host = cfg.Host ?? "localhost",
+            Port = cfg.Port ?? 5432,
+            Database = cfg.Database,
+            Username = cfg.User,
+            // Integrated: no password is sent, Npgsql answers the server's SSPI / GSS request with the Windows account.
+            Password = cfg.Auth == AuthMode.Integrated ? null : plainPassword,
+            Timeout = 10,
+        };
+        if (cfg.Tls is { } tls) ApplyTls(builder, tls);
+        return builder;
+    }
 
     /// <summary>Loads the whole schema of the connected database in four bulk queries (no per-table queries).</summary>
     public async Task<IReadOnlyList<TableInfo>> LoadSchemaAsync(DbConnection c, CancellationToken ct)

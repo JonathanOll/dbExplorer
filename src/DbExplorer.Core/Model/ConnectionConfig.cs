@@ -21,6 +21,9 @@ public record ConnectionConfig(
     /// <summary>The SSH tunnel the connection goes through; null connects directly.</summary>
     public SshTunnelConfig? Ssh { get; init; }
 
+    /// <summary>TLS settings (PostgreSQL); null keeps the driver's defaults, which is what old configs have.</summary>
+    public TlsConfig? Tls { get; init; }
+
     /// <summary>What the connection is used for. Init property (not positional) so old configs load as <see cref="DbEnvironment.None"/>.</summary>
     public DbEnvironment Environment { get; init; }
 

@@ -65,6 +65,7 @@ public static partial class DBeaverImporter
                 connection = connection with { Environment = EnvironmentOf(entry.Value, connectionTypes) };
                 connection = WithAuthentication(connection, entry.Value);
                 connection = WithSshTunnel(connection, entry.Name, entry.Value, credentials, protector, warnings);
+                connection = WithTls(connection, entry.Name, entry.Value, credentials, protector, warnings);
 
                 if (ReadOnlyReason(entry.Value, connectionTypes) is { } reason)
                 {
@@ -218,8 +219,9 @@ public static partial class DBeaverImporter
             {
                 if (entry.Value.TryGetProperty("#connection", out var conn))
                     result[entry.Name] = (Str(conn, "user"), Str(conn, "password"));
-                if (entry.Value.TryGetProperty("network/" + SshHandler, out var ssh))
-                    result[SshCredentialsKey(entry.Name)] = (Str(ssh, "user"), Str(ssh, "password"));
+                foreach (var handler in new[] { SshHandler, TlsHandler })
+                    if (entry.Value.TryGetProperty("network/" + handler, out var secret))
+                        result[HandlerCredentialsKey(entry.Name, handler)] = (Str(secret, "user"), Str(secret, "password"));
             }
         }
         catch (Exception e) when (e is CryptographicException or JsonException or ArgumentException or InvalidOperationException)

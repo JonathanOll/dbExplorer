@@ -28,6 +28,7 @@ public class StartupJsonTests
     [InlineData("""{"Settings":{"Appearance":{},"Editor":{},"Results":{}},"Export":{"Copy":{}}}""")]
     [InlineData("""{"Connections":[""" + Connection + """],"Groups":[],"RecentCommands":["a"]}""")]
     [InlineData("""{"AutoUpdateCheck":false,"ShowFolders":false,"QuickOpenHidden":"Views, Columns","Format":{"IndentSize":2}}""")]
+    [InlineData("""{"Connections":[{"Id":"7d0f0b0e-0000-0000-0000-000000000001","Name":"a","Kind":"Postgres","Database":"d","Tls":{}}]}""")]
     [InlineData("""{"Settings":null,"RecentCommands":null,"Unknown":1}""")]
     public void Config_LoadsLikeTheReflectionSerializer(string json)
     {

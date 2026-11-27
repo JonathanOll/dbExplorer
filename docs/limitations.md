@@ -43,8 +43,10 @@ What dbExplorer does not do, and the edges of what it does. Linked groups and th
   are run against real servers.
 - No MySQL/Oracle, no DDL editing or export wizards.
 - Sign-in: Windows and Microsoft Entra modes and SSH tunnels have not been tried against real servers. Not offered: Entra
-  device code and workload identity, a custom Entra application ID, client certificates, access tokens. PostgreSQL has no
-  TLS setting in the connection dialog (the driver's default applies: TLS when the server offers it, certificate not verified).
+  device code and workload identity, a custom Entra application ID, client certificates (SQL Server), access tokens.
+- PostgreSQL TLS: tested against a stand-in server only. The default mode (Prefer) does not verify the server certificate.
+  No direct TLS negotiation (PostgreSQL 17), no revocation check, and the TLS stage is named by **Test connection** only
+  (opening a connection shows the driver's message).
 - SSH tunnels: one jump server (no `ProxyJump` chain), password or private key only (no SSH agent, no `~/.ssh/config`, no
   interactive one-time codes), `known_hosts` of OpenSSH is not read. The forwarded port listens on `127.0.0.1`, so other
   programs of this machine can reach it while the connection is open (the database sign-in still applies). A drop is noticed
