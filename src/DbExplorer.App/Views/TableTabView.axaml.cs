@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.VisualTree;
 using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -121,7 +123,8 @@ public partial class TableTabView : UserControl
     // Double-click a column of the Structure sub-tab: show it in the Data sub-tab (scrolls to it and lights it, like Ctrl+L).
     private void OnStructureColumnDoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (sender is DataGrid { SelectedItem: StructureColumn column }) column.Jump();
+        // Only a row counts: two quick clicks on the grid's scroll bar or header must not leave the sub-tab.
+        if ((e.Source as Visual)?.FindAncestorOfType<DataGridRow>(includeSelf: true)?.DataContext is StructureColumn column) column.Jump();
     }
 
     // The tab control recreates this view when the tab is selected again: always follow the current view-model.

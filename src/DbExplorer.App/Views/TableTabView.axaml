@@ -11,9 +11,13 @@
       <Setter Property="GridLinesVisibility" Value="Horizontal" />
       <Setter Property="CanUserResizeColumns" Value="True" />
       <Setter Property="RowBackground" Value="Transparent" />
-      <Setter Property="VerticalScrollBarVisibility" Value="Disabled" />
+      <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
       <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+      <!-- fixed heights: the grid sizes itself from its row count (ContentHeightDataGrid) -->
+      <Setter Property="RowHeight" Value="{DynamicResource DbxGridRowHeight}" />
+      <Setter Property="ColumnHeaderHeight" Value="30" />
     </Style>
+    <Style Selector="DataGrid.structure Button.link"><Setter Property="MinHeight" Value="0" /><Setter Property="Padding" Value="6,0" /></Style>
     <Style Selector="DataGrid.structure DataGridColumnHeader">
       <Setter Property="Padding" Value="10,0,6,0" />
       <Setter Property="MinHeight" Value="30" />
@@ -267,15 +271,17 @@
             <TextBlock Text="Structure" />
           </StackPanel>
         </TabItem.Header>
-        <ScrollViewer>
-          <StackPanel Spacing="18" Margin="16" DataContext="{Binding Structure}" x:DataType="vm:StructureViewModel">
-            <StackPanel Spacing="6">
-              <StackPanel Orientation="Horizontal" Spacing="10">
+        <!-- Each grid gets a bounded height and scrolls its own rows; the outer scroll only serves a very short window -->
+        <ScrollViewer x:Name="StructureScroll">
+          <views:SharedHeightPanel Spacing="18" Margin="16" FitHeight="{Binding #StructureScroll.Viewport.Height}"
+                                   DataContext="{Binding Structure}" x:DataType="vm:StructureViewModel">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,6">
                 <TextBlock Classes="section" Text="{Binding ColumnsTitle}" Margin="0" />
                 <TextBlock Classes="faint small" Text="Double-click a column to show it in Data" VerticalAlignment="Center" IsVisible="{Binding HasColumns}" />
               </StackPanel>
               <Border Classes="surface" ClipToBounds="True">
-                <DataGrid Classes="structure" ItemsSource="{Binding Columns}" DoubleTapped="OnStructureColumnDoubleTapped">
+                <views:ContentHeightDataGrid Classes="structure" ItemsSource="{Binding Columns}" DoubleTapped="OnStructureColumnDoubleTapped">
                   <DataGrid.Columns>
                     <DataGridTextColumn Header="#" Binding="{Binding Ordinal}" Width="Auto" MinWidth="44" />
                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" />
@@ -311,14 +317,15 @@
                       </DataTemplate>
                     </DataGridTemplateColumn>
                   </DataGrid.Columns>
-                </DataGrid>
+                </views:ContentHeightDataGrid>
               </Border>
-            </StackPanel>
+            </DockPanel>
 
-            <StackPanel Spacing="6">
-              <TextBlock Classes="section" Text="{Binding ForeignKeysTitle}" Margin="0" />
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Top" Classes="section" Text="{Binding ForeignKeysTitle}" Margin="0,0,0,6" />
+              <TextBlock DockPanel.Dock="Top" Classes="faint" Text="This table has no foreign keys." IsVisible="{Binding !HasForeignKeys}" />
               <Border Classes="surface" ClipToBounds="True" IsVisible="{Binding HasForeignKeys}">
-                <DataGrid Classes="structure" ItemsSource="{Binding ForeignKeys}">
+                <views:ContentHeightDataGrid Classes="structure" ItemsSource="{Binding ForeignKeys}">
                   <DataGrid.Columns>
                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="1.5*" />
                     <DataGridTextColumn Header="Columns" Binding="{Binding Columns}" Width="1.5*" />
@@ -330,15 +337,15 @@
                       </DataTemplate>
                     </DataGridTemplateColumn>
                   </DataGrid.Columns>
-                </DataGrid>
+                </views:ContentHeightDataGrid>
               </Border>
-              <TextBlock Classes="faint" Text="This table has no foreign keys." IsVisible="{Binding !HasForeignKeys}" />
-            </StackPanel>
+            </DockPanel>
 
-            <StackPanel Spacing="6">
-              <TextBlock Classes="section" Text="{Binding IndexesTitle}" Margin="0" />
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Top" Classes="section" Text="{Binding IndexesTitle}" Margin="0,0,0,6" />
+              <TextBlock DockPanel.Dock="Top" Classes="faint" Text="This table has no indexes." IsVisible="{Binding !HasIndexes}" />
               <Border Classes="surface" ClipToBounds="True" IsVisible="{Binding HasIndexes}">
-                <DataGrid Classes="structure" ItemsSource="{Binding Indexes}">
+                <views:ContentHeightDataGrid Classes="structure" ItemsSource="{Binding Indexes}">
                   <DataGrid.Columns>
                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" />
                     <DataGridTemplateColumn Header="Unique" Width="Auto" MinWidth="100">
@@ -350,11 +357,10 @@
                     </DataGridTemplateColumn>
                     <DataGridTextColumn Header="Columns" Binding="{Binding Columns}" Width="2*" />
                   </DataGrid.Columns>
-                </DataGrid>
+                </views:ContentHeightDataGrid>
               </Border>
-              <TextBlock Classes="faint" Text="This table has no indexes." IsVisible="{Binding !HasIndexes}" />
-            </StackPanel>
-          </StackPanel>
+            </DockPanel>
+          </views:SharedHeightPanel>
         </ScrollViewer>
       </TabItem>
     </TabControl>

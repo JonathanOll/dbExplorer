@@ -171,6 +171,9 @@ current-cell frame: 2 px accent, inside the cell).
   The grid header is a name band (type-aware, sort in accent, context menu) over a lighter filter band with typed hints. Edited
   cells are bold with a "Was: …" tooltip; empty cells of a new row say `DEFAULT`. `Ctrl+C` / `Ctrl+Shift+C` copy, `Delete`, `Insert`,
   `Alt+Enter` opens the value viewer (full text, JSON indented, hex for binary).
+- **Structure sub-tab**: columns, foreign keys and indexes share the height (`SharedHeightPanel`): a short section takes
+  what it needs, the long ones split the rest and scroll their own rows (`ContentHeightDataGrid`). Never give a `DataGrid`
+  an unbounded height (inside a `StackPanel` or a `ScrollViewer`): rows become unreachable and the scroll jumps.
 - **Copy and export** (both grids, [docs/export.md](../export.md)): drag, `Alt+click` or `Shift+arrows` select a rectangle,
   `Ctrl+click` on a header or `Ctrl+Space` whole columns (cells lit like selected rows). The cell menu starts with Copy, Copy with
   headers, Advanced copy, "Copy as", Export and Select column. `ExportDialog` and `AdvancedCopyDialog` have the options on the
@@ -230,7 +233,7 @@ dotnet run --project tools/UiShots -- <outDir> [scene,scene...|all] [light|dark]
 dotnet run --project tools/UiShots -- --scroll 3        # scroll benchmark of a 200 x 20 grid, prints ms per frame
 ```
 
-Scenes: `er-diagram`, `er-diagram-focus`, `er-diagram-hover`, `er-diagram-large`, `er-diagram-export`, `empty`, `main-table`, `table-edit`, `table-structure`, `script`, `script-error`, `quick-open`, `connection-dialog`,
+Scenes: `er-diagram`, `er-diagram-focus`, `er-diagram-hover`, `er-diagram-large`, `er-diagram-export`, `empty`, `main-table`, `table-edit`, `table-structure`, `table-structure-wide`, `script`, `script-error`, `quick-open`, `connection-dialog`,
 `sql-preview`, `virtual-key`, `history` (the Query history window), `search`, `search-data`, `format-sql`, `confirm-dialog`, `live-theme-switch` (flips the theme while the window shows),
 `main-table-125` (1024x640 DIP, the 1280x800 window at 125 percent scaling), the Settings dialog (`settings-appearance`,
 `settings-editor`, `settings-results`, `settings-history`, `settings-format`, `settings-shortcuts`, `settings-upgrade`, `settings-search`, `settings-appearance-125`),

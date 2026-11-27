@@ -324,6 +324,7 @@ internal static partial class Scenes
         ("main-table", MainTable),
         ("table-edit", TableEdit),
         ("table-structure", TableStructure),
+        ("table-structure-wide", TableStructureWide),
         ("grid-selection", GridSelectionScene),
         ("export-dialog", d => ExportDialogScene(d, DbExplorer.Core.Export.ExportKind.Csv)),
         ("export-dialog-sql", d => ExportDialogScene(d, DbExplorer.Core.Export.ExportKind.SqlInsert)),
@@ -509,6 +510,25 @@ internal static partial class Scenes
         await Open(d);
         await OpenTable(d, "orders");
         d.Window.GetVisualDescendants().OfType<TabControl>().First(t => t.Name == "SubTabs").SelectedIndex = 1;
+        await Settle();
+        return null;
+    }
+
+    // 320 columns, 24 foreign keys and 30 indexes: every section of the Structure sub-tab scrolls inside its share.
+    private static async Task<Window?> TableStructureWide(Demo d)
+    {
+        var columns = Enumerable.Range(1, 320).Select(i =>
+            $"attribute_{i:000} {(i % 3 == 0 ? "INTEGER" : "TEXT")}" + (i % 3 == 0 && i <= 72 ? " REFERENCES customers(id)" : ""));
+        Demo.Exec(d.Shop.Database,
+            $"CREATE TABLE wide_facts ({string.Join(", ", columns)}); INSERT INTO wide_facts (attribute_001) VALUES ('x');"
+            + string.Concat(Enumerable.Range(1, 30).Select(i => $"CREATE INDEX ix_wide_{i:00} ON wide_facts(attribute_{i:000});")));
+        await Open(d);
+        await OpenTable(d, "wide_facts");
+        d.Window.GetVisualDescendants().OfType<TabControl>().First(t => t.Name == "SubTabs").SelectedIndex = 1;
+        await Settle();
+        // Scrolled to the middle of the columns, as a user would after a few notches.
+        var grid = d.Window.GetVisualDescendants().OfType<DataGrid>().First(g => g.Classes.Contains("structure"));
+        grid.ScrollIntoView(((System.Collections.IList)grid.ItemsSource)[160], null);
         await Settle();
         return null;
     }
