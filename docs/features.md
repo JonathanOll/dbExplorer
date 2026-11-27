@@ -7,6 +7,37 @@ where you left off. The big topics have their own page: [linked database groups]
 
 ![Table tab, light](ui/after/main-table-light.png)
 
+## Sign-in and SSH tunnels
+
+The connection dialog shows only the fields the chosen sign-in needs. **Test connection** goes the same way as a real
+connection and says which step failed: SSH server, host key, SSH sign-in, forwarding to the database, database sign-in or
+database.
+
+| Engine | Sign in | Asks for |
+| --- | --- | --- |
+| PostgreSQL | User and password | user, password |
+| PostgreSQL | Windows (SSPI / Kerberos) | optionally a role name |
+| SQL Server | SQL Server login | user, password |
+| SQL Server | Windows | nothing |
+| SQL Server | Microsoft Entra: interactive (MFA) | optionally the account; a Microsoft sign-in window opens |
+| SQL Server | Microsoft Entra: default credential | optionally a managed identity client ID |
+| SQL Server | Microsoft Entra: integrated | optionally the account |
+| SQL Server | Microsoft Entra: password | account, password |
+| SQL Server | Microsoft Entra: service principal | client ID, client secret |
+
+Choosing a Microsoft Entra mode ticks **Encrypt connection**. The Entra libraries are only loaded when a SQL Server
+connection is used, the SSH library when a tunnel opens: nothing more happens at start-up.
+
+**SSH tunnel** (PostgreSQL and SQL Server): sign in to an SSH server with a password or a private key (with its passphrase);
+the database host and port are then resolved from that server. Each open connection owns one tunnel, listening on a free
+port of `127.0.0.1`; it closes with the connection and is reopened by the next operation when it dropped (a script tab
+says it reconnected: an open transaction is lost). The server certificate is still checked against the database host name.
+
+**Host keys**: the first connection to an SSH server shows its SHA-256 fingerprint; only **Trust and connect** stores it
+(`ssh_known_hosts.json`, Cancel is the default). A server that later presents another key is refused without a question; if
+it was really reinstalled, remove its entry from that file. SSH passwords, passphrases and client secrets are encrypted like
+database passwords.
+
 ## Connection tree
 
 Folders (one level) > connection > schema > tables (SQLite has no schema level). Several

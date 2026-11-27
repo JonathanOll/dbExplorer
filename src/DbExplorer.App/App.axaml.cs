@@ -42,7 +42,7 @@ public class App : Application
             var window = new MainWindow();
             var dialogs = new DialogService(window);
             var cache = new MetadataCache(paths.CacheDir);
-            var sessions = new SessionManager(store, cache, protector);
+            var sessions = new SessionManager(store, cache, protector, hostKeyPrompt: new HostKeyDialog(window));
             var tree = new ConnectionTreeViewModel(
                 store, startup.Config, sessions, status, dialogs, paths.DBeaverDir, startup.PersistenceEnabled);
             settings.Persist = tree.SetSettings;

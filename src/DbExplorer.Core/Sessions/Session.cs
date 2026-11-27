@@ -13,16 +13,27 @@ namespace DbExplorer.Core.Sessions;
 public partial class Session : IDisposable
 {
     private readonly ISecretProtector? _protector;
+    private readonly ConnectionLink _link;
     private volatile bool _disposed;
 
     /// <param name="protector">Used to decrypt <c>Config.ProtectedPassword</c> on each open, so no plain password is kept in memory.</param>
     public Session(ConnectionConfig config, IDbDriver driver, IReadOnlyList<TableInfo> schema, ISecretProtector? protector = null)
+        : this(config, new ConnectionLink(driver, null), schema, protector)
+    {
+    }
+
+    /// <summary>A session that takes over <paramref name="link"/> (and its SSH tunnel) and closes it when disposed.</summary>
+    internal Session(ConnectionConfig config, ConnectionLink link, IReadOnlyList<TableInfo> schema, ISecretProtector? protector)
     {
         Config = config;
-        Driver = driver;
+        _link = link;
+        Driver = link.Driver;
         Schema = schema;
         _protector = protector;
     }
+
+    /// <summary>False when the SSH tunnel dropped: connections held through it are dead and must be replaced.</summary>
+    internal bool IsRouteAlive => _link.IsAlive;
 
     /// <summary>Current config. Replaced (same Id) when cosmetic settings such as the read-only flag change.</summary>
     public ConnectionConfig Config { get; private set; }
@@ -35,17 +46,11 @@ public partial class Session : IDisposable
     /// <summary>Opens a new connection; the caller disposes it.</summary>
     public async Task<DbConnection> OpenConnectionAsync(CancellationToken ct)
     {
-        var connection = CreateConnection();
-        try
-        {
-            await connection.OpenAsync(ct).ConfigureAwait(false);
-            return connection;
-        }
-        catch
-        {
-            await connection.DisposeAsync().ConfigureAwait(false);
-            throw;
-        }
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var connection = await _link.OpenAsync(Config, PlainPassword(), ct).ConfigureAwait(false);
+        if (!_disposed) return connection;
+        await connection.DisposeAsync().ConfigureAwait(false);
+        throw new ObjectDisposedException(nameof(Session));
     }
 
     public void UpdateConfig(ConnectionConfig config)
@@ -94,8 +99,9 @@ public partial class Session : IDisposable
         foreach (var script in DedicatedConnections()) script.Dispose();
         try
         {
-            using var connection = Build();
-            ConnectionPools.Clear(connection);
+            // Null: a tunnel that never opened has no pool to clear.
+            using var connection = _link.Build(Config, PlainPassword());
+            if (connection is not null) ConnectionPools.Clear(connection);
         }
         catch (Exception)
         {
@@ -104,21 +110,12 @@ public partial class Session : IDisposable
         finally
         {
             _disposed = true;
+            _link.Dispose();   // after the pool: its connections go through the tunnel
         }
     }
 
-    private DbConnection CreateConnection()
-    {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        return Build();
-    }
-
-    private DbConnection Build()
-    {
-        var password = string.IsNullOrEmpty(Config.ProtectedPassword) || _protector is null
+    private string? PlainPassword() =>
+        string.IsNullOrEmpty(Config.ProtectedPassword) || _protector is null || !AuthModes.UsesPassword(Config.Auth)
             ? null
             : _protector.Unprotect(Config.ProtectedPassword);
-        return Driver.CreateConnection(Config, password);
-    }
 }
-

@@ -48,7 +48,7 @@
     </views:DialogFooter>
 
     <views:DialogHeader DockPanel.Dock="Top" Icon="{StaticResource IconDatabase}" Title="{Binding Title}"
-                        Subtitle="Passwords are stored encrypted for your Windows user." />
+                        Subtitle="Passwords and secrets are stored encrypted for your Windows user." />
 
     <!-- Scrolls when the screen is shorter than the form (the window caps its own height, see the code-behind) -->
     <ScrollViewer Background="{DynamicResource DbxContentBg}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -127,12 +127,34 @@
           </Grid>
 
           <Grid ColumnDefinitions="92,*" IsVisible="{Binding IsNetwork}">
-            <Label Classes="cap" Content="_User" Target="{Binding #UserBox}" />
-            <TextBox x:Name="UserBox" Grid.Column="1" Text="{Binding User}" />
+            <Label Classes="cap" Content="_Sign in" Target="{Binding #AuthBox}" />
+            <StackPanel Grid.Column="1" Spacing="4">
+              <ComboBox x:Name="AuthBox" HorizontalAlignment="Stretch" ItemsSource="{Binding AuthOptions}"
+                        SelectedItem="{Binding SelectedAuthOption}" AutomationProperties.Name="Authentication">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:AuthOption">
+                    <TextBlock Text="{Binding Label}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBlock Classes="optdesc" Text="{Binding AuthHint}" IsVisible="{Binding HasAuthHint}" />
+              <TextBlock Classes="fielderror" Text="{Binding AuthError}" TextWrapping="Wrap"
+                         IsVisible="{Binding AuthError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            </StackPanel>
           </Grid>
 
-          <Grid ColumnDefinitions="92,*" IsVisible="{Binding IsNetwork}">
-            <Label Classes="cap" Content="_Password" Target="{Binding #PasswordBox}" />
+          <Grid ColumnDefinitions="92,*" IsVisible="{Binding ShowUser}">
+            <Label Classes="cap" Content="{Binding UserLabel}" Target="{Binding #UserBox}" />
+            <StackPanel Grid.Column="1" Spacing="4">
+              <TextBox x:Name="UserBox" Text="{Binding User}" Watermark="{Binding UserPlaceholder}"
+                       Classes.error="{Binding UserError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBlock Classes="fielderror" Text="{Binding UserError}"
+                         IsVisible="{Binding UserError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            </StackPanel>
+          </Grid>
+
+          <Grid ColumnDefinitions="92,*" IsVisible="{Binding ShowPassword}">
+            <Label Classes="cap" Content="{Binding PasswordLabel}" Target="{Binding #PasswordBox}" />
             <StackPanel Grid.Column="1" Spacing="8">
               <TextBox x:Name="PasswordBox" Text="{Binding Password}" PasswordChar="•" Watermark="{Binding PasswordHint}">
                 <TextBox.InnerRightContent>
@@ -144,6 +166,80 @@
                         IsVisible="{Binding HasSavedPassword}" />
             </StackPanel>
           </Grid>
+        </StackPanel>
+
+        <!-- SSH tunnel: one check box until it is wanted -->
+        <StackPanel Spacing="12" IsVisible="{Binding IsNetwork}">
+          <TextBlock Classes="section" Text="SSH TUNNEL" Margin="0" />
+          <CheckBox x:Name="SshCheck" IsChecked="{Binding UseSsh}">
+            <StackPanel>
+              <TextBlock Text="Connect through an SSH tunnel" />
+              <TextBlock Classes="optdesc" Text="The database host and port above are then reached from the SSH server." />
+            </StackPanel>
+          </CheckBox>
+          <StackPanel Spacing="12" IsVisible="{Binding ShowSsh}">
+            <Grid ColumnDefinitions="92,*">
+              <Label Classes="cap" Content="SS_H host" Target="{Binding #SshHostBox}" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <Grid ColumnDefinitions="*,Auto,96">
+                  <TextBox x:Name="SshHostBox" Text="{Binding SshHost}" Watermark="jump.example.com"
+                           Classes.error="{Binding SshHostError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <TextBlock Grid.Column="1" Classes="dim" Text="Port" Margin="14,0,8,0" VerticalAlignment="Center" />
+                  <TextBox x:Name="SshPortBox" Grid.Column="2" Text="{Binding SshPortText}" AutomationProperties.Name="SSH port"
+                           Classes.error="{Binding SshPortError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                </Grid>
+                <TextBlock Classes="fielderror" Text="{Binding SshHostError}"
+                           IsVisible="{Binding SshHostError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <TextBlock Classes="fielderror" Text="{Binding SshPortError}"
+                           IsVisible="{Binding SshPortError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              </StackPanel>
+            </Grid>
+
+            <Grid ColumnDefinitions="92,*">
+              <Label Classes="cap" Content="SSH us_er" Target="{Binding #SshUserBox}" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <TextBox x:Name="SshUserBox" Text="{Binding SshUser}"
+                         Classes.error="{Binding SshUserError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <TextBlock Classes="fielderror" Text="{Binding SshUserError}"
+                           IsVisible="{Binding SshUserError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              </StackPanel>
+            </Grid>
+
+            <Grid ColumnDefinitions="92,*">
+              <Label Classes="cap" Content="SSH sign in" Target="{Binding #SshAuthBox}" />
+              <ComboBox x:Name="SshAuthBox" Grid.Column="1" HorizontalAlignment="Stretch" ItemsSource="{Binding SshAuthChoices}"
+                        SelectedIndex="{Binding SshAuthIndex}" AutomationProperties.Name="SSH authentication" />
+            </Grid>
+
+            <Grid ColumnDefinitions="92,*" IsVisible="{Binding IsSshPassword}">
+              <Label Classes="cap" Content="Password" Target="{Binding #SshPasswordBox}" />
+              <TextBox x:Name="SshPasswordBox" Grid.Column="1" Text="{Binding SshPassword}" PasswordChar="•"
+                       Watermark="{Binding SshPasswordHint}" AutomationProperties.Name="SSH password" />
+            </Grid>
+
+            <Grid ColumnDefinitions="92,*" IsVisible="{Binding IsSshKey}">
+              <Label Classes="cap" Content="_Key file" Target="{Binding #SshKeyBox}" />
+              <StackPanel Grid.Column="1" Spacing="4">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBox x:Name="SshKeyBox" Text="{Binding SshKeyFile}" Watermark="%USERPROFILE%\.ssh\id_ed25519"
+                           Classes.error="{Binding SshKeyError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <Button Grid.Column="1" Content="Browse…" Margin="8,0,0,0" Click="OnBrowseKeyClick"
+                          ToolTip.Tip="Choose a private key file" />
+                </Grid>
+                <TextBlock Classes="fielderror" Text="{Binding SshKeyError}"
+                           IsVisible="{Binding SshKeyError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              </StackPanel>
+            </Grid>
+
+            <Grid ColumnDefinitions="92,*" IsVisible="{Binding IsSshKey}">
+              <Label Classes="cap" Content="Passphrase" Target="{Binding #SshPassphraseBox}" />
+              <TextBox x:Name="SshPassphraseBox" Grid.Column="1" Text="{Binding SshPassphrase}" PasswordChar="•"
+                       Watermark="{Binding SshPassphraseHint}" AutomationProperties.Name="Private key passphrase" />
+            </Grid>
+
+            <TextBlock Classes="optdesc" Margin="92,0,0,0"
+                       Text="The first connection shows the server's key fingerprint for you to check. A changed key is refused." />
+          </StackPanel>
         </StackPanel>
 
         <StackPanel Spacing="10">

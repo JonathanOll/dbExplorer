@@ -39,6 +39,47 @@ public sealed partial class SqlServerDriver : IDbDriver
 
     public DbConnection CreateConnection(ConnectionConfig cfg, string? plainPassword)
     {
+        if (cfg.Auth == AuthMode.EntraInteractive) EntraAuthentication.PrepareInteractive();
+        return new SqlConnection(Builder(cfg, plainPassword).ToString());
+    }
+
+    public (string Host, int Port) NetworkTarget(ConnectionConfig cfg)
+    {
+        var host = (cfg.Host ?? "").Trim();
+        if (host.StartsWith("tcp:", StringComparison.OrdinalIgnoreCase)) host = host[4..];
+        var port = cfg.Port;
+        var comma = host.IndexOf(',');
+        if (comma >= 0)
+        {
+            if (int.TryParse(host[(comma + 1)..], out var inHost)) port ??= inHost;
+            host = host[..comma];
+        }
+        var slash = host.IndexOf('\\');
+        if (slash >= 0)
+        {
+            // The SQL Server Browser service answers over UDP, which a TCP tunnel cannot carry.
+            if (port is null) throw new NotSupportedException("A named instance reached through an SSH tunnel needs an explicit port.");
+            host = host[..slash];
+        }
+        if (host is "" or "." or "(local)") host = "localhost";
+        return (host, port ?? 1433);
+    }
+
+    public DbConnection CreateTunneledConnection(ConnectionConfig cfg, string? plainPassword, int localPort)
+    {
+        var (host, port) = NetworkTarget(cfg);
+        if (cfg.Auth == AuthMode.EntraInteractive) EntraAuthentication.PrepareInteractive();
+        var builder = Builder(cfg, plainPassword);
+        builder.DataSource = $"127.0.0.1,{localPort}";
+        // The certificate is still checked against the server's own name, not the local end of the tunnel.
+        if (!cfg.TrustServerCertificate) builder.HostNameInCertificate = host;
+        // Same for Kerberos: the ticket is for the real server.
+        if (cfg.Auth == AuthMode.Integrated) builder.ServerSPN = $"MSSQLSvc/{host}:{port}";
+        return new SqlConnection(builder.ToString());
+    }
+
+    private static SqlConnectionStringBuilder Builder(ConnectionConfig cfg, string? plainPassword)
+    {
         var host = string.IsNullOrWhiteSpace(cfg.Host) ? "localhost" : cfg.Host;
         var builder = new SqlConnectionStringBuilder
         {
@@ -46,12 +87,26 @@ public sealed partial class SqlServerDriver : IDbDriver
             InitialCatalog = cfg.Database,
             Encrypt = cfg.Encrypt,
             TrustServerCertificate = cfg.TrustServerCertificate,
-            ConnectTimeout = ConnectTimeoutSeconds,
+            ConnectTimeout = cfg.Auth switch
+            {
+                // The user types a password and approves a prompt on a phone: far longer than a network round trip.
+                AuthMode.EntraInteractive => 180,
+                // The default credential chain probes several sources one after the other.
+                AuthMode.EntraDefault => 45,
+                AuthMode.EntraIntegrated or AuthMode.EntraPassword or AuthMode.EntraServicePrincipal => 30,
+                _ => ConnectTimeoutSeconds,
+            },
             ApplicationName = "dbExplorer",
         };
+        if (cfg.Auth == AuthMode.Integrated)
+        {
+            builder.IntegratedSecurity = true;
+            return builder;
+        }
+        if (AuthModes.IsEntra(cfg.Auth)) builder.Authentication = EntraAuthentication.Method(cfg.Auth);
         if (!string.IsNullOrEmpty(cfg.User)) builder.UserID = cfg.User;
-        if (plainPassword is not null) builder.Password = plainPassword;
-        return new SqlConnection(builder.ToString());
+        if (plainPassword is not null && AuthModes.UsesPassword(cfg.Auth)) builder.Password = plainPassword;
+        return builder;
     }
 
     public async Task<IReadOnlyList<TableInfo>> LoadSchemaAsync(DbConnection c, CancellationToken ct)

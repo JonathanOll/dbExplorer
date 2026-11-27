@@ -9,7 +9,7 @@ namespace DbExplorer.Core.Config;
 public record ImportResult(int Added, int Skipped, IReadOnlyList<string> Warnings, IReadOnlyList<string>? ReadOnlyImported = null);
 
 /// <summary>Imports folders, connections, credentials and virtual keys from a DBeaver workspace.</summary>
-public static class DBeaverImporter
+public static partial class DBeaverImporter
 {
     // DBeaver's well-known, fixed key for credentials-config.json (AES-128-CBC, IV = first 16 bytes).
     private static readonly byte[] CredentialsKey = Convert.FromHexString("babb4a9f774ab853c96c2d653dfe544a");
@@ -61,6 +61,9 @@ public static class DBeaverImporter
 
                 var connection = ToConnection(entry.Name, name, entry.Value, credentials, protector, warnings);
                 if (connection is null) continue;
+
+                connection = WithAuthentication(connection, entry.Value);
+                connection = WithSshTunnel(connection, entry.Name, entry.Value, credentials, protector, warnings);
 
                 if (ReadOnlyReason(entry.Value, connectionTypes) is { } reason)
                 {
@@ -187,8 +190,12 @@ public static class DBeaverImporter
             var plain = aes.DecryptCbc(data.AsSpan(16), data.AsSpan(0, 16), PaddingMode.PKCS7);
             using var doc = JsonDocument.Parse(plain);
             foreach (var entry in doc.RootElement.EnumerateObject())
+            {
                 if (entry.Value.TryGetProperty("#connection", out var conn))
                     result[entry.Name] = (Str(conn, "user"), Str(conn, "password"));
+                if (entry.Value.TryGetProperty("network/" + SshHandler, out var ssh))
+                    result[SshCredentialsKey(entry.Name)] = (Str(ssh, "user"), Str(ssh, "password"));
+            }
         }
         catch (Exception e) when (e is CryptographicException or JsonException or ArgumentException or InvalidOperationException)
         {

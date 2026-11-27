@@ -2,6 +2,7 @@ using DbExplorer.Core.Config;
 using DbExplorer.Core.Drivers;
 using DbExplorer.Core.Metadata;
 using DbExplorer.Core.Model;
+using DbExplorer.Core.Tunnels;
 
 namespace DbExplorer.Core.Sessions;
 
@@ -16,8 +17,11 @@ namespace DbExplorer.Core.Sessions;
 /// attempt never registers a session nor writes the metadata cache.
 /// </remarks>
 public class SessionManager(
-    ConfigStore configStore, MetadataCache cache, ISecretProtector protector, Func<DbKind, IDbDriver>? driverFactory = null)
+    ConfigStore configStore, MetadataCache cache, ISecretProtector protector, Func<DbKind, IDbDriver>? driverFactory = null,
+    IHostKeyPrompt? hostKeyPrompt = null, SshTunnelFactory? tunnelFactory = null)
 {
+    private readonly SshTunnelFactory _tunnels =
+        tunnelFactory ?? SshTunnels.Factory(KnownHostsStore.NextTo(configStore.FilePath), protector, hostKeyPrompt);
     private readonly Func<DbKind, IDbDriver> _drivers = driverFactory ?? DriverFactory.For;
     private readonly object _gate = new();
     private readonly Dictionary<Guid, Session> _open = new();
@@ -155,19 +159,42 @@ public class SessionManager(
         return routines;
     }
 
-    /// <summary>Opens a throw-away connection with the given plain password to validate the settings.</summary>
+    /// <summary>Opens a throw-away direct connection with the given plain password to validate the settings.</summary>
     public static Task TestConnectionAsync(ConnectionConfig config, string? plainPassword, CancellationToken ct) =>
+        TestAsync(() => new ConnectionLink(DriverFactory.For(config.Kind), null), config, plainPassword, ct);
+
+    /// <summary>
+    /// Opens a throw-away connection the way a session would (SSH tunnel, host key check, authentication). A failure is a
+    /// <see cref="ConnectionStageException"/> that says which step failed.
+    /// </summary>
+    public Task TestAsync(ConnectionConfig config, string? plainPassword, CancellationToken ct) =>
+        TestAsync(() => ConnectionLink.For(config, _drivers(config.Kind), _tunnels), config, plainPassword, ct);
+
+    private static Task TestAsync(Func<ConnectionLink> createLink, ConnectionConfig config, string? plainPassword, CancellationToken ct) =>
         Task.Run(async () =>
         {
-            var driver = DriverFactory.For(config.Kind);
-            await using var connection = driver.CreateConnection(config, plainPassword);
+            ConnectionLink? link = null;
             try
             {
-                await connection.OpenAsync(ct).ConfigureAwait(false);
+                link = createLink();
+                await using var connection = await link.OpenAsync(config, plainPassword, ct).ConfigureAwait(false);
+                ConnectionPools.Clear(connection);
+            }
+            catch (Exception e) when (e is not (OperationCanceledException or ConnectionStageException))
+            {
+                // A failed open leaves an entry in the provider's pool: drop it with the tunnel.
+                try
+                {
+                    using var failed = link?.Build(config, plainPassword);
+                    if (failed is not null) ConnectionPools.Clear(failed);
+                }
+                catch (Exception) { /* the settings are refused outright: no pool exists */ }
+                ct.ThrowIfCancellationRequested();
+                throw ConnectionStageException.Database(e);
             }
             finally
             {
-                ConnectionPools.Clear(connection);
+                link?.Dispose();
             }
         }, ct);
 
@@ -183,7 +210,10 @@ public class SessionManager(
     /// is stored now. Used to decide that rows loaded from one connection may be written to another.
     /// </summary>
     public static bool SameDatabase(ConnectionConfig a, ConnectionConfig b) =>
-        SameTarget(a with { ProtectedPassword = b.ProtectedPassword }, b);
+        SameTarget(a with { ProtectedPassword = b.ProtectedPassword, Ssh = WithSecretsOf(a.Ssh, b.Ssh) }, b);
+
+    private static SshTunnelConfig? WithSecretsOf(SshTunnelConfig? a, SshTunnelConfig? b) =>
+        a is null || b is null ? a : a with { ProtectedPassword = b.ProtectedPassword, ProtectedPassphrase = b.ProtectedPassphrase };
 
     private void TrySaveCache(Guid id, IReadOnlyList<TableInfo> schema)
     {
@@ -229,25 +259,35 @@ public class SessionManager(
     {
         var c = attempt.Config;
         var ct = attempt.Cts.Token;
-        var password = string.IsNullOrEmpty(c.ProtectedPassword) ? null : protector.Unprotect(c.ProtectedPassword);
+        var password = string.IsNullOrEmpty(c.ProtectedPassword) || !AuthModes.UsesPassword(c.Auth)
+            ? null
+            : protector.Unprotect(c.ProtectedPassword);
         var driver = _drivers(c.Kind);
-        await using var connection = driver.CreateConnection(c, password);
-        await connection.OpenAsync(ct).ConfigureAwait(false);
-        var schema = await driver.LoadSchemaAsync(connection, ct).ConfigureAwait(false);
-
-        lock (_gate)
+        var link = ConnectionLink.For(c, driver, _tunnels);
+        var owned = false;
+        try
         {
-            if (ct.IsCancellationRequested || !_pending.TryGetValue(c.Id, out var current) || current != attempt)
-            {
-                ConnectionPools.Clear(connection);
-                throw new OperationCanceledException("The connection was closed or changed while it was opening.");
-            }
+            await using var connection = await link.OpenAsync(c, password, ct).ConfigureAwait(false);
+            var schema = await driver.LoadSchemaAsync(connection, ct).ConfigureAwait(false);
 
-            TrySaveCache(c.Id, schema);   // the cache only feeds the search: a write failure must not fail the connect
-            var session = new Session(attempt.Latest, driver, schema, protector);
-            _open[c.Id] = session;
-            return session;
+            lock (_gate)
+            {
+                if (ct.IsCancellationRequested || !_pending.TryGetValue(c.Id, out var current) || current != attempt)
+                {
+                    ConnectionPools.Clear(connection);
+                    throw new OperationCanceledException("The connection was closed or changed while it was opening.");
+                }
+
+                TrySaveCache(c.Id, schema);   // the cache only feeds the search: a write failure must not fail the connect
+                var session = new Session(attempt.Latest, link, schema, protector);
+                owned = true;
+                _open[c.Id] = session;
+                return session;
+            }
+        }
+        finally
+        {
+            if (!owned) link.Dispose();
         }
     }
 }
-

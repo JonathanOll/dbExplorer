@@ -13,4 +13,11 @@ public record ConnectionConfig(
     string? ProtectedPassword,
     bool Encrypt,
     bool TrustServerCertificate,
-    bool ReadOnly);
+    bool ReadOnly)
+{
+    /// <summary>How the database sign-in works. Init property: old configs load as user and password.</summary>
+    public AuthMode Auth { get; init; }
+
+    /// <summary>The SSH tunnel the connection goes through; null connects directly.</summary>
+    public SshTunnelConfig? Ssh { get; init; }
+}

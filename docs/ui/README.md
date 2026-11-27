@@ -240,7 +240,7 @@ dotnet run --project tools/UiShots -- <outDir> [scene,scene...|all] [light|dark]
 dotnet run --project tools/UiShots -- --scroll 3        # scroll benchmark of a 200 x 20 grid, prints ms per frame
 ```
 
-Scenes: `er-diagram`, `er-diagram-focus`, `er-diagram-hover`, `er-diagram-large`, `er-diagram-export`, `empty`, `main-table`, `table-edit`, `table-structure`, `table-structure-wide`, `script`, `script-error`, `quick-open`, `connection-dialog`,
+Scenes: `er-diagram`, `er-diagram-focus`, `er-diagram-hover`, `er-diagram-large`, `er-diagram-export`, `empty`, `main-table`, `table-edit`, `table-structure`, `table-structure-wide`, `script`, `script-error`, `quick-open`, `connection-dialog`, `connection-dialog-entra`, `connection-dialog-ssh`, `host-key-dialog`,
 `sql-preview`, `virtual-key`, `history` (the Query history window), `search`, `search-data`, `format-sql`, `confirm-dialog`, `live-theme-switch` (flips the theme while the window shows),
 `main-table-125` (1024x640 DIP, the 1280x800 window at 125 percent scaling), the Settings dialog (`settings-appearance`,
 `settings-editor`, `settings-results`, `settings-history`, `settings-format`, `settings-shortcuts`, `settings-upgrade`, `settings-search`, `settings-appearance-125`),

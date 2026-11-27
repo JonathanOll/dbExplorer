@@ -52,7 +52,13 @@ public partial class ConnectionDialog : Window
             { HostError: not null } => HostBox,
             { PortError: not null } => HostBox,
             { DatabaseError: not null } => DatabaseBox,
-            _ => null,
+            { AuthError: not null } => AuthBox,
+            { UserError: not null } => UserBox,
+            { SshHostError: not null } => SshHostBox,
+            { SshPortError: not null } => SshPortBox,
+            { SshUserError: not null } => SshUserBox,
+            { SshKeyError: not null } => SshKeyBox,
+            _ => (Control?)null,
         };
         first?.Focus();
     }
@@ -65,6 +71,27 @@ public partial class ConnectionDialog : Window
         PasswordBox.RevealPassword = shown;
         RevealButton.Content = shown ? "Hide" : "Show";
         Avalonia.Automation.AutomationProperties.SetName(RevealButton, shown ? "Hide password" : "Show password");
+    }
+
+    private async void OnBrowseKeyClick(object? sender, RoutedEventArgs e)
+    {
+        if (ViewModel is not { } vm) return;
+        try
+        {
+            var ssh = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh");
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Select private key file",
+                AllowMultiple = false,
+                SuggestedStartLocation = await StorageProvider.TryGetFolderFromPathAsync(ssh),
+                FileTypeFilter = [FilePickerFileTypes.All],
+            });
+            if (files.Count > 0 && files[0].TryGetLocalPath() is { } path) vm.SshKeyFile = path;
+        }
+        catch (Exception ex)
+        {
+            vm.Error = $"Cannot open the file picker: {ex.Message}";
+        }
     }
 
     private async void OnBrowseClick(object? sender, RoutedEventArgs e)

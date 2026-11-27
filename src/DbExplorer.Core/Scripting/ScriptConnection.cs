@@ -209,9 +209,9 @@ public sealed class ScriptConnection : IDisposable
             _invalidated = false;
             DropConnection();
         }
-        else if (_connection is { State: not ConnectionState.Open })
+        else if (_connection is { State: not ConnectionState.Open } || _connection is not null && !Session.IsRouteAlive)
         {
-            DropConnection();
+            DropConnection();   // closed, or its SSH tunnel dropped
         }
         else if (_connection is not null && _suspect && !await ProbeAsync(_connection).ConfigureAwait(false))
         {

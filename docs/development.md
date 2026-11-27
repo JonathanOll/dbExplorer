@@ -46,6 +46,14 @@ $env:DBX_MSSQL = 'Server=localhost;Database=scratch;User Id=sa;Password=...;Trus
 dotnet test tests/DbExplorer.Core.Tests
 ```
 
+The SSH tunnel has its own opt-in test, `DBX_SSH = 'user:password@sshHost:22|targetHost:5432'` (the target is resolved from
+the SSH server). Without it the tests cover host key storage and refusal, the session / tunnel life cycle (a fake
+`ISshTunnel`), the failures of the real tunnel that need no server, and the TLS server name sent through a tunnel (a
+stand-in PostgreSQL server). Windows and Microsoft Entra sign-in are only tested down to the connection string.
+
+All connections are opened by `ConnectionLink` (driver plus optional tunnel), owned by the `Session`. A new engine supports
+tunnels by implementing `IDbDriver.NetworkTarget` and `IDbDriver.CreateTunneledConnection`.
+
 ## Startup performance
 
 The pass/fail bar from the design is a usable window in under about 1 s. Measured on the dev machine (Windows 11,

@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Data.Common;
+using System.Net.Security;
 using DbExplorer.Core.Model;
 using Npgsql;
 
@@ -30,19 +32,40 @@ public sealed partial class PostgresDriver : IDbDriver
         return $"{selectSql}{order} LIMIT {limit} OFFSET {offset}";
     }
 
-    public DbConnection CreateConnection(ConnectionConfig cfg, string? plainPassword)
+    public DbConnection CreateConnection(ConnectionConfig cfg, string? plainPassword) =>
+        new NpgsqlConnection(Builder(cfg, plainPassword).ConnectionString);
+
+    public (string Host, int Port) NetworkTarget(ConnectionConfig cfg) =>
+        (string.IsNullOrWhiteSpace(cfg.Host) ? "localhost" : cfg.Host, cfg.Port ?? 5432);
+
+    public DbConnection CreateTunneledConnection(ConnectionConfig cfg, string? plainPassword, int localPort)
     {
-        var builder = new NpgsqlConnectionStringBuilder
-        {
-            Host = cfg.Host ?? "localhost",
-            Port = cfg.Port ?? 5432,
-            Database = cfg.Database,
-            Username = cfg.User,
-            Password = plainPassword,
-            Timeout = 10,
-        };
-        return new NpgsqlConnection(builder.ConnectionString);
+        // Npgsql derives the Kerberos service name from the host it dials, which here is the local end of the tunnel.
+        if (cfg.Auth == AuthMode.Integrated)
+            throw new NotSupportedException("PostgreSQL Windows authentication does not work through an SSH tunnel.");
+        var host = NetworkTarget(cfg).Host;
+        var builder = Builder(cfg, plainPassword);
+        builder.Host = "127.0.0.1";
+        builder.Port = localPort;
+        var connection = new NpgsqlConnection(builder.ConnectionString);
+        // TLS (SNI and, with certificate verification, the name check) must see the real server, not 127.0.0.1.
+        connection.SslClientAuthenticationOptionsCallback = TlsTargets.GetOrAdd(host, static name => options => options.TargetHost = name);
+        return connection;
     }
+
+    // One delegate per host: every connection of a pool must be configured the same way.
+    private static readonly ConcurrentDictionary<string, Action<SslClientAuthenticationOptions>> TlsTargets = new();
+
+    private static NpgsqlConnectionStringBuilder Builder(ConnectionConfig cfg, string? plainPassword) => new()
+    {
+        Host = cfg.Host ?? "localhost",
+        Port = cfg.Port ?? 5432,
+        Database = cfg.Database,
+        Username = cfg.User,
+        // Integrated: no password is sent, Npgsql answers the server's SSPI / GSS request with the Windows account.
+        Password = cfg.Auth == AuthMode.Integrated ? null : plainPassword,
+        Timeout = 10,
+    };
 
     /// <summary>Loads the whole schema of the connected database in four bulk queries (no per-table queries).</summary>
     public async Task<IReadOnlyList<TableInfo>> LoadSchemaAsync(DbConnection c, CancellationToken ct)

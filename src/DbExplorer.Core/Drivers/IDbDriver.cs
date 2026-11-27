@@ -36,6 +36,17 @@ public interface IDbDriver
     /// <summary>Creates an unopened connection to the database described by <paramref name="cfg"/>.</summary>
     DbConnection CreateConnection(ConnectionConfig cfg, string? plainPassword);
 
+    /// <summary>The server and port an SSH tunnel must forward to (as seen from the SSH server).</summary>
+    (string Host, int Port) NetworkTarget(ConnectionConfig cfg) =>
+        throw new NotSupportedException($"{Kind} connections cannot use an SSH tunnel.");
+
+    /// <summary>
+    /// Like <see cref="CreateConnection"/>, but through a tunnel listening on 127.0.0.1:<paramref name="localPort"/>.
+    /// The server certificate is still checked against the configured host name.
+    /// </summary>
+    DbConnection CreateTunneledConnection(ConnectionConfig cfg, string? plainPassword, int localPort) =>
+        throw new NotSupportedException($"{Kind} connections cannot use an SSH tunnel.");
+
     Task<IReadOnlyList<TableInfo>> LoadSchemaAsync(DbConnection c, CancellationToken ct);
 
     // ---- views and routines, read on demand (the defaults describe an engine that has none) ----

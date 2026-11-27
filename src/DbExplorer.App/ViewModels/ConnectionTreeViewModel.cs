@@ -1133,7 +1133,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
 
     private ConnectionDialogViewModel NewDialog(ConnectionConfig? existing) =>
         new(_store.Protector, Config.Folders.ToList(),
-            Config.Connections.Where(c => c.Id != existing?.Id).Select(c => c.Name).ToList(), existing);
+            Config.Connections.Where(c => c.Id != existing?.Id).Select(c => c.Name).ToList(), existing, _sessions.TestAsync);
 
     private void ReplaceConnections(Func<ConnectionConfig, ConnectionConfig> map)
     {

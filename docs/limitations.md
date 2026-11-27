@@ -41,8 +41,16 @@ What dbExplorer does not do, and the edges of what it does. Linked groups and th
   tests](development.md#integration-tests-against-real-databases)).
 - The PostgreSQL and SQL Server code paths are only validated by unit tests with fakes unless the [integration tests](development.md#integration-tests-against-real-databases)
   are run against real servers.
-- Authentication is user/password only (no Windows integrated or Azure AD), no SSH tunnels, no MySQL/Oracle, no DDL
-  editing or export wizards.
+- No MySQL/Oracle, no DDL editing or export wizards.
+- Sign-in: Windows and Microsoft Entra modes and SSH tunnels have not been tried against real servers. Not offered: Entra
+  device code and workload identity, a custom Entra application ID, client certificates, access tokens. PostgreSQL has no
+  TLS setting in the connection dialog (the driver's default applies: TLS when the server offers it, certificate not verified).
+- SSH tunnels: one jump server (no `ProxyJump` chain), password or private key only (no SSH agent, no `~/.ssh/config`, no
+  interactive one-time codes), `known_hosts` of OpenSSH is not read. The forwarded port listens on `127.0.0.1`, so other
+  programs of this machine can reach it while the connection is open (the database sign-in still applies). A drop is noticed
+  when the connection is next used or by the 30 s keep-alive; running statements fail and are not replayed.
+- Through a tunnel: PostgreSQL Windows authentication does not work; a SQL Server named instance needs an explicit port;
+  Azure SQL (server redirection, and a gateway that routes by server name) may refuse a tunneled connection.
 - ER diagrams are read only (no schema editing). They show tables and declared foreign keys: no views, no virtual keys, no
   relation guessed from column names; a key to a table outside the shown schemas is not drawn. Diagram tabs and the places
   of dragged tables are not saved, and changing columns, schemas or depth lays the diagram out again. Lines are not routed

@@ -4,7 +4,12 @@ Click **Import** in the navigator toolbar. It reads `%APPDATA%\DBeaverData\works
 and `credentials-config.json` (or the `--dbeaver-dir` folder): folders, connections, credentials (re-stored DPAPI-encrypted)
 and virtual keys. It is a one-time, re-runnable action: connections whose name already exists are skipped, and the live
 config is replaced only when the whole import succeeded. Warnings (unsupported drivers, missing credentials) are listed
-in the status bar. Only user/password authentication is imported.
+in the status bar.
+
+SSH tunnels (host, port, user, password or key file and passphrase) are imported, as are SQL Server Windows and Microsoft
+Entra authentication modes and Windows / Kerberos authentication on PostgreSQL. A tunnel using another SSH sign-in (agent)
+is kept as a private-key tunnel without a key file, with a warning: choose the key in the connection. The connection never
+silently becomes a direct one. SSH jump chains and SSH profiles shared between connections are not read.
 
 Connections that DBeaver marks `read-only`, or whose connection type is `prod` / `production` (or a custom type with
 "prod" in its name or one that forbids data edits), are imported **read-only**, on purpose: an imported production database

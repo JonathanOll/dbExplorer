@@ -26,10 +26,14 @@ public partial class ConnectionDialogViewModel : ObservableObject
     private bool _showNameErrors;
     private bool _showConnectionErrors;
 
+    private readonly Func<ConnectionConfig, string?, CancellationToken, Task> _test;
+
+    /// <param name="test">Opens a throw-away connection (the session manager's, which knows SSH tunnels); direct by default.</param>
     public ConnectionDialogViewModel(
         ISecretProtector protector, IReadOnlyList<string> folders, IReadOnlyCollection<string> takenNames,
-        ConnectionConfig? existing = null)
+        ConnectionConfig? existing = null, Func<ConnectionConfig, string?, CancellationToken, Task>? test = null)
     {
+        _test = test ?? SessionManager.TestConnectionAsync;
         _protector = protector;
         _takenNames = takenNames;
         _existing = existing;
@@ -46,6 +50,9 @@ public partial class ConnectionDialogViewModel : ObservableObject
         Encrypt = existing.Encrypt;
         TrustServerCertificate = existing.TrustServerCertificate;
         ReadOnly = existing.ReadOnly;
+        Auth = existing.Auth;
+        Encrypt = existing.Encrypt;   // choosing the mode above may have ticked it: the saved value wins
+        LoadSsh(existing.Ssh);
     }
 
     public IReadOnlyList<DbKind> Kinds { get; } = [DbKind.Postgres, DbKind.SqlServer, DbKind.Sqlite];
@@ -69,14 +76,14 @@ public partial class ConnectionDialogViewModel : ObservableObject
     public string OkText => IsEdit ? "Save" : "Add connection";
 
     /// <summary>The connection has a saved password that stays unless a new one is typed (or its removal is ticked).</summary>
-    public bool HasSavedPassword => !string.IsNullOrEmpty(_existing?.ProtectedPassword);
+    public bool HasSavedPassword => !string.IsNullOrEmpty(_existing?.ProtectedPassword) && SameSecretKind(_existing!.Auth, Auth);
 
     public string PasswordHint => HasSavedPassword && !ClearSavedPassword ? "Saved. Type to replace it" : "Optional";
 
     [ObservableProperty] private string _name = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSqlite), nameof(IsNetwork), nameof(IsSqlServer), nameof(DatabaseLabel), nameof(DatabasePlaceholder))]
+    [NotifyPropertyChangedFor(nameof(IsSqlite), nameof(IsNetwork), nameof(IsSqlServer), nameof(DatabaseLabel), nameof(DatabasePlaceholder), nameof(ShowSsh))]
     private DbKind _kind = DbKind.Postgres;
 
     [ObservableProperty] private string _host = "";
@@ -113,7 +120,11 @@ public partial class ConnectionDialogViewModel : ObservableObject
 
     /// <summary>An error that no field line explains (the banner shows it).</summary>
     public bool HasGeneralError =>
-        Error is not null && NameError is null && HostError is null && PortError is null && DatabaseError is null;
+        Error is not null && NameError is null && !HasConnectionFieldError;
+
+    private bool HasConnectionFieldError =>
+        HostError is not null || PortError is not null || DatabaseError is not null || UserError is not null || AuthError is not null
+        || SshHostError is not null || SshPortError is not null || SshUserError is not null || SshKeyError is not null;
 
     [ObservableProperty] private bool _isTesting;
     [ObservableProperty] private bool _testSucceeded;
@@ -140,12 +151,12 @@ public partial class ConnectionDialogViewModel : ObservableObject
             PortText = DefaultPorts[newValue]?.ToString() ?? "";
     }
 
-    partial void OnKindChanged(DbKind value) { ResetTest(); RefreshErrors(); }
+    partial void OnKindChanged(DbKind value) { FollowKindWithAuth(); ResetTest(); RefreshErrors(); }
     partial void OnNameChanged(string value) => RefreshErrors();
     partial void OnHostChanged(string value) { ResetTest(); RefreshErrors(); }
     partial void OnPortTextChanged(string value) { ResetTest(); RefreshErrors(); }
     partial void OnDatabaseChanged(string value) { ResetTest(); RefreshErrors(); }
-    partial void OnUserChanged(string value) => ResetTest();
+    partial void OnUserChanged(string value) { ResetTest(); RefreshErrors(); }
     partial void OnPasswordChanged(string value) => ResetTest();
     partial void OnClearSavedPasswordChanged(bool value) => ResetTest();
     partial void OnTrustServerCertificateChanged(bool value) => ResetTest();
@@ -190,11 +201,21 @@ public partial class ConnectionDialogViewModel : ObservableObject
         HostError = _showConnectionErrors ? HostProblem() : null;
         DatabaseError = _showConnectionErrors ? DatabaseProblem() : null;
         PortError = _showConnectionErrors ? PortProblem() : null;
-        if (Error is not null && NameError is null && HostError is null && DatabaseError is null && PortError is null) Error = null;
+        UserError = _showConnectionErrors ? UserProblem() : null;
+        AuthError = _showConnectionErrors ? AuthProblem() : null;
+        SshHostError = _showConnectionErrors ? SshHostProblem() : null;
+        SshPortError = _showConnectionErrors ? SshPortProblem() : null;
+        SshUserError = _showConnectionErrors ? SshUserProblem() : null;
+        SshKeyError = _showConnectionErrors ? SshKeyProblem() : null;
+        if (Error is not null && NameError is null && !HasConnectionFieldError) Error = null;
     }
 
     /// <summary>Returns the first problem with the current input, or null when it is valid.</summary>
-    public string? Validate() => NameProblem(includeEmpty: true) ?? HostProblem() ?? DatabaseProblem() ?? PortProblem();
+    public string? Validate() => NameProblem(includeEmpty: true) ?? ConnectionProblem();
+
+    private string? ConnectionProblem() =>
+        HostProblem() ?? PortProblem() ?? DatabaseProblem() ?? AuthProblem() ?? UserProblem()
+        ?? SshHostProblem() ?? SshPortProblem() ?? SshUserProblem() ?? SshKeyProblem();
 
     public bool TryConfirm()
     {
@@ -212,25 +233,30 @@ public partial class ConnectionDialogViewModel : ObservableObject
         // A test needs the connection fields only: the name (and a clash with another connection) is not its business.
         _showConnectionErrors = true;
         RefreshErrors();
-        if ((HostProblem() ?? DatabaseProblem() ?? PortProblem()) is not null)
+        if (ConnectionProblem() is not null)
         {
             TestSucceeded = false;
             TestMessage = null;   // the field lines say what to fix
             return;
         }
 
-        var plain = Password.Length > 0 ? Password : ClearSavedPassword ? null : ExistingPlainPassword();
+        var plain = !AuthModes.UsesPassword(Auth) ? null
+            : Password.Length > 0 ? Password : ClearSavedPassword ? null : ExistingPlainPassword();
         _testCts?.Dispose();
         _testCts = new CancellationTokenSource();
         IsTesting = true;
-        TestMessage = "Testing connection…";
+        TestMessage = Auth == AuthMode.EntraInteractive
+            ? "Testing connection… Complete the sign-in in the window that opens."
+            : "Testing connection…";
         TestSucceeded = false;
         var watch = Stopwatch.StartNew();
         try
         {
-            await SessionManager.TestConnectionAsync(BuildConfig(null), plain, _testCts.Token);
+            var config = BuildConfig(null);
+            await _test(config, plain, _testCts.Token);
             TestSucceeded = true;
-            TestMessage = $"Connection succeeded in {watch.ElapsedMilliseconds} ms.";
+            var route = config.Ssh is null ? "" : " through the SSH tunnel";
+            TestMessage = $"Connection succeeded{route} in {watch.ElapsedMilliseconds} ms.";
         }
         catch (OperationCanceledException)
         {
@@ -251,10 +277,10 @@ public partial class ConnectionDialogViewModel : ObservableObject
 
     private string? ExistingPlainPassword()
     {
-        if (string.IsNullOrEmpty(_existing?.ProtectedPassword)) return null;
+        if (!HasSavedPassword) return null;
         try
         {
-            return _protector.Unprotect(_existing.ProtectedPassword);
+            return _protector.Unprotect(_existing!.ProtectedPassword!);
         }
         catch (Exception)
         {
@@ -264,9 +290,9 @@ public partial class ConnectionDialogViewModel : ObservableObject
 
     private string? ProtectedPasswordForSave()
     {
-        if (IsSqlite) return null;
+        if (IsSqlite || !AuthModes.UsesPassword(Auth)) return null;
         if (Password.Length > 0) return _protector.Protect(Password);
-        return ClearSavedPassword ? null : _existing?.ProtectedPassword;
+        return ClearSavedPassword || !HasSavedPassword ? null : _existing?.ProtectedPassword;
     }
 
     private ConnectionConfig BuildConfig(string? protectedPassword)
@@ -280,10 +306,14 @@ public partial class ConnectionDialogViewModel : ObservableObject
             network ? Host.Trim() : null,
             network && int.TryParse(PortText, out var port) ? port : null,
             Database.Trim(),
-            network && !string.IsNullOrWhiteSpace(User) ? User.Trim() : null,
+            ShowUser && !string.IsNullOrWhiteSpace(User) ? User.Trim() : null,
             protectedPassword,
             Encrypt: IsSqlServer && Encrypt,
             TrustServerCertificate: IsSqlServer && TrustServerCertificate,
-            ReadOnly);
+            ReadOnly)
+        {
+            Auth = network ? Auth : AuthMode.Password,
+            Ssh = BuildSsh(),
+        };
     }
 }

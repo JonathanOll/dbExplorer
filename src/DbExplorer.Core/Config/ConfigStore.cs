@@ -47,7 +47,8 @@ public class ConfigStore(string path, ISecretProtector protector)
         };
         if (normalized.Groups.Any(g => g is null || g.Name is null || g.ConnectionIds is null)
             || normalized.Folders.Any(f => f is null)
-            || normalized.Connections.Any(c => c is null || c.Name is null || c.Database is null)
+            || normalized.Connections.Any(c => c is null || c.Name is null || c.Database is null
+                || c.Ssh is { } ssh && (ssh.Host is null || ssh.User is null))
             || normalized.VirtualKeys.Values.Any(v => v is null))
             throw new JsonException("The config contains null entries.");
         return normalized;
