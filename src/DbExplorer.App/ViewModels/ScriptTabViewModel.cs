@@ -123,6 +123,9 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
 
     public bool HasRunSummary => RunSummary is not null;
 
+    /// <summary>The outcome of a run that left no result tab (DECLARE, SET, DDL...), shown in the result area; null otherwise.</summary>
+    [ObservableProperty] private string? _quietRunText;
+
     /// <summary>Why the run buttons are disabled right now (null when they are enabled): the tooltip says it.</summary>
     public string? RunDisabledReason =>
         IsRunning ? "A script is running. Stop it first."
@@ -458,7 +461,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
             var start = Math.Clamp(Math.Min(sel.Start, sel.End), 0, text.Length);
             var end = Math.Clamp(Math.Max(sel.Start, sel.End), 0, text.Length);
             if (end > start)
-                return ScriptSplitter.Split(text[start..end], kind)
+                return ScriptSplitter.SplitForRun(text[start..end], kind)
                     .Select(s => s with { Start = s.Start + start, End = s.End + start }).ToList();   // offsets in the whole script
         }
 
@@ -469,7 +472,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
 
     /// <summary>F5: every statement of the script.</summary>
     [RelayCommand]
-    public Task RunScriptAsync() => RunAsync(ScriptSplitter.Split(Text, Connection.Kind));
+    public Task RunScriptAsync() => RunAsync(ScriptSplitter.SplitForRun(Text, Connection.Kind));
 
     /// <summary>Cancels the running script, or the running group run (button or Ctrl+Break). Safe to call at any time.</summary>
     [RelayCommand]
@@ -508,6 +511,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
         ErrorMessage = null;
         NeedsReconnect = false;
         RunSummary = null;
+        QuietRunText = null;
         _lastStatements = statements;
         _lastRunWasGroup = false;
         _lastPlanRequest = planRequest;
@@ -545,7 +549,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
             _estimatedRun = planMode == PlanMode.Estimated;
             // An estimated plan runs nothing, so there is nothing to count or time.
             var statistics = StatisticsEnabled && kind == DbKind.SqlServer && !_estimatedRun;
-            var options = new ScriptOptions(maxRows, session.Config.ReadOnly, kind, statistics, planMode);
+            var options = new ScriptOptions(maxRows, session.Config.ReadOnly, kind, statistics, planMode, CaptureMessages: true);
             var plans = new List<(QueryPlan Plan, PlanStatement Statement)>();
 
             // Everything that touches the database runs on the thread pool: some providers (SQLite) execute
@@ -593,26 +597,31 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
                     var vm = new StatementResultViewModel(ran, r, maxRows) { StartLine = LineOf(_runText, r.Statement.Start) };
                     foreach (var set in vm.Sets) set.Source = new ResultSource(session.Config.Id, kind, r.Statement.Text, set.Index);
                     Results.Add(vm);
-                    ResultTabs.Add(vm);
-                    SelectedResult = vm;
+                    if (!vm.IsQuiet)
+                    {
+                        ResultTabs.Add(vm);
+                        SelectedResult = vm;
+                    }
                 }
                 if (ran < _totalStatements) RunProgressText = $"Running statement {ran + 1} of {_totalStatements}";
             }
 
             if (await producer is { } failure) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Throw(failure);
             if (statistics && Results.Count > 0) AddStatisticsTabs();
+            else if (Results.Any(r => r.Messages.Count > 0)) ResultTabs.Add(BuildGridTabs().Messages);
             if (planMode != PlanMode.None && plans.Count > 0)
             {
                 var planTab = new PlanResultTab(plans, planMode, kind) { Host = this };
                 ResultTabs.Add(planTab);
                 // Estimated: the plan is the answer. Actual: the rows stay in front, the plan is one click away.
-                if (_estimatedRun || Results.Count == 0) SelectedResultTab = planTab;
+                if (_estimatedRun || SelectedResultTab is null) SelectedResultTab = planTab;
             }
             else if (planMode != PlanMode.None && ran > 0 && Results.All(r => !r.HasError))
             {
                 _status.Info("The server returned no plan for this statement.");
             }
 
+            SelectedResultTab ??= ResultTabs.LastOrDefault();   // only run-level grids: the messages are the answer
             Report(ran, script.Reopened, script.ConnectionReset, plans.Count);
         }
         catch (OperationCanceledException)
@@ -697,16 +706,22 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
         {
             RunSummary = $"{Plural(total, "statement")} completed · {ms:N0} ms";
         }
+
+        // Nothing came back to put in a tab: the result area says how the run went instead of the "run a query" hint.
+        QuietRunText = ResultTabs.Count > 0 || ran == 0 ? null
+            : RunSummary ?? (_estimatedRun ? "No plan was returned · nothing was run" : $"Statement completed · {ms:N0} ms");
     }
 
     /// <summary>Appends the Statistics and Messages tabs built from the messages of the statements that ran (the failed one included).</summary>
     private void AddStatisticsTabs()
     {
-        var (stats, messages) = GridResultTab.Build(
-            Results.Select(r => new StatementMessages(null, r.Index, r.Messages)).ToList());
+        var (stats, messages) = BuildGridTabs();
         ResultTabs.Add(stats);
         ResultTabs.Add(messages);
     }
+
+    private (GridResultTab Statistics, GridResultTab Messages) BuildGridTabs() =>
+        GridResultTab.Build(Results.Select(r => new StatementMessages(null, r.Index, r.Messages)).ToList());
 
     public const string SessionResetNote =
         "(The connection of this tab was lost or reset: it was reopened, so open transactions, temp tables and variables are gone.)";

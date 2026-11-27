@@ -31,7 +31,10 @@ public sealed record StatementResult(
 /// compiled), <see cref="Plans.PlanMode.Actual"/> runs it and adds the plan. The plan comes back as result sets that
 /// <see cref="Plans.PlanCapture.Extract"/> picks out. Needs <see cref="Kind"/>. SQL Server sets the option on the connection
 /// itself (<see cref="ScriptConnection"/> does it; the connection overload trusts the caller).</param>
-public sealed record ScriptOptions(int MaxRows = 1000, bool ReadOnly = false, DbKind? Kind = null, bool Statistics = false, Plans.PlanMode Plan = Plans.PlanMode.None);
+/// <param name="CaptureMessages">Capture the server's messages (PRINT, notices) into <see cref="StatementResult.Messages"/>
+/// without asking for statistics.</param>
+public sealed record ScriptOptions(int MaxRows = 1000, bool ReadOnly = false, DbKind? Kind = null, bool Statistics = false, Plans.PlanMode Plan = Plans.PlanMode.None,
+    bool CaptureMessages = false);
 
 public static class ScriptRunner
 {
@@ -48,7 +51,7 @@ public static class ScriptRunner
         DbTransaction? transaction = null)
     {
         // Only while the user's statements run: what the statistics settings themselves print never lands on a statement.
-        using var capture = o.Statistics ? ServerMessageCapture.Start(c) : null;
+        using var capture = o.Statistics || o.CaptureMessages ? ServerMessageCapture.Start(c) : null;
         foreach (var stmt in stmts)
         {
             if (ct.IsCancellationRequested) yield break;
@@ -128,7 +131,8 @@ public static class ScriptRunner
 
             var sets = new List<ResultSet>();
             // An actual SQL Server plan arrives after the rows: read them all (kept up to the limit) or the plan is never sent.
-            var drain = o.Plan == Plans.PlanMode.Actual && planKind == DbKind.SqlServer;
+            // A whole batch is drained too: aborting it at the row limit would skip the statements after the large result.
+            var drain = stmt.IsBatch || o.Plan == Plans.PlanMode.Actual && planKind == DbKind.SqlServer;
             int affected;
             await using (var reader = await cmd.ExecuteReaderAsync(ct))
             {
@@ -151,6 +155,8 @@ public static class ScriptRunner
                 affected = reader.RecordsAffected;
             }
 
+            // SQLite also gives a count (0, or the previous write's) for BEGIN, PRAGMA or DDL: only a data change has one.
+            if ((o.Kind == DbKind.Sqlite || c is Microsoft.Data.Sqlite.SqliteConnection) && !ChangesRows(stmt.Text)) affected = -1;
             return new StatementResult(stmt, sets, affected >= 0 ? affected : null, watch.Elapsed, null);
         }
         catch (Exception) when (ct.IsCancellationRequested)
@@ -160,8 +166,8 @@ public static class ScriptRunner
         catch (Exception ex)
         {
             // SqlClient folds the info messages still pending when an error arrives into the exception (and Message joins them
-            // all): with statistics on they go back to the messages and the error text keeps only the real errors.
-            if (o.Statistics && ServerMessageCapture.SplitSqlException(ex) is { } split)
+            // all): when messages are captured they go back to the messages and the error text keeps only the real errors.
+            if ((o.Statistics || o.CaptureMessages) && ServerMessageCapture.SplitSqlException(ex) is { } split)
                 return new StatementResult(stmt, [], null, watch.Elapsed, split.Error, split.Messages);
             return new StatementResult(stmt, [], null, watch.Elapsed, ex.Message);
         }
@@ -169,6 +175,16 @@ public static class ScriptRunner
         {
             pump?.Stop();   // after the command is disposed: no interrupt may reach the statements that follow on this connection
         }
+    }
+
+    private static bool ChangesRows(string sql)
+    {
+        var tokens = SqlLexer.Tokenize(sql, SqlLexOptions.For(DbKind.Sqlite));
+        if (tokens.Count == 0) return false;
+        var first = sql.AsSpan(tokens[0].Start, tokens[0].End - tokens[0].Start);
+        return first.Equals("INSERT", StringComparison.OrdinalIgnoreCase) || first.Equals("UPDATE", StringComparison.OrdinalIgnoreCase)
+            || first.Equals("DELETE", StringComparison.OrdinalIgnoreCase) || first.Equals("REPLACE", StringComparison.OrdinalIgnoreCase)
+            || first.Equals("WITH", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyList<ServerMessage> MergeMessages(IReadOnlyList<ServerMessage> raised, IReadOnlyList<ServerMessage>? fromException)

@@ -4,7 +4,8 @@ namespace DbExplorer.Core.Scripting;
 
 /// <param name="Start">Offset of the first character in the script.</param>
 /// <param name="End">Exclusive offset just after the last character of <paramref name="Text"/>.</param>
-public sealed record ScriptStatement(string Text, int Start, int End);
+/// <param name="IsBatch">A whole T-SQL batch of several statements, sent as one command (<see cref="ScriptSplitter.SplitForRun"/>).</param>
+public sealed record ScriptStatement(string Text, int Start, int End, bool IsBatch = false);
 
 public static class ScriptSplitter
 {
@@ -15,6 +16,34 @@ public static class ScriptSplitter
     /// belong to it. Comment-only and empty fragments are dropped.
     /// </summary>
     public static IReadOnlyList<ScriptStatement> Split(string script, DbKind kind) => SplitCore(script, kind, blankLines: false);
+
+    /// <summary>
+    /// The statements a script run sends: as <see cref="Split"/>, except that a SQL Server batch which declares a variable stays
+    /// whole (GO still separates), because the variable does not exist for a command sent after the one that declared it.
+    /// </summary>
+    public static IReadOnlyList<ScriptStatement> SplitForRun(string script, DbKind kind)
+    {
+        var statements = Split(script, kind);
+        if (kind != DbKind.SqlServer) return statements;
+
+        var result = new List<ScriptStatement>();
+        foreach (var batch in SplitCore(script, kind, blankLines: false, semicolons: false))
+        {
+            var inside = statements.Where(s => s.Start >= batch.Start && s.End <= batch.End).ToList();
+            if (inside.Count > 1 && DeclaresVariable(batch.Text)) result.Add(batch with { IsBatch = true });
+            else result.AddRange(inside);
+        }
+        return result;
+    }
+
+    // DECLARE @name: a cursor declared by name outlives its command, a variable does not.
+    private static bool DeclaresVariable(string text)
+    {
+        var tokens = SqlLexer.Tokenize(text, SqlLexOptions.For(DbKind.SqlServer));
+        for (var i = 0; i + 1 < tokens.Count; i++)
+            if (IsWord(text, tokens[i], "DECLARE") && text[tokens[i + 1].Start] == '@') return true;
+        return false;
+    }
 
     /// <summary>
     /// Splits a SQL Server script into the batches the server would receive: only a lone GO line separates them, a ';' stays

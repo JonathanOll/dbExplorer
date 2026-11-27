@@ -124,7 +124,7 @@ public sealed partial class ScriptTabViewModel
 
         var members = GroupMembers;   // the snapshot this run is about: later membership changes only affect the next run
         var kind = members[0].Kind;
-        var statements = wholeScript ? ScriptSplitter.Split(Text, kind) : StatementsAtCaretOrSelection(kind);
+        var statements = wholeScript ? ScriptSplitter.SplitForRun(Text, kind) : StatementsAtCaretOrSelection(kind);
         if (statements.Count == 0)
         {
             _status.Info("Nothing to run.");

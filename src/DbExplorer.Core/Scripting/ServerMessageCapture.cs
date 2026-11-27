@@ -1,12 +1,14 @@
 using System.Data;
 using System.Data.Common;
 using Microsoft.Data.SqlClient;
+using Npgsql;
 
 namespace DbExplorer.Core.Scripting;
 
 /// <summary>
 /// A connection that reports the server's messages as they arrive. Implemented by the test doubles; SQL Server
-/// connections are handled directly through <see cref="SqlConnection.InfoMessage"/>.
+/// connections are handled directly through <see cref="SqlConnection.InfoMessage"/>, PostgreSQL ones through
+/// <see cref="NpgsqlConnection.Notice"/>.
 /// </summary>
 public interface IServerMessageSource
 {
@@ -41,10 +43,17 @@ internal sealed class ServerMessageCapture : IDisposable
                 {
                     // One event can carry several errors; Message would join them. Severity above 10 never comes here (it throws).
                     if (e.Errors.Count == 0) capture.Add(e.Message);
-                    else foreach (SqlError error in e.Errors) capture.Add(error.Message);
+                    // 5701 / 5703: "Changed database context / language setting", sent for every USE; SSMS hides them too.
+                    else foreach (SqlError error in e.Errors)
+                        if (error.Number is not (5701 or 5703)) capture.Add(error.Message);
                 };
                 sql.InfoMessage += onInfo;
                 capture._detach = () => sql.InfoMessage -= onInfo;
+                return capture;
+            case NpgsqlConnection pg:
+                NoticeEventHandler onNotice = (_, e) => capture.Add(e.Notice.MessageText);
+                pg.Notice += onNotice;
+                capture._detach = () => pg.Notice -= onNotice;
                 return capture;
             default:
                 return null;

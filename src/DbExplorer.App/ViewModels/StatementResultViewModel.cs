@@ -101,6 +101,8 @@ public sealed partial class StatementResultViewModel : IResultTab
         ToolTipText = HasError ? $"Failed · {StatementText}" : StatementText;
         AutomationName = HasError ? $"Failed: {Header}" : Header;
 
+        IsQuiet = !HasError && !HasSets && result.RowsAffected is null;
+
         NoResultText = HasError || HasSets
             ? null
             : result.RowsAffected is { } n ? $"Statement ran, {RowsText(n)} affected" : "Statement ran, no result set";
@@ -190,6 +192,10 @@ public sealed partial class StatementResultViewModel : IResultTab
     public string? NoResultText { get; }
 
     public bool ShowNoResult => NoResultText is not null;
+
+    /// <summary>The server returned no result set, no row count and no error: a script run gives it no tab (its messages
+    /// are in the Messages tab).</summary>
+    public bool IsQuiet { get; }
 
     internal static string RowsText(long n) => n == 1 ? "1 row" : $"{Count(n)} rows";
 

@@ -91,10 +91,10 @@ public class ExecutionStatisticsTests
 
     private static (ScriptTabViewModel Tab, StatsConnection Connection) NewTab(DbKind kind = DbKind.SqlServer, string text = "SELECT 1; SELECT 2")
     {
-        var connection = new StatsConnection
-        {
-            Says = sql => sql == "SELECT 1" ? [Io1, Exec] : sql == "SELECT 2" ? ["PRINT hello", Io2, Exec] : [],
-        };
+        var connection = new StatsConnection();
+        // As a real server: the IO / TIME lines only come while the session has the statistics on.
+        bool On() => connection.Log.LastOrDefault(l => l.StartsWith("SET STATISTICS", StringComparison.Ordinal))?.Contains(" ON;") == true;
+        connection.Says = sql => !On() ? [] : sql == "SELECT 1" ? [Io1, Exec] : sql == "SELECT 2" ? ["PRINT hello", Io2, Exec] : [];
         var config = TreeFixture.Conn("Sql", kind: kind);
         var session = new Session(config, new StatsDriver(kind, () => connection), [], null);
         var tab = new ScriptTabViewModel(config, session, new ScriptTabHooks(_ => Task.FromResult<Session?>(session)), 1) { Text = text };

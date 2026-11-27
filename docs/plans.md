@@ -63,8 +63,8 @@ next runs send `SET STATISTICS IO ON; SET STATISTICS TIME ON` on the tab's conne
 `... OFF` after them (a session setting sent as commands, not added to your text: the read-only guard, the statement
 split and an open transaction are unaffected, and no option is left on the reused connection). The server messages are
 captured per statement (`InfoMessage`; errors still fail the statement exactly as before) and two tabs appear after the
-statement tabs, replaced by each run: **Statistics** and **Messages**. With the box off nothing is captured and nothing
-changes. The box is per tab and not remembered across restarts.
+statement tabs, replaced by each run: **Statistics** and **Messages**. With the box off no statistics are asked for; ordinary server
+messages (`PRINT`, notices) still show in a **Messages** tab. The box is per tab and not remembered across restarts.
 
 **Statistics** is one grid, sortable by a click on a header (numbers by value, NULL last):
 

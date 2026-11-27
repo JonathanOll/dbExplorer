@@ -102,6 +102,13 @@ the limit says so, raise the limit and run again. Honours the connection read-on
 unsaved editor contents are restored at the next start: from the saved tab list, plus any autosave copy written after it
 (e.g. after a crash); older copies the list does not mention stay in `scripts\` and the status bar says how many.
 
+A statement that returns no result set, no row count and no error (`DECLARE`, `SET`, `USE`, DDL) gets no result tab; it
+still counts in the run summary and keeps its gutter mark. A run with nothing to show says it completed. Server messages
+(`PRINT`, PostgreSQL notices) appear in a Messages tab. T-SQL variables live in their batch, so `F5` and a selection send
+a SQL Server batch that declares a variable as a whole (one statement, split at `GO` only; all its rows are read, so a
+result cut at the row limit does not stop what follows). `Ctrl+Enter` at the cursor still runs one statement: select the
+lines to run a `DECLARE` with its use.
+
 Brackets and quotes surround the selection or close themselves: [Typing in the editor](scripts.md#typing-in-the-editor).
 
 More on scripts (library, history, formatting, search): [Scripts](scripts.md). Plans and statistics: [Execution plans and statistics](plans.md).

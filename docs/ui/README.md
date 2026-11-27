@@ -183,6 +183,7 @@ current-cell frame: 2 px accent, inside the cell).
   shortcuts flyout. Editor with find (`Ctrl+F`), `Ctrl+/` comments, gutter marks per statement that ran. Results: a run summary
   line, result tabs titled `1 · SELECT … FROM orders`, a result line (`N rows · X ms`, "Showing first 1,000 rows" with
   "Raise limit"), error banners with "Go to statement" and "Copy" (amber with a lock when the read-only guard blocks a statement).
+  Statements with nothing to show get no tab; a run made only of them shows a check mark with the outcome instead.
   Chords: `Ctrl+Enter` / `F5` run here, `Ctrl+Shift+Enter` / `Ctrl+Shift+F5` run on the group, `Esc` stops a run, `F6` switches pane,
   `Ctrl+1…9` pick a result tab (`ScriptTabKeys`).
 - **Group run panel** (below the editor, replaces the result tabs while a group run is shown): a header with a summary and a

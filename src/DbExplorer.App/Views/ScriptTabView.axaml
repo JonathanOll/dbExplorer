@@ -387,22 +387,32 @@
       <Grid Grid.Row="2" Background="{DynamicResource DbxContentBg}">
         <Grid IsVisible="{Binding GroupRun, Converter={x:Static ObjectConverters.IsNull}}">
           <!-- Nothing ran yet: what to do, not only which keys -->
-          <StackPanel Classes="empty" IsVisible="{Binding !ResultTabs.Count}">
-            <PathIcon Data="{StaticResource IconPlay}" />
-            <TextBlock Classes="h2" Text="Run a query to see its results" />
-            <TextBlock Classes="dim" Text="Select some text to run just that part." />
-            <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto,Auto,Auto" HorizontalAlignment="Center" Margin="0,8,0,0">
-              <Border Grid.Row="0" Classes="kbd" HorizontalAlignment="Right" Margin="0,3,12,3"><TextBlock Text="Ctrl+Enter" /></Border>
-              <TextBlock Grid.Row="0" Grid.Column="1" Classes="dim" Text="Run the statement at the caret or the selection" VerticalAlignment="Center" TextAlignment="Left" />
-              <Border Grid.Row="1" Classes="kbd" HorizontalAlignment="Right" Margin="0,3,12,3"><TextBlock Text="F5" /></Border>
-              <TextBlock Grid.Row="1" Grid.Column="1" Classes="dim" Text="Run the whole script" VerticalAlignment="Center" TextAlignment="Left" />
-              <Border Grid.Row="2" Classes="kbd" HorizontalAlignment="Right" Margin="0,3,12,3" IsVisible="{Binding HasGroupSwitch}"><TextBlock Text="Ctrl+Shift+Enter" /></Border>
-              <TextBlock Grid.Row="2" Grid.Column="1" Classes="dim" Text="Run on every database of the group (read-only)" VerticalAlignment="Center"
-                         TextAlignment="Left" IsVisible="{Binding HasGroupSwitch}" />
-              <Border Grid.Row="3" Classes="kbd" HorizontalAlignment="Right" Margin="0,3,12,3" IsVisible="{Binding HasGroupSwitch}"><TextBlock Text="Ctrl+Shift+F5" /></Border>
-              <TextBlock Grid.Row="3" Grid.Column="1" Classes="dim" Text="Run the whole script on the group" VerticalAlignment="Center"
-                         TextAlignment="Left" IsVisible="{Binding HasGroupSwitch}" />
-            </Grid>
+          <Panel IsVisible="{Binding QuietRunText, Converter={x:Static ObjectConverters.IsNull}}">
+            <StackPanel Classes="empty" IsVisible="{Binding !ResultTabs.Count}">
+              <PathIcon Data="{StaticResource IconPlay}" />
+              <TextBlock Classes="h2" Text="Run a query to see its results" />
+              <TextBlock Classes="dim" Text="Select some text to run just that part." />
+              <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto,Auto,Auto" HorizontalAlignment="Center" Margin="0,8,0,0">
+                <Border Grid.Row="0" Classes="kbd" HorizontalAlignment="Right" Margin="0,3,12,3"><TextBlock Text="Ctrl+Enter" /></Border>
+                <TextBlock Grid.Row="0" Grid.Column="1" Classes="dim" Text="Run the statement at the caret or the selection" VerticalAlignment="Center" TextAlignment="Left" />
+                <Border Grid.Row="1" Classes="kbd" HorizontalAlignment="Right" Margin="0,3,12,3"><TextBlock Text="F5" /></Border>
+                <TextBlock Grid.Row="1" Grid.Column="1" Classes="dim" Text="Run the whole script" VerticalAlignment="Center" TextAlignment="Left" />
+                <Border Grid.Row="2" Classes="kbd" HorizontalAlignment="Right" Margin="0,3,12,3" IsVisible="{Binding HasGroupSwitch}"><TextBlock Text="Ctrl+Shift+Enter" /></Border>
+                <TextBlock Grid.Row="2" Grid.Column="1" Classes="dim" Text="Run on every database of the group (read-only)" VerticalAlignment="Center"
+                           TextAlignment="Left" IsVisible="{Binding HasGroupSwitch}" />
+                <Border Grid.Row="3" Classes="kbd" HorizontalAlignment="Right" Margin="0,3,12,3" IsVisible="{Binding HasGroupSwitch}"><TextBlock Text="Ctrl+Shift+F5" /></Border>
+                <TextBlock Grid.Row="3" Grid.Column="1" Classes="dim" Text="Run the whole script on the group" VerticalAlignment="Center"
+                           TextAlignment="Left" IsVisible="{Binding HasGroupSwitch}" />
+              </Grid>
+            </StackPanel>
+          </Panel>
+
+          <!-- A run that worked and left nothing to look at -->
+          <StackPanel Classes="empty" IsVisible="{Binding QuietRunText, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <PathIcon Data="{StaticResource IconCheck}" IsVisible="{Binding !RunSummaryIsCancelled}" />
+            <PathIcon Data="{StaticResource IconStop}" IsVisible="{Binding RunSummaryIsCancelled}" />
+            <TextBlock Classes="h2" Text="{Binding QuietRunText}" />
+            <TextBlock Classes="dim" Text="No rows or results to show." />
           </StackPanel>
 
           <DockPanel IsVisible="{Binding !!ResultTabs.Count}">

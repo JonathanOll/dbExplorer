@@ -175,7 +175,7 @@ public sealed class ScriptConnection : IDisposable
                     tx = await Querying.TableDataLoader.BeginReadOnlyContextAsync(connection, Session.Driver.Kind, ct).ConfigureAwait(false);
                 await foreach (var result in ScriptRunner.RunAsync(connection, stmts, o, ct, tx).ConfigureAwait(false))
                 {
-                    if (result.Sets.Any(s => s.Truncated)) _suspect = true;   // the command was aborted before its end
+                    if (result.Sets.Any(s => s.Truncated) && !result.Statement.IsBatch) _suspect = true;   // the command was aborted before its end
                     yield return result;
                 }
             }
