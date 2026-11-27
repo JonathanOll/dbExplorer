@@ -97,7 +97,7 @@ function New-SyntheticDataDir {
     $fixture = Join-Path $repo 'tests\DbExplorer.Core.Tests\Fixtures\data-sources.json'
     if (Test-Path $fixture) { Copy-Item $fixture (Join-Path $dbeaver 'data-sources.json') }
     $folders = 'Admin', 'Company', 'Keeple', 'Translate'
-    $kinds = 'SqlServer', 'SqlServer', 'SqlServer', 'SqlServer', 'SqlServer', 'Postgres', 'Postgres', 'Sqlite'
+    $kinds = 'SqlServer', 'SqlServer', 'SqlServer', 'SqlServer', 'SqlServer', 'Postgres', 'MySql', 'Sqlite'
     $conns = for ($i = 0; $i -lt 8; $i++) {
         [ordered]@{
             Id = [Guid]::NewGuid().ToString(); Name = "Synthetic $i"; Kind = $kinds[$i]; Folder = $folders[$i % 4]
@@ -131,7 +131,7 @@ function Get-Stat($values) {
 }
 
 # Must not be loaded before the first frame: each is only needed once a connection of its kind opens.
-$heavy = '^(Microsoft\.Data\.|Npgsql$|SQLitePCLRaw|Renci\.|BouncyCastle|Azure\.|Microsoft\.Identity)'
+$heavy = '^(Microsoft\.Data\.|Npgsql$|MySqlConnector$|SQLitePCLRaw|Renci\.|BouncyCastle|Azure\.|Microsoft\.Identity)'
 $frame = New-Object System.Collections.Generic.List[double]
 $ready = New-Object System.Collections.Generic.List[double]
 $early = New-Object System.Collections.Generic.SortedSet[string]

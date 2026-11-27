@@ -94,6 +94,7 @@ public sealed partial class GroupEditorViewModel : ObservableObject
         DbKind.Postgres => "PostgreSQL only",
         DbKind.SqlServer => "SQL Server only",
         DbKind.Sqlite => "SQLite only",
+        DbKind.MySql => "MySQL / MariaDB only",
         _ => null,
     };
 

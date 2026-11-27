@@ -117,6 +117,14 @@ public sealed class ScriptConnection : IDisposable
                 var second = await cmd.ExecuteScalarAsync().ConfigureAwait(false);
                 return first is not null and not DBNull && first.Equals(second);
             }
+            case Model.DbKind.MySql:
+                // A savepoint only lasts inside a transaction: releasing it fails in autocommit.
+                cmd.CommandText = "SAVEPOINT dbx_probe";
+                await cmd.ExecuteNonQueryAsync().ConfigureAwait(false);
+                cmd.CommandText = "RELEASE SAVEPOINT dbx_probe";
+                try { await cmd.ExecuteNonQueryAsync().ConfigureAwait(false); }
+                catch (DbException) { return false; }
+                return true;
             default:
                 cmd.CommandText = "BEGIN";
                 try { await cmd.ExecuteNonQueryAsync().ConfigureAwait(false); }
@@ -159,6 +167,7 @@ public sealed class ScriptConnection : IDisposable
             var plan = Plans.PlanCapture.Effective(Session.Driver.Kind, o.Plan);
             o = o with { Plan = plan, Kind = o.Kind ?? Session.Driver.Kind };
             var planOn = false;
+            string? undoExplain = null;
             try
             {
                 if (plan != Plans.PlanMode.None && Plans.PlanCapture.OnSql(Session.Driver.Kind, plan) is not null)
@@ -166,6 +175,8 @@ public sealed class ScriptConnection : IDisposable
                     await Plans.PlanCapture.EnableAsync(connection, Session.Driver.Kind, plan, ct).ConfigureAwait(false);
                     planOn = true;
                 }
+                if (plan == Plans.PlanMode.Estimated && Session.Driver.Kind == Model.DbKind.MySql && !o.ReadOnly)
+                    undoExplain = await Plans.PlanCapture.BeginRolledBackExplainAsync(connection, ct).ConfigureAwait(false);
                 if (statistics)
                 {
                     await StatisticsSession.EnableAsync(connection, ct).ConfigureAwait(false);
@@ -186,6 +197,9 @@ public sealed class ScriptConnection : IDisposable
                 await TearDownReadOnlyContextAsync(connection, tx, o).ConfigureAwait(false);
                 // First: while SHOWPLAN_XML is on, nothing else would run on this connection (not even the probe).
                 if (planOn && !await Plans.PlanCapture.DisableAsync(connection, Session.Driver.Kind, plan).ConfigureAwait(false)) _suspect = true;
+                // Left open, the transaction would swallow the next statements: such a connection is not reused.
+                if (undoExplain is not null && !await Plans.PlanCapture.RollBackExplainAsync(connection, undoExplain).ConfigureAwait(false))
+                    _invalidated = true;
                 if (statisticsOn && !await StatisticsSession.DisableAsync(connection).ConfigureAwait(false)) _suspect = true;
                 // Probe now, not at the next run: the abort (PostgreSQL: the cancel request fails a statement inside the user's
                 // transaction, which then aborts it) must be reported by THIS run, while the user still knows what ran.
@@ -302,7 +316,7 @@ public sealed class ScriptConnection : IDisposable
         var rollback = Session.Driver.Kind switch
         {
             Model.DbKind.SqlServer => "IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION",
-            Model.DbKind.Postgres => "ROLLBACK",
+            Model.DbKind.Postgres or Model.DbKind.MySql => "ROLLBACK",
             _ => null,
         };
         if (rollback is null || connection.State != ConnectionState.Open)

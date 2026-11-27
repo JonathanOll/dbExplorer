@@ -26,6 +26,10 @@ public static class SqlFormatter
         var o = (options ?? SqlFormatOptions.Default).Normalized();
         var lex = SqlLexOptions.For(kind);
         var eol = sql.Contains("\r\n") ? "\r\n" : "\n";
+        // A script that changes the delimiter holds stored programs, whose ';' do not end statements: left alone.
+        if (lex.MySqlComments
+            && SqlLexer.Tokenize(sql, lex with { Delimiters = true }).Any(t => t.Kind is SqlTokenKind.Directive or SqlTokenKind.Executable))
+            return sql;
         var toks = FTokenizer.Tokenize(sql, lex);
         if (toks.Count == 0) return sql;
 

@@ -226,7 +226,7 @@ public static class DataSearch
         var cast = driver.CastToText(driver.Quote(column.Name));
         return mode == DataMatchMode.Exact
             ? $"{cast} = {driver.ParamPrefix}p"
-            : $"{cast} LIKE {driver.ParamPrefix}p ESCAPE '\\'";
+            : $"{cast} LIKE {driver.ParamPrefix}p {driver.LikeEscapeClause}";
     }
 
     private static string Pattern(IDbDriver driver, DataSearchOptions o) => o.Mode switch

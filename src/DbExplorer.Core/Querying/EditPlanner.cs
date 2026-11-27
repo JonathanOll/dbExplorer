@@ -91,7 +91,7 @@ public static class EditPlanner
         }).ToList();
 
         if (values.Count == 0)
-            return Build(d, _ => $"INSERT INTO {d.QuoteTable(t.Ref)} DEFAULT VALUES");
+            return Build(d, _ => d.InsertDefaultsSql(t.Ref));
 
         return Build(d, render => string.Concat(
             "INSERT INTO ", d.QuoteTable(t.Ref),
@@ -184,6 +184,8 @@ public static class EditPlanner
     /// <summary>Renders a value as a SQL literal for display. Never executed.</summary>
     private static string Literal(DbKind kind, object value)
     {
+        // MySQL strings and times have their own rules, all in the export literals.
+        if (kind == DbKind.MySql) return Export.SqlLiterals.Format(kind, value);
         var inv = CultureInfo.InvariantCulture;
         switch (value)
         {

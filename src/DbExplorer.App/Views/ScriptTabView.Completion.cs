@@ -64,7 +64,7 @@ public partial class ScriptTabView
         if (text[0] == '.')
         {
             // Only a dot that follows a name: not a decimal point, not an ellipsis.
-            if (caret >= 2 && (IsIdentChar(document.GetCharAt(caret - 2)) || document.GetCharAt(caret - 2) is '"' or ']')) ShowCompletion();
+            if (caret >= 2 && (IsIdentChar(document.GetCharAt(caret - 2)) || document.GetCharAt(caret - 2) is '"' or ']' or '`')) ShowCompletion();
         }
         else if (IsIdentChar(text[0]))
         {
@@ -99,7 +99,7 @@ public partial class ScriptTabView
         window = new CompletionWindow(Editor.TextArea);
         var start = items[0].ReplaceStart;
         // The list narrows on what follows an opening quote; the quote itself is part of the replaced text.
-        if (start < caret && Editor.Document.GetCharAt(start) is '"' or '[') start++;
+        if (start < caret && Editor.Document.GetCharAt(start) is '"' or '[' or '`') start++;
         window.StartOffset = start;
         foreach (var item in items) window.CompletionList.CompletionData.Add(new SqlCompletionData(item));
         window.Closed += (_, _) =>

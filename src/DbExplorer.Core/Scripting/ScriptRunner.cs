@@ -63,6 +63,7 @@ public static class ScriptRunner
                 : await ExecuteAsync(c, transaction, stmt, o, ct);
 
             if (result is null) yield break;   // cancelled
+            if (capture is not null && AsksForWarnings(result, stmts, o)) await capture.ReadMySqlWarningsAsync(c, transaction, ReadsTable(result.Statement.Text), ct);
             if (capture is not null) result = result with { Messages = MergeMessages(capture.Drain(), result.Messages) };
             yield return result;
             if (result.Error is not null) yield break;
@@ -108,6 +109,17 @@ public static class ScriptRunner
         }
     }
 
+    // MySqlConnector raises no event for the warnings of a statement that returns rows: they are asked for. Not when the
+    // script reads FOUND_ROWS(), which the extra statement would overwrite.
+    private static bool AsksForWarnings(StatementResult result, IReadOnlyList<ScriptStatement> script, ScriptOptions o) =>
+        o.Kind == DbKind.MySql && o.Plan == Plans.PlanMode.None && result.Error is null
+        && result.Sets.Count > 0 && !result.Sets.Any(s => s.Truncated)
+        && !result.Statement.Text.StartsWith("SHOW", StringComparison.OrdinalIgnoreCase)
+        && !script.Any(s => s.Text.Contains("FOUND_ROWS", StringComparison.OrdinalIgnoreCase));
+
+    private static bool ReadsTable(string sql) => SqlLexer.Tokenize(sql, SqlLexOptions.For(DbKind.MySql))
+        .Any(t => t.Kind == SqlTokenKind.Word && sql.AsSpan(t.Start, t.End - t.Start).Equals("FROM", StringComparison.OrdinalIgnoreCase));
+
     private static bool IsRefused(ScriptStatement stmt, ScriptOptions o) =>
         o.Kind is { } kind ? ReadOnlyGuard.IsWrite(stmt.Text, kind) : ReadOnlyGuard.IsWrite(stmt.Text);
 
@@ -122,9 +134,10 @@ public static class ScriptRunner
             await using var cmd = c.CreateCommand();
             cmd.Transaction = transaction;
             var planKind = o.Kind ?? DbKind.SqlServer;
-            if (o.Plan != Plans.PlanMode.None && Plans.PlanCapture.CannotPlan(stmt.Text, planKind) is { } cannot)
+            var mariaDb = planKind == DbKind.MySql && Drivers.MySqlDriver.IsMariaDb(c);
+            if (o.Plan != Plans.PlanMode.None && Plans.PlanCapture.CannotPlan(stmt.Text, planKind, o.Plan, mariaDb) is { } cannot)
                 return new StatementResult(stmt, [], null, watch.Elapsed, cannot);
-            cmd.CommandText = Plans.PlanCapture.Wrap(stmt.Text, planKind, o.Plan);
+            cmd.CommandText = Plans.PlanCapture.Wrap(stmt.Text, planKind, o.Plan, mariaDb);
             Querying.CommandTimeouts.Unbounded(cmd);   // the statement ends or the user cancels it
             pump = new CancelPump(cmd);
             using var cancelRegistration = ct.Register(pump.OnCancel);
@@ -151,12 +164,16 @@ public static class ScriptRunner
                     }
                 } while (await reader.NextResultAsync(ct));
 
-                await reader.CloseAsync();
+                try { await reader.CloseAsync(); }
+                // MySQL ends a command cancelled at the row limit with "query interrupted" while the reader drains.
+                catch (DbException e) when (e.SqlState == "70100" && sets.Any(s => s.Truncated)) { }
                 affected = reader.RecordsAffected;
             }
 
             // SQLite also gives a count (0, or the previous write's) for BEGIN, PRAGMA or DDL: only a data change has one.
-            if ((o.Kind == DbKind.Sqlite || c is Microsoft.Data.Sqlite.SqliteConnection) && !ChangesRows(stmt.Text)) affected = -1;
+            // MySQL gives 0 for them.
+            if ((o.Kind == DbKind.Sqlite || c is Microsoft.Data.Sqlite.SqliteConnection) && !ChangesRows(stmt.Text, DbKind.Sqlite)
+                || o.Kind == DbKind.MySql && affected == 0 && !ChangesRows(stmt.Text, DbKind.MySql)) affected = -1;
             return new StatementResult(stmt, sets, affected >= 0 ? affected : null, watch.Elapsed, null);
         }
         catch (Exception) when (ct.IsCancellationRequested)
@@ -177,9 +194,9 @@ public static class ScriptRunner
         }
     }
 
-    private static bool ChangesRows(string sql)
+    private static bool ChangesRows(string sql, DbKind kind)
     {
-        var tokens = SqlLexer.Tokenize(sql, SqlLexOptions.For(DbKind.Sqlite));
+        var tokens = SqlLexer.Tokenize(sql, SqlLexOptions.For(kind));
         if (tokens.Count == 0) return false;
         var first = sql.AsSpan(tokens[0].Start, tokens[0].End - tokens[0].Start);
         return first.Equals("INSERT", StringComparison.OrdinalIgnoreCase) || first.Equals("UPDATE", StringComparison.OrdinalIgnoreCase)

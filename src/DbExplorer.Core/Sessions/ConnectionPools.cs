@@ -15,6 +15,13 @@ internal static class ConnectionPools
             case NpgsqlConnection pg: NpgsqlConnection.ClearPool(pg); break;
             case SqlConnection sql: SqlConnection.ClearPool(sql); break;
             case SqliteConnection lite: SqliteConnection.ClearPool(lite); break;
+            // By name first: a connection of another engine must not load the MySQL provider.
+            default:
+                if (connection.GetType().Namespace == "MySqlConnector") ClearMySql(connection);
+                break;
         }
     }
+
+    private static void ClearMySql(DbConnection connection) =>
+        MySqlConnector.MySqlConnection.ClearPool((MySqlConnector.MySqlConnection)connection);
 }

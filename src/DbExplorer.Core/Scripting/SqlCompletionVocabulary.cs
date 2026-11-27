@@ -39,6 +39,40 @@ internal static class SqlCompletionVocabulary
     private static readonly string[] SqlServerStatements = ["DECLARE", "EXEC", "USE", "SET", "IF", "PRINT", "GO", "GRANT", "REVOKE"];
     private static readonly string[] SqliteStatements = ["PRAGMA", "VACUUM", "REPLACE INTO", "ATTACH DATABASE", "ANALYZE"];
 
+    private static readonly string[] MySqlKeywords =
+    [
+        "LIMIT", "OFFSET", "TRUE", "FALSE", "ON DUPLICATE KEY UPDATE", "INSERT IGNORE INTO", "REPLACE INTO", "STRAIGHT_JOIN",
+        "REGEXP", "AUTO_INCREMENT", "ENGINE=InnoDB", "FOR UPDATE", "WITH ROLLUP", "USING", "WITH RECURSIVE", "SHOW TABLES",
+        "SHOW CREATE TABLE", "DELIMITER", "IF", "BEGIN", "DECLARE",
+    ];
+
+    private static readonly string[] MySqlStatements =
+        ["SHOW", "DESCRIBE", "USE", "SET", "REPLACE INTO", "CALL", "ANALYZE TABLE", "OPTIMIZE TABLE", "GRANT", "REVOKE"];
+
+    private static readonly string[] MySqlFunctions =
+    [
+        "NOW", "CURDATE", "DATE_FORMAT", "DATE_ADD", "DATE_SUB", "DATEDIFF", "TIMESTAMPDIFF", "STR_TO_DATE", "UNIX_TIMESTAMP",
+        "FROM_UNIXTIME", "IFNULL", "IF", "GROUP_CONCAT", "CONCAT_WS", "SUBSTRING_INDEX", "LENGTH", "CHAR_LENGTH", "LOCATE",
+        "LEFT", "RIGHT", "FLOOR", "CEIL", "RAND", "UUID", "LAST_INSERT_ID", "ROW_COUNT", "JSON_EXTRACT", "JSON_OBJECT",
+        "JSON_ARRAYAGG", "REGEXP_REPLACE", "CONVERT", "DATABASE",
+    ];
+
+    /// <summary>Words MySQL or MariaDB reserve beyond the common ones: a name equal to one needs backticks.</summary>
+    internal static readonly HashSet<string> MySqlReserved = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "ACCESSIBLE", "ANALYZE", "BEFORE", "BIGINT", "BINARY", "BLOB", "BOTH", "CALL", "CASCADE", "CHANGE", "CHAR", "CHARACTER",
+        "CONDITION", "CONTINUE", "CONVERT", "CUBE", "CUME_DIST", "CURSOR", "DATABASE", "DATABASES", "DECIMAL", "DECLARE", "DELAYED",
+        "DESCRIBE", "DIV", "DOUBLE", "DUAL", "EACH", "ELSEIF", "EMPTY", "ENCLOSED", "ESCAPED", "EXIT", "EXPLAIN", "FLOAT", "FORCE",
+        "FULLTEXT", "FUNCTION", "GENERATED", "GROUPING", "GROUPS", "HIGH_PRIORITY", "IF", "IGNORE", "INFILE", "INOUT", "INT",
+        "INTEGER", "INTERVAL", "ITERATE", "KEYS", "KILL", "LAG", "LEAD", "LEADING", "LEAVE", "LINEAR", "LINES", "LOAD", "LOCK",
+        "LONG", "LOOP", "MATCH", "MAXVALUE", "MOD", "MODIFIES", "OF", "OPTIMIZE", "OPTION", "OPTIONALLY", "OUT", "OUTFILE",
+        "PRECISION", "PROCEDURE", "PURGE", "RANGE", "RANK", "READ", "READS", "REAL", "RECURSIVE", "REGEXP", "RELEASE", "RENAME",
+        "REPEAT", "REPLACE", "REQUIRE", "RESTRICT", "RETURN", "REVOKE", "RLIKE", "ROW", "ROWS", "ROW_NUMBER", "SCHEMA", "SCHEMAS",
+        "SENSITIVE", "SEPARATOR", "SHOW", "SIGNAL", "SMALLINT", "SPATIAL", "SQL", "SSL", "STARTING", "STORED", "SYSTEM",
+        "TERMINATED", "THEN", "TINYINT", "TRAILING", "TRIGGER", "UNDO", "UNLOCK", "UNSIGNED", "USAGE", "USE", "VARBINARY",
+        "VARCHAR", "VARYING", "VIRTUAL", "WHILE", "WRITE", "XOR", "ZEROFILL",
+    };
+
     private static readonly string[] CommonFunctions =
     [
         "COUNT", "SUM", "AVG", "MIN", "MAX", "COALESCE", "NULLIF", "CAST", "UPPER", "LOWER", "SUBSTRING", "TRIM", "REPLACE", "ROUND",
@@ -80,6 +114,7 @@ internal static class SqlCompletionVocabulary
     {
         DbKind.Postgres => PostgresStatements,
         DbKind.SqlServer => SqlServerStatements,
+        DbKind.MySql => MySqlStatements,
         _ => SqliteStatements,
     }];
 
@@ -87,6 +122,7 @@ internal static class SqlCompletionVocabulary
     {
         DbKind.Postgres => PostgresKeywords,
         DbKind.SqlServer => SqlServerKeywords,
+        DbKind.MySql => MySqlKeywords,
         _ => SqliteKeywords,
     }];
 
@@ -94,6 +130,7 @@ internal static class SqlCompletionVocabulary
     {
         DbKind.Postgres => PostgresFunctions,
         DbKind.SqlServer => SqlServerFunctions,
+        DbKind.MySql => MySqlFunctions,
         _ => SqliteFunctions,
     }];
 }

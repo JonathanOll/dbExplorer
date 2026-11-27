@@ -43,11 +43,11 @@ internal sealed class SqlCompletionData(CompletionItem item) : ICompletionData
         var start = completionSegment.Offset;
         // The window filters on what follows the opening quote the user typed; that quote is replaced too. Only then does the item
         // start before the segment: a quote that closes the previous name stays.
-        if (item.ReplaceStart == start - 1 && document.GetCharAt(start - 1) is '"' or '[') start--;
+        if (item.ReplaceStart == start - 1 && document.GetCharAt(start - 1) is '"' or '[' or '`') start--;
         var end = Math.Max(start, completionSegment.EndOffset);
         // The quote or bracket already closed after the caret (added by the editor) is replaced too: the item brings its own.
         if (start == item.ReplaceStart && start < end && end < document.TextLength
-            && document.GetCharAt(start) is var opener and ('"' or '[') && document.GetCharAt(end) == (opener == '"' ? '"' : ']'))
+            && document.GetCharAt(start) is var opener and ('"' or '[' or '`') && document.GetCharAt(end) == (opener == '[' ? ']' : opener))
             end++;
         document.Replace(start, end - start, item.Text);
         textArea.Caret.Offset = start + item.Text.Length;

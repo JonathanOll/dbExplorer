@@ -15,6 +15,7 @@ public partial class ConnectionDialogViewModel : ObservableObject
         [DbKind.Postgres] = 5432,
         [DbKind.SqlServer] = 1433,
         [DbKind.Sqlite] = null,
+        [DbKind.MySql] = 3306,
     };
 
     private readonly ISecretProtector _protector;
@@ -57,7 +58,7 @@ public partial class ConnectionDialogViewModel : ObservableObject
         LoadTls(existing.Tls);
     }
 
-    public IReadOnlyList<DbKind> Kinds { get; } = [DbKind.Postgres, DbKind.SqlServer, DbKind.Sqlite];
+    public IReadOnlyList<DbKind> Kinds { get; } = [DbKind.Postgres, DbKind.SqlServer, DbKind.MySql, DbKind.Sqlite];
 
     public const string NoFolderLabel = "(no folder)";
 
@@ -89,7 +90,7 @@ public partial class ConnectionDialogViewModel : ObservableObject
     [ObservableProperty] private string _name = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSqlite), nameof(IsNetwork), nameof(IsSqlServer), nameof(DatabaseLabel), nameof(DatabasePlaceholder), nameof(ShowSsh), nameof(IsPostgres))]
+    [NotifyPropertyChangedFor(nameof(IsSqlite), nameof(IsNetwork), nameof(IsSqlServer), nameof(DatabaseLabel), nameof(DatabasePlaceholder), nameof(ShowSsh), nameof(IsPostgres), nameof(ShowTls))]
     private DbKind _kind = DbKind.Postgres;
 
     [ObservableProperty] private string _host = "";
@@ -158,7 +159,7 @@ public partial class ConnectionDialogViewModel : ObservableObject
             PortText = DefaultPorts[newValue]?.ToString() ?? "";
     }
 
-    partial void OnKindChanged(DbKind value) { FollowKindWithAuth(); ResetTest(); RefreshErrors(); }
+    partial void OnKindChanged(DbKind value) { FollowKindWithAuth(); FollowKindWithTls(); ResetTest(); RefreshErrors(); }
     partial void OnNameChanged(string value) => RefreshErrors();
     partial void OnHostChanged(string value) { ResetTest(); RefreshErrors(); }
     partial void OnPortTextChanged(string value) { ResetTest(); RefreshErrors(); }

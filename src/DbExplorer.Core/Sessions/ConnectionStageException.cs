@@ -63,6 +63,13 @@ public class ConnectionStageException(ConnectionStage stage, string detail, Exce
         SqlException sql => sql.Number is 18452 or 18456 or 18470 or 18486 or 18487 or 18488
                             || sql.Message.Contains("Active Directory", StringComparison.OrdinalIgnoreCase)
                             || sql.Message.Contains("SSPI", StringComparison.Ordinal),
+        // MySqlConnector, matched by name so that other engines never load it.
+        System.Data.Common.DbException db when db.GetType().Namespace == "MySqlConnector" => IsMySqlSignIn(db),
         _ => false,
     };
+
+    private static bool IsMySqlSignIn(System.Data.Common.DbException e) =>
+        e.SqlState?.StartsWith("28", StringComparison.Ordinal) == true
+        || e.Message.Contains("Access denied", StringComparison.OrdinalIgnoreCase)
+        || e.Message.Contains("authenticat", StringComparison.OrdinalIgnoreCase);
 }

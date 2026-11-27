@@ -3,7 +3,7 @@ using DbExplorer.Core.Model;
 
 namespace DbExplorer.App.ViewModels;
 
-// TLS of a PostgreSQL connection: SSL mode and certificate files.
+// TLS of a PostgreSQL, MySQL or MariaDB connection: SSL mode and certificate files.
 public partial class ConnectionDialogViewModel
 {
     [ObservableProperty]
@@ -25,7 +25,31 @@ public partial class ConnectionDialogViewModel
 
     public bool IsPostgres => Kind == DbKind.Postgres;
 
-    public IReadOnlyList<TlsMode> TlsModes { get; } = Enum.GetValues<TlsMode>();
+    /// <summary>The engine has the TLS settings.</summary>
+    public bool ShowTls => Kind is DbKind.Postgres or DbKind.MySql;
+
+    private static readonly TlsMode[] AllTlsModes = Enum.GetValues<TlsMode>();
+
+    // MySQL has no "allow".
+    private static readonly TlsMode[] MySqlTlsModes = [.. AllTlsModes.Where(m => m != TlsMode.Allow)];
+
+    public IReadOnlyList<TlsMode> TlsModes => Kind == DbKind.MySql ? MySqlTlsModes : AllTlsModes;
+
+    private void FollowKindWithTls()
+    {
+        if (Kind == DbKind.MySql && TlsMode == TlsMode.Allow) TlsMode = TlsMode.Prefer;
+        var chosen = TlsMode;
+        OnPropertyChanged(nameof(TlsModes));
+        OnPropertyChanged(nameof(TlsRootHint));
+        OnPropertyChanged(nameof(TlsPassphraseHint));
+        TlsMode = chosen;   // the drop-down may drop its selection when the list changes
+        OnPropertyChanged(nameof(TlsMode));
+    }
+
+    /// <summary>Where the authority comes from when no root CA file is chosen.</summary>
+    public string TlsRootHint => Kind == DbKind.MySql
+        ? "Empty: the authorities Windows trusts."
+        : @"Empty: %APPDATA%\postgresql\root.crt if present, else the authorities Windows trusts.";
 
     /// <summary>What the selected mode does, in plain words.</summary>
     public string TlsHint => TlsMode switch
@@ -56,14 +80,15 @@ public partial class ConnectionDialogViewModel
     public bool ShowClientCertificateChoice => TlsMode != TlsMode.Disable;
     public bool ShowClientCertificate => ShowClientCertificateChoice && UseClientCertificate;
 
-    public string TlsPassphraseHint => SavedTlsPassphrase() is null ? "Only for an encrypted key" : "Saved. Type to replace it";
+    public string TlsPassphraseHint => SavedTlsPassphrase() is not null ? "Saved. Type to replace it"
+        : Kind == DbKind.MySql ? "Only for a .pfx file" : "Only for an encrypted key";
 
     partial void OnTlsModeChanged(TlsMode value) { ResetTest(); RefreshErrors(); }
     partial void OnTlsRootFileChanged(string value) => ResetTest();
     partial void OnUseClientCertificateChanged(bool value) { ResetTest(); RefreshErrors(); }
     partial void OnTlsCertificateFileChanged(string value) { ResetTest(); RefreshErrors(); }
     partial void OnTlsKeyFileChanged(string value) => ResetTest();
-    partial void OnTlsPassphraseChanged(string value) => ResetTest();
+    partial void OnTlsPassphraseChanged(string value) { ResetTest(); RefreshErrors(); }
 
     private void LoadTls(TlsConfig? tls)
     {
@@ -85,7 +110,7 @@ public partial class ConnectionDialogViewModel
     /// <summary>Only what the mode uses is saved. Null (the driver's defaults) for plain Prefer.</summary>
     private TlsConfig? BuildTls()
     {
-        if (!IsPostgres) return null;
+        if (!ShowTls) return null;
         var certificate = ShowClientCertificate ? Filled(TlsCertificateFile) : null;
         if (TlsMode == TlsMode.Prefer && certificate is null) return null;
         return new TlsConfig(
@@ -99,8 +124,13 @@ public partial class ConnectionDialogViewModel
         static string? Filled(string text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
     }
 
-    private string? TlsCertificateProblem() =>
-        IsPostgres && ShowClientCertificate && string.IsNullOrWhiteSpace(TlsCertificateFile)
-            ? "Client certificate file is required."
+    private string? TlsCertificateProblem()
+    {
+        if (!ShowTls || !ShowClientCertificate) return null;
+        if (string.IsNullOrWhiteSpace(TlsCertificateFile)) return "Client certificate file is required.";
+        var pfx = Path.GetExtension(TlsCertificateFile.Trim()).ToLowerInvariant() is ".pfx" or ".p12";
+        return Kind == DbKind.MySql && !pfx && (TlsPassphrase.Length > 0 || SavedTlsPassphrase() is not null)
+            ? "MySQL cannot read an encrypted PEM key: use a .pfx file, or a key without passphrase."
             : null;
+    }
 }

@@ -1,6 +1,6 @@
 # dbExplorer
 
-A fast, lightweight Windows app to explore and edit PostgreSQL, SQL Server and SQLite databases. It opens in about a
+A fast, lightweight Windows app to explore and edit PostgreSQL, SQL Server, MySQL, MariaDB and SQLite databases. It opens in about a
 quarter of a second, switches between connections instantly, and jumps to any table or column as you type its name.
 
 ![Table tab, light](docs/ui/after/main-table-light.png)
@@ -50,7 +50,7 @@ All switches, install locations, GitHub rate limit (`$env:GITHUB_TOKEN`) and man
   SQL formatter, and one search over scripts and data. [Scripts](docs/scripts.md)
 - **ER diagrams**: tables, columns and foreign keys of a database, a schema or around one table; search, drag, PNG
   export. [Features](docs/features.md#er-diagrams)
-- **Execution plans**: estimated and actual plans for SQL Server, PostgreSQL and SQLite, a plan canvas with issues and missing
+- **Execution plans**: estimated and actual plans for SQL Server, PostgreSQL, MySQL, MariaDB and SQLite, a plan canvas with issues and missing
   indexes, and a before/after plan comparison. [Plans](docs/plans.md)
 - **Statistics** (SQL Server): `STATISTICS IO` and `TIME` captured per statement, also per database in a group run.
   [Plans](docs/plans.md#execution-statistics)
@@ -94,7 +94,7 @@ dotnet run --project src/DbExplorer.App -c Release
 ```
 
 Publishing, integration tests against real servers and start-up measurements: [docs/development.md](docs/development.md).
-Built with .NET 10, Avalonia 11 and native ADO.NET drivers (Npgsql, Microsoft.Data.SqlClient, Microsoft.Data.Sqlite).
+Built with .NET 10, Avalonia 11 and native ADO.NET drivers (Npgsql, Microsoft.Data.SqlClient, MySqlConnector, Microsoft.Data.Sqlite).
 
 ## Data and privacy
 

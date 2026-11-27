@@ -55,7 +55,7 @@
       <Border Padding="24,20,24,22">
       <StackPanel Spacing="18">
 
-        <!-- Engine: three cards, the form below follows the choice -->
+        <!-- Engine: one card each, the form below follows the choice -->
         <ListBox x:Name="EngineList" ItemsSource="{Binding Kinds}" SelectedItem="{Binding Kind}" Background="Transparent"
                  BorderThickness="0" Padding="0" Margin="0,0,-8,0" AutomationProperties.Name="Database engine"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Disabled">
@@ -64,9 +64,11 @@
           </ListBox.ItemsPanel>
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="model:DbKind">
-              <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
-                <views:EngineIcon Kind="{Binding .}" Width="18" Height="18" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding ., Converter={x:Static views:Icons.EngineName}}" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <!-- Icon above the name: four cards side by side leave no room for both on one line -->
+              <StackPanel HorizontalAlignment="Center" Spacing="6">
+                <views:EngineIcon Kind="{Binding .}" Width="18" Height="18" HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding ., Converter={x:Static views:Icons.EngineName}}" FontWeight="SemiBold" HorizontalAlignment="Center"
+                           TextWrapping="Wrap" TextAlignment="Center" />
               </StackPanel>
             </DataTemplate>
           </ListBox.ItemTemplate>
@@ -186,8 +188,8 @@
           </Grid>
         </StackPanel>
 
-        <!-- TLS (PostgreSQL): the mode, then only the files that mode can use -->
-        <StackPanel x:Name="TlsSection" Spacing="12" IsVisible="{Binding IsPostgres}">
+        <!-- TLS (PostgreSQL, MySQL / MariaDB): the mode, then only the files that mode can use -->
+        <StackPanel x:Name="TlsSection" Spacing="12" IsVisible="{Binding ShowTls}">
           <TextBlock Classes="section" Text="TLS" Margin="0" />
 
           <Grid ColumnDefinitions="92,*">
@@ -216,7 +218,7 @@
                 <Button Grid.Column="1" Content="Browse…" Margin="8,0,0,0" Tag="root" Click="OnBrowseCertificateClick"
                         ToolTip.Tip="Choose the CA certificate that signed the server's" />
               </Grid>
-              <TextBlock Classes="optdesc" Text="Empty: %APPDATA%\postgresql\root.crt if present, else the authorities Windows trusts." />
+              <TextBlock Classes="optdesc" Text="{Binding TlsRootHint}" />
             </StackPanel>
           </Grid>
 

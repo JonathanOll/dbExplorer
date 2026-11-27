@@ -7,13 +7,17 @@ config is replaced only when the whole import succeeded. Warnings (unsupported d
 in the status bar.
 
 SSH tunnels (host, port, user, password or key file and passphrase) are imported, as are SQL Server Windows and Microsoft
-Entra authentication modes and Windows / Kerberos authentication on PostgreSQL. A tunnel using another SSH sign-in (agent)
+Entra authentication modes and Windows / Kerberos authentication on PostgreSQL, MySQL and MariaDB. A tunnel using another SSH sign-in (agent)
 is kept as a private-key tunnel without a key file, with a warning: choose the key in the connection. The connection never
 silently becomes a direct one. SSH jump chains and SSH profiles shared between connections are not read.
 
 PostgreSQL SSL settings are imported: the mode, root CA, client certificate, key and passphrase. SSL switched on in
 DBeaver without a mode becomes **VerifyFull**, as its driver does. A Java keystore is not imported, and a DER / PK8 client
 key must be converted to PEM: both are reported as warnings.
+
+MySQL and MariaDB connections are imported with their SSL mode (`sslMode`, or DBeaver's require / verify settings) and
+certificate files. One without a database (DBeaver can connect to a whole server) is imported with a warning: choose the
+database in the connection.
 
 Connections that DBeaver marks `read-only`, or whose connection type is `prod` / `production` (or a custom type with
 "prod" in its name or one that forbids data edits), are imported **read-only**, on purpose: an imported production database

@@ -341,6 +341,8 @@ internal static partial class Scenes
         ("plan-sqlite", PlanSqlite),
         ("plan-sqlserver", PlanSqlServer),
         ("plan-compare", PlanCompare),
+        ("plan-mysql", PlanMySql),
+        ("connection-dialog-mysql", MySqlConnectionDialog),
         ("quick-open", QuickOpen),
         ("quick-open-extended", d => QuickOpenWords(d, "billing ord", everywhere: false)),
         ("quick-open-words", d => QuickOpenWords(d, "stg inv", everywhere: true)),

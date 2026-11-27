@@ -103,7 +103,7 @@ public static class TableQueryBuilder
             FilterOp.IsNull => $"{col} IS NULL",
             FilterOp.NotNull => $"{col} IS NOT NULL",
             FilterOp.Contains =>
-                $"{d.CastToText(col)} LIKE {Bind("%" + d.EscapeLike(expr.Values[0]) + "%")} ESCAPE '\\'",
+                $"{d.CastToText(col)} LIKE {Bind("%" + d.EscapeLike(expr.Values[0]) + "%")} {d.LikeEscapeClause}",
             FilterOp.Eq => $"{col} = {Bind(Typed(expr.Values[0]), column)}",
             FilterOp.Ne => $"{col} <> {Bind(Typed(expr.Values[0]), column)}",
             FilterOp.Lt => $"{col} < {Bind(Typed(expr.Values[0]), column)}",

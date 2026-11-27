@@ -60,7 +60,7 @@ database never blocks the others. The results:
 and every database runs in a read-only context, **whatever the read-only flag of each connection says**: a connection that is
 editable on its own is still read-only in a group run. It is exactly as strong as the read-only mode of an ordinary connection
 (see [Known limitations](limitations.md): a lexical guard that does not know functions with side effects, plus a database-enforced read-only
-context on PostgreSQL and SQLite and a rolled-back transaction on SQL Server). A write statement (or anything the guard cannot prove to be a read)
+context on PostgreSQL, MySQL, MariaDB and SQLite and a rolled-back transaction on SQL Server). A write statement (or anything the guard cannot prove to be a read)
 refuses the whole run for all databases with "Group runs are read-only; run writes on one database at a time". This check
 runs first, before the app starts resolving any member's session, and the runner repeats it as its own guard before it opens
 a connection. Other refusals are reported the same way: an empty script, or a run, a switch or a reconnect already in

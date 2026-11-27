@@ -24,7 +24,8 @@ internal sealed class EditorPairing(TextArea area, Func<DbKind?> engine, Func<bo
         if (!area.Selection.IsEmpty)
         {
             // A rectangular selection keeps the editor's own behaviour (the character replaces every line of it).
-            if (area.Selection is not RectangleSelection && AutoPairs.CloserOf(typed) is { } around) e.Handled = Surround(typed, around);
+            if (area.Selection is not RectangleSelection && (typed != '`' || kind == DbKind.MySql)   // a backtick quotes names there only
+                && AutoPairs.CloserOf(typed) is { } around) e.Handled = Surround(typed, around);
             return;
         }
         if (!autoClose()) return;

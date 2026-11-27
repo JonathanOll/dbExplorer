@@ -200,6 +200,8 @@ public sealed class QueryPlan
     {
         DbKind.SqlServer => ".sqlplan",
         DbKind.Postgres => ".json",
+        // MySQL's measured plan is a text tree; every other plan of MySQL and MariaDB is JSON.
+        DbKind.MySql when Raw.AsSpan().TrimStart().StartsWith("{") => ".json",
         _ => ".txt",
     };
 
@@ -207,6 +209,7 @@ public sealed class QueryPlan
     {
         DbKind.SqlServer => "SQL Server execution plan",
         DbKind.Postgres => "PostgreSQL plan (JSON)",
+        DbKind.MySql when FileExtension == ".json" => "MySQL / MariaDB plan (JSON)",
         _ => "Query plan (text)",
     };
 }

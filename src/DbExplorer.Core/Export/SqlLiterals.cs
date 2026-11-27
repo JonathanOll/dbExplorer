@@ -25,11 +25,14 @@ public static class SqlLiterals
             case sbyte or byte or short or ushort or int or uint or long or ulong or decimal or System.Numerics.BigInteger:
                 return ((IFormattable)value).ToString(null, inv);
             case DateTime dt: return Quoted(Timestamp(kind, dt));
+            // MariaDB refuses an offset in a literal: the UTC time is written.
+            case DateTimeOffset dto when kind == DbKind.MySql: return Quoted(Timestamp(kind, dto.UtcDateTime));
             case DateTimeOffset dto:
                 return Quoted(dto.ToString(kind == DbKind.SqlServer ? "yyyy-MM-ddTHH:mm:ss.FFFFFFFzzz" : "yyyy-MM-dd HH:mm:ss.FFFFFFFzzz", inv));
             case DateOnly date: return Quoted(date.ToString("yyyy-MM-dd", inv));
             case TimeOnly time: return Quoted(time.ToString("HH:mm:ss.FFFFFFF", inv));
-            case TimeSpan span: return Quoted(kind == DbKind.Postgres ? Interval(span) : span.ToString("c", inv));
+            case TimeSpan span:
+                return Quoted(kind switch { DbKind.Postgres => Interval(span), DbKind.MySql => MySqlTime(span), _ => span.ToString("c", inv) });
             case Guid g: return Quoted(g.ToString("D"));
             case byte[] bytes:
                 var hex = Convert.ToHexString(bytes);
@@ -49,6 +52,9 @@ public static class SqlLiterals
 
     private static string Text(DbKind kind, string s)
     {
+        // Whether a backslash escapes depends on the server's sql_mode: a hexadecimal literal reads the same in every mode.
+        if (kind == DbKind.MySql && s.AsSpan().IndexOfAny('\\', '\0') >= 0)
+            return $"_utf8mb4 X'{Convert.ToHexString(System.Text.Encoding.UTF8.GetBytes(s))}'";
         // A NUL character would end the statement text early in SQLite; PostgreSQL text cannot hold one at all.
         if (s.Contains('\0'))
         {
@@ -69,6 +75,7 @@ public static class SqlLiterals
     private static string Timestamp(DbKind kind, DateTime dt)
     {
         var inv = CultureInfo.InvariantCulture;
+        if (kind == DbKind.MySql) return dt.ToString("yyyy-MM-dd HH:mm:ss.FFFFFF", inv);   // microseconds at most
         if (kind != DbKind.SqlServer) return dt.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF", inv);
         // The "T" form does not depend on SET DATEFORMAT. A datetime column refuses more than 3 decimals, so more are
         // written only when the value has them (it then comes from a datetime2 column).
@@ -83,6 +90,15 @@ public static class SqlLiterals
         var micro = abs.Ticks % TimeSpan.TicksPerSecond / 10;
         if (micro != 0) time += "." + micro.ToString("000000", CultureInfo.InvariantCulture).TrimEnd('0');
         return abs.Days == 0 ? sign + time : $"{sign}{abs.Days} days {sign}{time}";
+    }
+
+    // [-]HHH:mm:ss.ffffff, the hours going past a day.
+    private static string MySqlTime(TimeSpan span)
+    {
+        var abs = span.Duration();
+        var time = $"{(span < TimeSpan.Zero ? "-" : "")}{(long)abs.TotalHours:00}:{abs.Minutes:00}:{abs.Seconds:00}";
+        var micro = abs.Ticks % TimeSpan.TicksPerSecond / 10;
+        return micro == 0 ? time : time + "." + micro.ToString("000000", CultureInfo.InvariantCulture).TrimEnd('0');
     }
 
     private static string NotFinite(DbKind kind, double d) => kind switch

@@ -30,6 +30,7 @@ public static class Icons
         DbKind.Postgres => "PostgreSQL",
         DbKind.SqlServer => "SQL Server",
         DbKind.Sqlite => "SQLite",
+        DbKind.MySql => "MySQL / MariaDB",
         _ => kind.ToString(),
     });
 

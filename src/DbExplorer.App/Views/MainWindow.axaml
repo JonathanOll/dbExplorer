@@ -663,7 +663,7 @@
               <StackPanel Classes="empty" Margin="16" IsVisible="{Binding Tree.IsEmpty}">
                 <PathIcon Data="{StaticResource IconDatabaseAdd}" />
                 <TextBlock Classes="h2" Text="No connections yet" />
-                <TextBlock Classes="dim" Text="Add a PostgreSQL, SQL Server or SQLite database, or bring your DBeaver connections." />
+                <TextBlock Classes="dim" Text="Add a PostgreSQL, SQL Server, MySQL, MariaDB or SQLite database, or bring your DBeaver connections." />
                 <Button Classes="accent" Content="Add a connection" Command="{Binding Tree.AddConnectionCommand}" />
                 <Button Classes="ghost" Content="Import from DBeaver" Command="{Binding Tree.ImportFromDBeaverCommand}" />
               </StackPanel>
@@ -765,7 +765,7 @@
                     <PathIcon Classes="dim" Data="{StaticResource IconDatabaseAdd}" Width="20" Height="20" Margin="0,0,12,0" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                       <TextBlock Text="Add a connection" FontWeight="SemiBold" />
-                      <TextBlock Classes="dim small" Text="PostgreSQL, SQL Server or a SQLite file" />
+                      <TextBlock Classes="dim small" Text="PostgreSQL, SQL Server, MySQL or a SQLite file" />
                     </StackPanel>
                   </Grid>
                 </Button>

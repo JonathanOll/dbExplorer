@@ -40,6 +40,7 @@ public static class AuthModes
     {
         DbKind.SqlServer => SqlServer,
         DbKind.Postgres => Postgres,
+        DbKind.MySql => Postgres,   // password, or the Windows account (MariaDB GSSAPI)
         _ => [AuthMode.Password],
     };
 

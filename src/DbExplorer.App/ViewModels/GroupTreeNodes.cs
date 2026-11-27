@@ -51,6 +51,7 @@ public sealed partial class GroupNodeViewModel(ConnectionGroup group) : TreeNode
         DbKind.Postgres => "PostgreSQL",
         DbKind.SqlServer => "SQL Server",
         DbKind.Sqlite => "SQLite",
+        DbKind.MySql => "MySQL / MariaDB",
         _ => kind.ToString(),
     };
 }

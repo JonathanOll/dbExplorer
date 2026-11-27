@@ -107,24 +107,31 @@ internal static class FTokenizer
 
             var start = i;
             FKind kind;
-            if (c == '-' && SqlLexer.Peek(s, i + 1) == '-') { i = SqlLexer.SkipLineComment(s, i); kind = FKind.LineComment; }
-            else if (c == '/' && SqlLexer.Peek(s, i + 1) == '*') { i = SqlLexer.SkipBlockComment(s, i, o.NestedBlockComments); kind = FKind.BlockComment; }
+            if (SqlLexer.TrySkipComment(s, i, o, out var commentEnd))
+            {
+                kind = c == '/' ? FKind.BlockComment : FKind.LineComment;
+                i = commentEnd;
+            }
             else if (c == ';') { i++; kind = FKind.Semicolon; }
             else if (c == '\'')
             {
-                var escapes = o.BackslashEscapesInEStrings && start > 0 && s[start - 1] is 'E' or 'e'
+                var escapes = o.BackslashEscapesInSingleQuotes
+                              || o.BackslashEscapesInEStrings && start > 0 && s[start - 1] is 'E' or 'e'
                               && (start < 2 || !SqlLexer.IsWordChar(s[start - 2]));
                 i = SqlLexer.SkipQuoted(s, i, '\'', escapes);
                 kind = FKind.Quoted;
             }
-            else if (c is '"' or '`') { i = SqlLexer.SkipQuoted(s, i, c, false); kind = FKind.Quoted; }
+            else if (c is '"' or '`') { i = SqlLexer.SkipQuoted(s, i, c, c == '"' && o.BackslashEscapesInDoubleQuotes); kind = FKind.Quoted; }
             else if (c == '[' && o.BracketIdentifiers && s.IndexOf(']', i + 1) >= 0) { i = SqlLexer.SkipBracketIdentifier(s, i); kind = FKind.Quoted; }
             else if (c == '$' && o.DollarQuotes && SqlLexer.TryDollarQuote(s, i, out var dEnd)) { i = dEnd; kind = FKind.Quoted; }
             else if (IsNumberStart(s, i, toks)) { i = SkipNumber(s, i); kind = FKind.Number; }
+            // An executable comment is left exactly as it is: the whole statement is then not laid out.
+            else if (o.MySqlComments && c == '/' && SqlLexer.Peek(s, i + 1) == '*') { i = s.Length; kind = FKind.Unknown; }
             else if (SqlLexer.IsWordStart(c) || IsVariableStart(s, i))
             {
                 i++;
-                while (i < s.Length && SqlLexer.IsWordChar(s[i]) && (!o.DollarQuotes || s[i] is not ('@' or '#'))) i++;
+                while (i < s.Length && SqlLexer.IsWordChar(s[i]) && (!o.DollarQuotes || s[i] is not ('@' or '#'))
+                       && !(o.MySqlComments && s[i] == '#')) i++;
                 kind = FKind.Word;
                 var word = s.Substring(start, i - start);
                 // U&'..' and U&".." (unicode escapes) change meaning with spacing: do not reformat them.

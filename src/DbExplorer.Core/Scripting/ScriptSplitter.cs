@@ -13,7 +13,8 @@ public static class ScriptSplitter
     /// Splits a script into statements. Separators: ';' (all kinds) and a lone GO line (SQL Server only).
     /// Semicolons inside strings, quoted identifiers, comments and PostgreSQL dollar quotes do not split.
     /// A statement's text excludes its terminating separator and any trailing comment; comments in front of it
-    /// belong to it. Comment-only and empty fragments are dropped.
+    /// belong to it. Comment-only and empty fragments are dropped. MySQL scripts also follow their <c>DELIMITER</c> lines
+    /// (never sent), and an executable comment (<c>/*! ... */</c>) counts as code.
     /// </summary>
     public static IReadOnlyList<ScriptStatement> Split(string script, DbKind kind) => SplitCore(script, kind, blankLines: false);
 
@@ -181,9 +182,11 @@ public static class ScriptSplitter
     /// <param name="strictGo">True: a GO-like line that is not a separator throws instead of staying in its statement.</param>
     private static IReadOnlyList<ScriptStatement> SplitCore(string script, DbKind kind, bool blankLines, bool semicolons = true, bool strictGo = false)
     {
-        var options = SqlLexOptions.For(kind);
+        var options = SqlLexOptions.For(kind) with { Delimiters = kind == DbKind.MySql };
         var tokens = SqlLexer.Tokenize(script, options);
         var result = new List<ScriptStatement>();
+        // Under a custom delimiter (a stored program) a blank line is part of the body.
+        var customDelimiter = false;
 
         var segmentStart = 0;   // offset just after the previous separator
         var firstToken = -1;    // index of the first token of the current statement
@@ -203,8 +206,16 @@ public static class ScriptSplitter
         {
             var t = tokens[i];
 
-            if (blankLines
-                && LastBlankLine(script, i == 0 ? 0 : tokens[i - 1].End, t.Start, startsBlank: i == 0, options.NestedBlockComments) is var gap and >= 0)
+            if (t.Kind == SqlTokenKind.Directive)
+            {
+                Flush();
+                segmentStart = t.End;
+                customDelimiter = script[t.Start..t.End].Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries) is not [_, ";", ..];
+                continue;
+            }
+
+            if (blankLines && !customDelimiter
+                && LastBlankLine(script, i == 0 ? 0 : tokens[i - 1].End, t.Start, startsBlank: i == 0 || tokens[i - 1].Kind == SqlTokenKind.Directive, options) is var gap and >= 0)
             {
                 Flush();
                 segmentStart = gap;
@@ -238,7 +249,7 @@ public static class ScriptSplitter
     /// Offset of the line break that ends the last blank line in the gap between two tokens (whitespace and comments only), or
     /// -1. Text inside a comment is never a blank line; <paramref name="startsBlank"/> says the gap begins at a line start.
     /// </summary>
-    private static int LastBlankLine(string s, int from, int to, bool startsBlank, bool nestedComments)
+    private static int LastBlankLine(string s, int from, int to, bool startsBlank, SqlLexOptions options)
     {
         var found = -1;
         var lineBlank = startsBlank;
@@ -252,14 +263,9 @@ public static class ScriptSplitter
                 lineBlank = true;
                 i++;
             }
-            else if (c == '-' && i + 1 < s.Length && s[i + 1] == '-')
+            else if (SqlLexer.TrySkipComment(s, i, options, out var end))
             {
-                i = SqlLexer.SkipLineComment(s, i);
-                lineBlank = false;
-            }
-            else if (c == '/' && i + 1 < s.Length && s[i + 1] == '*')
-            {
-                i = SqlLexer.SkipBlockComment(s, i, nestedComments);
+                i = end;
                 lineBlank = false;
             }
             else

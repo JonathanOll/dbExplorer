@@ -159,6 +159,7 @@ public static partial class DBeaverImporter
             "postgresql" => DbKind.Postgres,
             "sqlserver" => DbKind.SqlServer,
             "sqlite" => DbKind.Sqlite,
+            "mysql" or "mariadb" => DbKind.MySql,
             _ => null
         };
         if (kind is null)
@@ -191,6 +192,9 @@ public static partial class DBeaverImporter
             if (!string.IsNullOrEmpty(cred.Password)) protectedPassword = protector.Protect(cred.Password);
         }
 
+        if (kind == DbKind.MySql && database.Length == 0)
+            warnings.Add($"Connection '{name}': no database is set in DBeaver; choose one in the connection");
+
         // DBeaver does not store an "encrypt" setting; keep the JDBC default (no forced encryption).
         return new ConnectionConfig(
             Guid.NewGuid(), name, kind.Value, Str(node, "folder"), host, port, database,
@@ -219,7 +223,7 @@ public static partial class DBeaverImporter
             {
                 if (entry.Value.TryGetProperty("#connection", out var conn))
                     result[entry.Name] = (Str(conn, "user"), Str(conn, "password"));
-                foreach (var handler in new[] { SshHandler, TlsHandler })
+                foreach (var handler in new[] { SshHandler, TlsHandler, MySqlTlsHandler })
                     if (entry.Value.TryGetProperty("network/" + handler, out var secret))
                         result[HandlerCredentialsKey(entry.Name, handler)] = (Str(secret, "user"), Str(secret, "password"));
             }

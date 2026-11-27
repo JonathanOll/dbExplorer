@@ -21,10 +21,16 @@ public interface IDbDriver
     string CastToText(string quotedColumn);
 
     /// <summary>
-    /// Escapes LIKE wildcards in <paramref name="text"/> with a backslash. The LIKE clause must declare
-    /// <c>ESCAPE '\'</c>.
+    /// Escapes LIKE wildcards in <paramref name="text"/>. The LIKE clause must declare <see cref="LikeEscapeClause"/>
+    /// (a backslash for every engine but MySQL).
     /// </summary>
     string EscapeLike(string text);
+
+    /// <summary>The LIKE clause that declares the escape character <see cref="EscapeLike"/> uses.</summary>
+    string LikeEscapeClause => "ESCAPE '\\'";
+
+    /// <summary>An INSERT of one row made of column defaults only.</summary>
+    string InsertDefaultsSql(TableRef t) => $"INSERT INTO {QuoteTable(t)} DEFAULT VALUES";
 
     /// <summary>
     /// Wraps <paramref name="selectSql"/> with ordering and paging. <paramref name="orderBy"/> is the column

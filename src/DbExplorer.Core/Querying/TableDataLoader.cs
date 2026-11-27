@@ -27,7 +27,7 @@ public sealed record TablePage(
 /// <c>1=1) DELETE FROM t WHERE (1=1</c> is one statement to the splitter and two to SQL Server. A table-data query
 /// is a SELECT; a write word in its condition is never legitimate.</item>
 /// <item>Defence in depth: the query runs in a read-only context (<see cref="BeginReadOnlyContextAsync"/>): SQLite
-/// <c>PRAGMA query_only</c>, PostgreSQL <c>READ ONLY</c> transaction, SQL Server a transaction that is always rolled
+/// <c>PRAGMA query_only</c>, PostgreSQL <c>READ ONLY</c> transaction, MySQL / MariaDB <c>READ ONLY</c> session, SQL Server a transaction that is always rolled
 /// back (no read-only mode exists; rolling back undoes any DML or DDL that slipped past the lexer).</item>
 /// </list>
 /// </summary>
@@ -115,6 +115,11 @@ public static class TableDataLoader
                     await cmd.ExecuteNonQueryAsync(ct);
                 }
                 return null;
+
+            case DbKind.MySql:
+                // The session default, not only this transaction: DDL commits implicitly, and what follows must stay refused.
+                await Drivers.MySqlDriver.MakeSessionReadOnlyAsync(c, ct);
+                return await c.BeginTransactionAsync(ct);
 
             case DbKind.Postgres:
             {

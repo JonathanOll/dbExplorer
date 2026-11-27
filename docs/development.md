@@ -36,15 +36,21 @@ nothing else was touched; the GitHub CLI is only needed for its `-UseGh` and fal
 
 ## Integration tests against real databases
 
-The unit tests use fakes and SQLite. The Postgres and SQL Server driver tests also have integration variants that are
+The unit tests use fakes and SQLite. The PostgreSQL, SQL Server and MySQL / MariaDB driver tests also have integration variants that are
 skipped unless an environment variable holds a connection string to a scratch database. They create uniquely named
 throw-away schemas and drop them afterwards, but do not point them at a database you care about.
 
 ```powershell
 $env:DBX_PG    = 'Host=localhost;Port=5432;Database=scratch;Username=postgres;Password=...'   # Npgsql connection string, PostgreSQL 11+
 $env:DBX_MSSQL = 'Server=localhost;Database=scratch;User Id=sa;Password=...;TrustServerCertificate=True'   # ADO.NET connection string
+$env:DBX_MYSQL = 'Server=127.0.0.1;Port=3306;User ID=root;Password=...'                               # MySqlConnector string, MySQL 8 or MariaDB 10.6+
 dotnet test tests/DbExplorer.Core.Tests
 ```
+
+`DBX_MYSQL` needs a user that may create and drop databases (each test uses a throw-away one); run it once per engine.
+MySQL with binary logging also needs `log_bin_trust_function_creators = 1` (the tests create a function). Throw-away
+servers: `docker run -d -e MYSQL_ROOT_PASSWORD=pw -p 127.0.0.1:33306:3306 mysql:8.4` (or `mariadb:11.4` with
+`MARIADB_ROOT_PASSWORD`).
 
 The SSH tunnel has its own opt-in test, `DBX_SSH = 'user:password@sshHost:22|targetHost:5432'` (the target is resolved from
 the SSH server). Without it the tests cover host key storage and refusal, the session / tunnel life cycle (a fake
@@ -109,7 +115,7 @@ What was tried, and what was kept:
 - **Avalonia/runtime options: rejected, no measurable gain.** `UseWin32().UseSkia()` instead of `UsePlatformDetect()`,
   an explicit default font, `RedirectionSurface` composition only, `InvariantGlobalization`, `UseNls`. There is no custom
   font or `WithInterFont` (the system font is used).
-- **Provider assemblies:** Npgsql and Microsoft.Data.SqlClient are not loaded at startup (checked from the loaded-assembly
+- **Provider assemblies:** Npgsql, Microsoft.Data.SqlClient and MySqlConnector are not loaded at startup (checked from the loaded-assembly
   list); they load on the first connection of that kind.
 - **Linked groups, reopen-closed-tab and fuzzy search: nothing runs before the first paint.** Groups are a few lines of the
   small `config.json` read on the worker thread; the Groups section of the tree is built in memory from it (no I/O, no

@@ -13,6 +13,7 @@ public static class AutoPairs
         '{' => '}',
         '\'' => '\'',
         '"' => '"',
+        '`' => '`',
         _ => null,
     };
 
@@ -22,10 +23,11 @@ public static class AutoPairs
         if (CloserOf(opener) is null) return false;
         var options = SqlLexOptions.For(kind);
         if (opener == '[' && !options.BracketIdentifiers) return false;
+        if (opener == '`' && kind != DbKind.MySql) return false;
 
         // Only before a space or what ends an expression: before a word, a string or an opening bracket the closer is in the way.
         if (caret < text.Length && !char.IsWhiteSpace(text[caret]) && !")]},;:.=<>+-*/|%!".Contains(text[caret])) return false;
-        if (opener is not ('\'' or '"')) return true;
+        if (opener is not ('\'' or '"' or '`')) return true;
 
         if (caret > 0)
         {

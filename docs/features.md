@@ -17,6 +17,8 @@ sign-in or database.
 | --- | --- | --- |
 | PostgreSQL | User and password | user, password |
 | PostgreSQL | Windows (SSPI / Kerberos) | optionally a role name |
+| MySQL / MariaDB | User and password | user, password |
+| MySQL / MariaDB | Windows (MariaDB GSSAPI) | optionally a user name; needs the server's gssapi plugin |
 | SQL Server | SQL Server login | user, password |
 | SQL Server | Windows | nothing |
 | SQL Server | Microsoft Entra: interactive (MFA) | optionally the account; a Microsoft sign-in window opens |
@@ -28,7 +30,7 @@ sign-in or database.
 Choosing a Microsoft Entra mode ticks **Encrypt connection**. The Entra libraries are only loaded when a SQL Server
 connection is used, the SSH library when a tunnel opens: nothing more happens at start-up.
 
-**SSH tunnel** (PostgreSQL and SQL Server): sign in to an SSH server with a password or a private key (with its passphrase);
+**SSH tunnel** (PostgreSQL, SQL Server, MySQL and MariaDB): sign in to an SSH server with a password or a private key (with its passphrase);
 the database host and port are then resolved from that server. Each open connection owns one tunnel, listening on a free
 port of `127.0.0.1`; it closes with the connection and is reopened by the next operation when it dropped (a script tab
 says it reconnected: an open transaction is lost). The server certificate is still checked against the database host name.
@@ -66,9 +68,27 @@ certificate you can check.
 
 ![TLS settings, light](ui/after/connection-dialog-tls-light.png)
 
+## MySQL and MariaDB
+
+One engine in the dialog for both; the app tells them apart by the server version. A connection is one database: the tree
+lists its tables directly (no schema level). The driver (MySqlConnector) is only loaded when such a connection is used.
+
+**TLS** uses the same fields as PostgreSQL, without **Allow** (MySQL has none). Empty **Root CA**: the authorities Windows
+trusts. A client certificate is a PEM certificate with an unencrypted key, or a `.pfx` with its passphrase. Through an SSH
+tunnel, VerifyFull checks the certificate against the connection's database host.
+
+**Scripts** understand backticks, `#` comments, `--` followed by a blank, backslash escapes, and the `DELIMITER` lines of
+the mysql client (never sent; a blank line does not end a statement under a custom delimiter). Warnings and notes appear in
+the Messages tab (not read for a script that calls `FOUND_ROWS()`). `0000-00-00` dates read as `0001-01-01`.
+
+**Read-only** connections are enforced twice. The guard refuses anything not provably a read, under every way `sql_mode`
+may read the quotes, and any executable comment (`/*! ... */`, `/*M! ... */`). The server session is set to `TRANSACTION
+READ ONLY` (so a DDL statement's implicit commit changes nothing), `sql_mode` loses the modes that change quoting
+(`ANSI_QUOTES`, `NO_BACKSLASH_ESCAPES`...), and every run is a transaction that is rolled back.
+
 ## Connection tree
 
-Folders (one level) > connection > schema > tables (SQLite has no schema level). Several
+Folders (one level) > connection > schema > tables (SQLite, MySQL and MariaDB have no schema level). Several
 connections stay connected at once, one session each. Drag a connection into a folder; add, rename, edit, delete.
 Reorder folders by dragging one above or below another (a line shows where it lands), or with **Move up** / **Move down**
 in the folder's context menu; the order is saved.
@@ -79,7 +99,7 @@ Above the tables of a schema (of the connection for SQLite) sit up to three grou
 
 - **Views** (materialized views included): a double-click opens the data, as for a table, with the columns in the
   Structure sub-tab.
-- **Procedures** and **Functions** (SQL Server and PostgreSQL; SQLite has neither): listed when a group is first expanded.
+- **Procedures** and **Functions** (SQL Server, PostgreSQL, MySQL and MariaDB; SQLite has neither): listed when a group is first expanded.
   PostgreSQL shows the argument types, which tell overloads apart.
 
 **Open definition** (context menu of a view; double-click or `Enter` on a procedure or function) shows the source text in
@@ -175,7 +195,7 @@ Connections marked **Production** ask for confirmation before any write: [enviro
 ## Script runner
 
 A SQL editor tab per connection (AvaloniaEdit, syntax highlighting). `F5` runs the whole script,
-split on `;` (respecting quotes, comments and `$$` bodies) and on `GO` lines for SQL Server. `Ctrl+Enter` with nothing
+split on `;` (respecting quotes, comments and `$$` bodies) and on `GO` lines for SQL Server (MySQL: `DELIMITER` lines too). `Ctrl+Enter` with nothing
 selected runs the statement under the cursor, which also ends at a **blank line** (outside strings, comments and `$$`
 bodies; T-SQL needs no `;`), so a SELECT followed by a blank line and an UPDATE never run together; a cursor on a blank
 line runs the statement above it. A selection runs as selected (split by `;`/`GO` only). One result grid per result
@@ -186,7 +206,7 @@ unsaved editor contents are restored at the next start: from the saved tab list,
 
 A statement that returns no result set, no row count and no error (`DECLARE`, `SET`, `USE`, DDL) gets no result tab; it
 still counts in the run summary and keeps its gutter mark. A run with nothing to show says it completed. Server messages
-(`PRINT`, PostgreSQL notices) appear in a Messages tab. T-SQL variables live in their batch, so `F5` and a selection send
+(`PRINT`, PostgreSQL notices, MySQL warnings) appear in a Messages tab. T-SQL variables live in their batch, so `F5` and a selection send
 a SQL Server batch that declares a variable as a whole (one statement, split at `GO` only; all its rows are read, so a
 result cut at the row limit does not stop what follows). `Ctrl+Enter` at the cursor still runs one statement: select the
 lines to run a `DECLARE` with its use.

@@ -49,10 +49,14 @@ public static class KeyResolver
         var paren = type.IndexOf('(');
         if (paren >= 0) type = type[..paren];
         type = type.Trim().ToLowerInvariant();
+        if (kind == DbKind.MySql) type = type.Split(' ')[0];   // "float unsigned"
         return kind switch
         {
             DbKind.SqlServer => type is not ("text" or "ntext" or "image" or "xml" or "geography" or "geometry"),
             DbKind.Postgres => type is not ("json" or "xml" or "point" or "line" or "lseg" or "box" or "path" or "polygon" or "circle"),
+            // JSON and spatial values do not compare with a bound parameter, and "=" almost never matches a FLOAT.
+            DbKind.MySql => type is not ("float" or "json" or "geometry" or "point" or "linestring" or "polygon" or "multipoint"
+                or "multilinestring" or "multipolygon" or "geometrycollection" or "geomcollection"),
             _ => true,
         };
     }

@@ -81,7 +81,7 @@ public static class SqlCompletion
         {
             // Only a quoted identifier being typed ("Ord) is completed, never a string literal or a comment.
             // An identifier never spans lines here: a stray quote further up must not make the following lines the replaced text.
-            if (tokens.Count == 0 || tokens[^1] is not { Kind: SqlTokenKind.Quoted } q || q.End <= caretInStmt || before[q.Start] != '"'
+            if (tokens.Count == 0 || tokens[^1] is not { Kind: SqlTokenKind.Quoted } q || q.End <= caretInStmt || before[q.Start] != QuoteChar(kind)
                 || before.IndexOf('\n', q.Start) >= 0)
                 return [];
             replaceStart = q.Start;
@@ -116,7 +116,7 @@ public static class SqlCompletion
         {
             all = all[..replaceStart] + " " + all[(replaceStart + 1)..];
             // So does a quote already closing it at the caret, which would otherwise open a string over the rest.
-            if (caretInStmt < all.Length && all[caretInStmt] == '"') all = all[..caretInStmt] + " " + all[(caretInStmt + 1)..];
+            if (caretInStmt < all.Length && all[caretInStmt] == QuoteChar(kind)) all = all[..caretInStmt] + " " + all[(caretInStmt + 1)..];
         }
         var stmtTokens = SqlLexer.Tokenize(all, options);
         // A dollar-quoted body is only recognised with its closing delimiter, which lies after the caret.
@@ -259,6 +259,7 @@ public static class SqlCompletion
         {
             '"' when raw[^1] == '"' => raw[1..^1].Replace("\"\"", "\""),
             '[' when raw[^1] == ']' => raw[1..^1].Replace("]]", "]"),
+            '`' when raw[^1] == '`' => raw[1..^1].Replace("``", "`"),
             _ => null,
         };
     }
@@ -415,13 +416,21 @@ public static class SqlCompletion
 
     // ---- quoting ----
 
+    // The quote that opens an identifier being typed (MySQL reads a double quote as a string).
+    private static char QuoteChar(DbKind kind) => kind == DbKind.MySql ? '`' : '"';
+
     private static bool IsIdentChar(char c) => char.IsLetterOrDigit(c) || c is '_' or '$';
 
     /// <summary>The identifier as the dialect wants it written: quoted only when it has to be (or when the user already opened a quote).</summary>
     private static string Fmt(string name, DbKind kind, bool force)
     {
         if (!force && !NeedsQuotes(name, kind)) return name;
-        return kind == DbKind.SqlServer ? "[" + name.Replace("]", "]]") + "]" : "\"" + name.Replace("\"", "\"\"") + "\"";
+        return kind switch
+        {
+            DbKind.SqlServer => "[" + name.Replace("]", "]]") + "]",
+            DbKind.MySql => "`" + name.Replace("`", "``") + "`",
+            _ => "\"" + name.Replace("\"", "\"\"") + "\"",
+        };
     }
 
     internal static bool NeedsQuotes(string name, DbKind kind)
@@ -433,6 +442,7 @@ public static class SqlCompletion
             if (!IsIdentChar(c)) return true;
             if (kind == DbKind.Postgres && char.IsUpper(c)) return true;   // PostgreSQL folds unquoted names to lower case
         }
+        if (kind == DbKind.MySql && SqlCompletionVocabulary.MySqlReserved.Contains(name)) return true;
         return SqlCompletionVocabulary.Reserved.Contains(name) && !LooseWords.Contains(name);
     }
 }

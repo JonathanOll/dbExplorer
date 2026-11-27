@@ -49,7 +49,7 @@ public class DialogViewTests : IDisposable
         var window = Show(new ConnectionDialog { DataContext = vm });
         var tiles = window.FindControl<ListBox>("EngineList")!;
 
-        Assert.Equal(3, tiles.ItemCount);
+        Assert.Equal(4, tiles.ItemCount);
         Assert.Equal(DbKind.Postgres, tiles.SelectedItem);
         Assert.True(window.FindControl<TextBox>("HostBox")!.IsEffectivelyVisible);
 

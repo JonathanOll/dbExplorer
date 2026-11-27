@@ -300,14 +300,14 @@ public partial class ConnectionTreeViewModel : ObservableObject
     public const int AutoExpandLimit = 200;
 
     /// <summary>
-    /// Fills a connected node: schema nodes for engines with schemas, tables directly for SQLite; views (and routines)
+    /// Fills a connected node: schema nodes for engines with schemas, tables directly for SQLite and MySQL; views (and routines)
     /// sit in groups of their own above the tables. Table nodes are created lazily, on first expansion of their parent; a parent with more than
     /// <see cref="AutoExpandLimit"/> tables is not expanded automatically.
     /// </summary>
     public static void ApplySchema(ConnectionNodeViewModel node, Session session)
     {
         var tables = session.Schema;
-        if (session.Driver.Kind == DbKind.Sqlite)
+        if (session.Driver.Kind is DbKind.Sqlite or DbKind.MySql)   // no schema level
         {
             node.SetLazyChildren(() => SchemaChildren(node, session, "", tables));
             node.IsExpanded = tables.Count <= AutoExpandLimit;

@@ -8,7 +8,7 @@ namespace DbExplorer.Core.Scripting;
 /// <summary>
 /// A connection that reports the server's messages as they arrive. Implemented by the test doubles; SQL Server
 /// connections are handled directly through <see cref="SqlConnection.InfoMessage"/>, PostgreSQL ones through
-/// <see cref="NpgsqlConnection.Notice"/>.
+/// <see cref="NpgsqlConnection.Notice"/>, MySQL ones through their InfoMessage event (warnings and notes).
 /// </summary>
 public interface IServerMessageSource
 {
@@ -56,8 +56,61 @@ internal sealed class ServerMessageCapture : IDisposable
                 capture._detach = () => pg.Notice -= onNotice;
                 return capture;
             default:
-                return null;
+                // By name first: a connection of another engine must not load the MySQL provider.
+                if (connection.GetType().Namespace != "MySqlConnector") return null;
+                capture.AttachMySql(connection);
+                return capture;
         }
+    }
+
+    // The server's warnings and notes (the provider asks for them with SHOW WARNINGS when a statement raised some).
+    private void AttachMySql(DbConnection connection)
+    {
+        var mysql = (MySqlConnector.MySqlConnection)connection;
+        MySqlConnector.MySqlInfoMessageEventHandler onInfo = (_, e) =>
+        {
+            foreach (var warning in e.Errors) Add(Warning(warning.Level.ToString(), (int)warning.ErrorCode, warning.Message));
+        };
+        mysql.InfoMessage += onInfo;
+        _detach = () => mysql.InfoMessage -= onInfo;
+    }
+
+    private static string Warning(string level, int code, string message) => $"{level} {code}: {message}";
+
+    // The list last read on each connection: MariaDB keeps it through a statement that reads no table.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<DbConnection, string> LastRead = [];
+
+    /// <summary>
+    /// MySQL / MariaDB: reads the warnings of the statement that just ran, unless the provider already reported some.
+    /// <paramref name="readsTable"/> false: a list identical to the last one is the old one, still there, and is dropped.
+    /// Best effort: a failure here is not the statement's.
+    /// </summary>
+    public async Task ReadMySqlWarningsAsync(DbConnection connection, DbTransaction? transaction, bool readsTable, CancellationToken ct)
+    {
+        lock (_gate)
+            if (_buffer.Count > 0) return;
+        try
+        {
+            var read = new List<string>();
+            await using (var cmd = connection.CreateCommand())
+            {
+                cmd.Transaction = transaction;
+                cmd.CommandText = "SHOW WARNINGS";
+                cmd.CommandTimeout = 10;
+                await using var reader = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+                while (await reader.ReadAsync(ct).ConfigureAwait(false))
+                    read.Add(Warning(reader.GetString(0), Convert.ToInt32(reader.GetValue(1)), reader.GetString(2)));
+            }
+            var list = string.Join('\n', read);
+            var stale = !readsTable && LastRead.TryGetValue(connection, out var last) && last == list;
+            LastRead.AddOrUpdate(connection, list);
+            lock (_gate)
+            {
+                _buffer.Clear();   // the event may report the same ones for SHOW WARNINGS itself
+                if (!stale) _buffer.AddRange(read.Select(t => new ServerMessage(DateTimeOffset.Now, t)));
+            }
+        }
+        catch (Exception) { /* cancelled, or the connection broke: the statement's own result stands */ }
     }
 
     /// <summary>

@@ -51,12 +51,62 @@ public static class PlanCapture
         }
     }
 
-    // ---- statement text (PostgreSQL, SQLite) ----
+    // ---- MySQL / MariaDB: explain inside something that is rolled back ----
+
+    /// <summary>
+    /// The optimizer may evaluate constant parts, stored functions included, while it explains. This opens a transaction
+    /// (a savepoint when the script already has one open, which must not be committed) and returns the statement that
+    /// undoes whatever they changed. A read-only context is no use: the server then refuses to explain a change.
+    /// </summary>
+    internal static async Task<string> BeginRolledBackExplainAsync(DbConnection connection, CancellationToken ct)
+    {
+        await using var cmd = connection.CreateCommand();
+        cmd.CommandTimeout = 30;
+        async Task Run(string sql)
+        {
+            cmd.CommandText = sql;
+            await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        // A savepoint only lasts inside a transaction: releasing it fails in autocommit.
+        await Run("SAVEPOINT dbx_probe").ConfigureAwait(false);
+        try { await Run("RELEASE SAVEPOINT dbx_probe").ConfigureAwait(false); }
+        catch (DbException)
+        {
+            await Run("START TRANSACTION").ConfigureAwait(false);
+            return "ROLLBACK";
+        }
+        await Run("SAVEPOINT dbx_plan").ConfigureAwait(false);
+        return "ROLLBACK TO SAVEPOINT dbx_plan";
+    }
+
+    /// <summary>Runs the statement <see cref="BeginRolledBackExplainAsync"/> returned; false when that failed.</summary>
+    internal static async Task<bool> RollBackExplainAsync(DbConnection connection, string undo)
+    {
+        if (connection.State != ConnectionState.Open) return true;
+        try
+        {
+            await using var cmd = connection.CreateCommand();
+            cmd.CommandText = undo;
+            cmd.CommandTimeout = 10;
+            await cmd.ExecuteNonQueryAsync(CancellationToken.None).ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    // ---- statement text (PostgreSQL, SQLite, MySQL / MariaDB) ----
 
     /// <summary>The text actually sent for a statement under <paramref name="mode"/>.</summary>
-    internal static string Wrap(string text, DbKind kind, PlanMode mode) => (kind, mode) switch
+    internal static string Wrap(string text, DbKind kind, PlanMode mode, bool mariaDb = false) => (kind, mode) switch
     {
         (_, PlanMode.None) => text,
+        (DbKind.MySql, PlanMode.Estimated) => "EXPLAIN FORMAT=JSON " + text,
+        // MariaDB: ANALYZE runs the statement and reports in JSON. MySQL only measures in its tree format.
+        (DbKind.MySql, PlanMode.Actual) => (mariaDb ? "ANALYZE FORMAT=JSON " : "EXPLAIN ANALYZE FORMAT=TREE ") + text,
         (DbKind.Postgres, PlanMode.Estimated) => "EXPLAIN (FORMAT JSON) " + text,
         (DbKind.Postgres, PlanMode.Actual) => "EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) " + text,
         (DbKind.Sqlite, _) => "EXPLAIN QUERY PLAN " + text,
@@ -67,13 +117,45 @@ public static class PlanCapture
         ["SELECT", "WITH", "VALUES", "TABLE", "INSERT", "UPDATE", "DELETE", "MERGE", "EXECUTE", "DECLARE", "CREATE"];
 
     /// <summary>Null when the engine can give a plan for the statement, else why not.</summary>
-    internal static string? CannotPlan(string text, DbKind kind)
+    internal static string? CannotPlan(string text, DbKind kind, PlanMode mode = PlanMode.Estimated, bool mariaDb = false)
     {
+        if (kind == DbKind.MySql) return CannotPlanMySql(text, mode, mariaDb);
         if (kind != DbKind.Postgres) return null;
         var word = FirstWord(text);
         if (PostgresExplainable.Contains(word, StringComparer.OrdinalIgnoreCase)) return null;
         var name = word.Length == 0 ? "an empty statement" : word.ToUpperInvariant();
         return $"No execution plan: PostgreSQL only explains SELECT, WITH, VALUES, INSERT, UPDATE, DELETE, MERGE, EXECUTE, DECLARE and CREATE TABLE AS ({name} is none of them).";
+    }
+
+    private static readonly string[] MySqlExplainable = ["SELECT", "WITH", "TABLE", "INSERT", "UPDATE", "DELETE", "REPLACE"];
+
+    // MySQL only measures what reads: EXPLAIN ANALYZE of a single-table change runs nothing and gives no figures.
+    private static readonly string[] MySqlMeasurable = ["SELECT", "WITH", "TABLE"];
+
+    private static readonly string[] MariaDbMeasurable = ["SELECT", "WITH", "INSERT", "UPDATE", "DELETE", "REPLACE"];
+
+    // The server accepts several statements in one command: "EXPLAIN ... SELECT 1; DELETE ..." would run the DELETE. So the
+    // text must be one statement under every way the server may read it, with no executable comment (it could add ANALYZE).
+    private static string? CannotPlanMySql(string text, PlanMode mode, bool mariaDb)
+    {
+        var allowed = mode != PlanMode.Actual ? MySqlExplainable : mariaDb ? MariaDbMeasurable : MySqlMeasurable;
+        var word = "";
+        foreach (var reading in SqlLexOptions.Readings(DbKind.MySql))
+        {
+            var tokens = SqlLexer.Tokenize(text, reading);
+            if (text.Contains('\0') || tokens.Any(t => t.Kind == SqlTokenKind.Executable))
+                return "No execution plan: the statement holds an executable comment (/*! ... */), which could change what runs.";
+            var end = tokens.FindIndex(t => t.Kind == SqlTokenKind.Semicolon);
+            if (end >= 0 && tokens.Skip(end).Any(t => t.Kind != SqlTokenKind.Semicolon))
+                return "No execution plan: the text holds more than one statement.";
+            var first = tokens.FirstOrDefault(t => !(t.Kind == SqlTokenKind.Other && text[t.Start] == '('));
+            word = first.Kind == SqlTokenKind.Word ? text[first.Start..first.End] : "";
+            if (!allowed.Contains(word, StringComparer.OrdinalIgnoreCase)) break;
+        }
+        if (allowed.Contains(word, StringComparer.OrdinalIgnoreCase)) return null;
+        var engine = mode == PlanMode.Actual ? (mariaDb ? "MariaDB only measures" : "MySQL only measures") : "MySQL and MariaDB only explain";
+        var name = word.Length == 0 ? "this one" : word.ToUpperInvariant();
+        return $"No execution plan: {engine} {string.Join(", ", allowed)} ({name} is none of them).";
     }
 
     private static string FirstWord(string sql)
@@ -122,6 +204,13 @@ public static class PlanCapture
                     var json = set?.Rows[0][0]?.ToString();
                     if (!PostgresPlanParser.LooksLikePlan(json)) return (result, null);
                     return (result with { Sets = [] }, PostgresPlanParser.Parse(json!, mode, result.Statement.Text));
+                }
+                case DbKind.MySql:
+                {
+                    var set = result.Sets.FirstOrDefault(s => s.Rows.Count > 0 && s.Rows[0].Length > 0);
+                    var raw = set?.Rows[0][0] is byte[] bytes ? System.Text.Encoding.UTF8.GetString(bytes) : set?.Rows[0][0]?.ToString();
+                    if (!MySqlPlanParser.LooksLikePlan(raw)) return (result, null);
+                    return (result with { Sets = [] }, MySqlPlanParser.Parse(raw!, mode, result.Statement.Text));
                 }
                 default:
                 {

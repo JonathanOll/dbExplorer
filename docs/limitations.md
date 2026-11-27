@@ -19,11 +19,11 @@ What dbExplorer does not do, and the edges of what it does. Linked groups and th
 - No background schema refresh: the schema and the metadata cache behind `Ctrl+Shift+P` are reloaded when a connection is
   (re)opened or on the tree's Refresh action, never while a connection just stays open.
 - SQL Server read-only mode is a statement guard plus a rolled-back transaction, not a database-enforced read-only session.
-  PostgreSQL uses a `READ ONLY` transaction. SQLite read-only is enforced by the database: the file is opened read-only
+  PostgreSQL uses a `READ ONLY` transaction, MySQL and MariaDB a read-only session and transaction. SQLite read-only is enforced by the database: the file is opened read-only
   (SQLite is not pooled, so toggling the flag applies to the next connection opened, and a script tab reconnects at its
   next run) and scripts also set `PRAGMA query_only`.
 - One connection per script tab: a transaction left open (`BEGIN TRAN` without `COMMIT`/`ROLLBACK`) keeps its locks until
-  you finish it or close the tab, which rolls it back (an explicit rollback is sent on SQL Server and PostgreSQL). Table
+  you finish it or close the tab, which rolls it back (an explicit rollback is sent on SQL Server, PostgreSQL, MySQL and MariaDB). Table
   tabs, the tree and edits use other connections: they do not see an uncommitted change, and on SQL Server (default READ
   COMMITTED) a table tab reading rows that the open transaction has locked may wait until you `COMMIT` or `ROLLBACK`. There
   is no "transaction open" indicator (it cannot be detected reliably across the three engines). After a cancelled statement
@@ -41,7 +41,20 @@ What dbExplorer does not do, and the edges of what it does. Linked groups and th
   tests](development.md#integration-tests-against-real-databases)).
 - The PostgreSQL and SQL Server code paths are only validated by unit tests with fakes unless the [integration tests](development.md#integration-tests-against-real-databases)
   are run against real servers.
-- No MySQL/Oracle, no DDL editing or export wizards.
+- No Oracle, no DDL editing or export wizards.
+- MySQL / MariaDB: one database per connection (other databases are reachable in scripts, not in the tree or completion).
+  No execution statistics (SQL Server only) and no database upgrade (its scripts are T-SQL; the dialog says so). The
+  read-only guard also refuses `get_lock`, `release_lock`, `nextval` / `setval`, `sys_exec`, Spider and server component
+  functions; the server's read-only session refuses writes of other stored functions, but not what a user-defined function
+  does outside the database. The guard is strict: a string holding `\\'` followed by a word such as `delete`, or any
+  executable comment, is refused on a read-only connection and confirmed on production.
+- MySQL / MariaDB: an estimated plan on a writable connection releases `LOCK TABLES` locks; non-transactional tables
+  written by a function the optimizer evaluates are not rolled back. Edits of non-transactional tables (MyISAM) cannot be
+  rolled back when a save fails. `DECIMAL` values beyond .NET's `decimal` range cannot be shown (cast them to text).
+  Triggers and events are not listed. The formatter leaves scripts with `DELIMITER` lines or executable comments as they
+  are. An encrypted PEM client key is not supported (use `.pfx`).
+- MySQL / MariaDB were checked against MySQL 8.4 and MariaDB 11.4 containers (integration tests, TLS modes with a direct
+  connection). Client certificates, Windows (GSSAPI) sign-in and SSH tunnels have not been tried against real servers.
 - Sign-in: Windows and Microsoft Entra modes and SSH tunnels have not been tried against real servers. Not offered: Entra
   device code and workload identity, a custom Entra application ID, client certificates (SQL Server), access tokens.
 - PostgreSQL TLS: tested against a stand-in server only. The default mode (Prefer) does not verify the server certificate.

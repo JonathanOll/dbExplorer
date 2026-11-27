@@ -11,11 +11,11 @@ The script toolbar has a **Plan** button (`Ctrl+L`) and an **Actual plan** switc
 
 - **Estimated plan** (`Ctrl+L`): the plan the optimizer would use for the selection or the statement at the caret. Nothing is run,
   so it is allowed on a read-only connection, even for a write statement. SQL Server: `SET SHOWPLAN_XML`. PostgreSQL:
-  `EXPLAIN (FORMAT JSON)`. SQLite: `EXPLAIN QUERY PLAN` (no cost or row counts: a tree of scans and searches).
+  `EXPLAIN (FORMAT JSON)`. SQLite: `EXPLAIN QUERY PLAN` (no cost or row counts: a tree of scans and searches). MySQL and\n  MariaDB: `EXPLAIN FORMAT=JSON` of one `SELECT`, `WITH`, `TABLE`, `INSERT`, `UPDATE`, `DELETE` or `REPLACE` (a text with an\n  executable comment or a second statement is refused). On a writable connection it runs inside a transaction (a savepoint\n  inside yours) that is rolled back, in case the optimizer evaluates a function; a read-only connection cannot explain a\n  change (the server refuses).
 - **Actual plan** (switch on, then run as usual): the statements run, the rows stay in their tabs, and an **Execution plan**
   tab is added with the real row counts and times. SQL Server: `SET STATISTICS XML` (the rows past the row limit are read
   and dropped so that the plan, which the server sends last, is received). PostgreSQL: `EXPLAIN (ANALYZE, BUFFERS)`, which
-  runs the statement but does not return its rows. SQLite has no actual plan.
+  runs the statement but does not return its rows. MariaDB: `ANALYZE FORMAT=JSON`, which runs the\n  statement, changes included. MySQL (8.0.18 or later): `EXPLAIN ANALYZE FORMAT=TREE`, for reading statements only. Neither\n  returns the rows. SQLite has no actual plan.
 
 The plan tab, one chip per statement when a run has several (with its share of the batch):
 

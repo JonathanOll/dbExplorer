@@ -172,6 +172,7 @@ public sealed partial class ConnectionNodeViewModel(ConnectionConfig config) : T
         DbKind.Postgres => "PostgreSQL",
         DbKind.SqlServer => "SQL Server",
         DbKind.Sqlite => "SQLite",
+        DbKind.MySql => "MySQL / MariaDB",
         _ => kind.ToString(),
     };
 

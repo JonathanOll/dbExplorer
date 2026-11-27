@@ -15,6 +15,13 @@ public partial class ConnectionDialogViewModel
         new(AuthMode.Integrated, "Windows (SSPI / Kerberos)", "Signs in with your Windows account. The server must offer SSPI or GSS."),
     ];
 
+    private static readonly AuthOption[] MySqlAuth =
+    [
+        new(AuthMode.Password, "User and password", ""),
+        new(AuthMode.Integrated, "Windows (MariaDB GSSAPI)",
+            "Signs in with your Windows account. Only a MariaDB server with the gssapi plugin offers it."),
+    ];
+
     private static readonly AuthOption[] SqlServerAuth =
     [
         new(AuthMode.Password, "SQL Server login", ""),
@@ -38,7 +45,12 @@ public partial class ConnectionDialogViewModel
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasGeneralError))] private string? _userError;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(HasGeneralError))] private string? _authError;
 
-    public IReadOnlyList<AuthOption> AuthOptions => Kind == DbKind.SqlServer ? SqlServerAuth : PostgresAuth;
+    public IReadOnlyList<AuthOption> AuthOptions => Kind switch
+    {
+        DbKind.SqlServer => SqlServerAuth,
+        DbKind.MySql => MySqlAuth,
+        _ => PostgresAuth,
+    };
 
     /// <summary>Bridge between the drop-down and <see cref="Auth"/>; the null a list swap selects is ignored.</summary>
     public AuthOption? SelectedAuthOption

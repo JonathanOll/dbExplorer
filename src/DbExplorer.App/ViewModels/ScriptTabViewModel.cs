@@ -389,8 +389,8 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
     // ---- execution plans ----
 
     /// <summary>
-    /// "Actual plan" toggle: every run also returns the plan the statements ran with (SQL Server: STATISTICS XML, PostgreSQL:
-    /// EXPLAIN ANALYZE, whose rows are not returned). Not for SQLite, which has only the estimated plan. Per tab, not remembered.
+    /// "Actual plan" toggle: every run also returns the plan the statements ran with (SQL Server: STATISTICS XML, PostgreSQL and
+    /// MySQL: EXPLAIN ANALYZE, MariaDB: ANALYZE, whose rows are not returned). Not for SQLite, which has only the estimated plan. Per tab, not remembered.
     /// </summary>
     [NotifyPropertyChangedFor(nameof(ActualPlanTip))]
     [ObservableProperty] private bool _actualPlanEnabled;
@@ -401,6 +401,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
     public string ActualPlanTip => Connection.Kind switch
     {
         DbKind.Postgres => "Run the statements and show the plan they ran with, with real rows and times (EXPLAIN ANALYZE: the rows themselves are not returned)",
+        DbKind.MySql => "Run the statements and show the plan they ran with, with real rows and times (MariaDB: ANALYZE; MySQL: EXPLAIN ANALYZE, SELECT only). The rows themselves are not returned",
         _ => "Run the statements and show the plan they ran with, with real row counts and times, next to the results",
     };
 

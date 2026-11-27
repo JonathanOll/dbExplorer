@@ -53,7 +53,8 @@ Group runs (one statement on every database) are not recorded.
   second character wraps it again. One `Ctrl+Z` undoes it. A rectangular selection is replaced as usual.
 - **Auto-close**: the same characters, typed without a selection, also add the closing one, with the caret between the two.
   Not before a word, a string or an opening bracket; for quotes, not after a word (except the `N'...'`, `E'...'` and `X'...'`
-  prefixes), inside a string, a comment or a quoted identifier. `[` is not closed on PostgreSQL.
+  prefixes), inside a string, a comment or a quoted identifier. `[` is not closed on PostgreSQL. On
+  MySQL and MariaDB the backtick is paired too.
 - Typing the closing character over one the editor added steps over it; `Backspace` in a still empty pair added by the
   editor removes both. Characters you typed yourself are never skipped or removed.
 - **Tools > Settings > Editor > Close brackets and quotes** switches the auto-close off. Surrounding a selection stays.
