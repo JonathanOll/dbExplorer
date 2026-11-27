@@ -18,6 +18,7 @@ public partial class MainViewModel
         registry.Add(ScriptCommands);
         registry.Add(TableCommands);
         registry.Add(GridCommands);
+        registry.Add(CompareCommands);
         registry.Add(PlanCommands);
         registry.Add(DiagramCommands);
         registry.Add(NavigateCommands);
@@ -127,7 +128,7 @@ public partial class MainViewModel
     private IEnumerable<AppCommand> GridCommands()
     {
         const string category = "Grid";
-        var grid = ActiveTab is TableTabViewModel or ScriptTabViewModel ? FindActiveGrid?.Invoke() : null;
+        var grid = ActiveTab is TableTabViewModel or ScriptTabViewModel or CompareTabViewModel ? FindActiveGrid?.Invoke() : null;
         var none = grid is not null ? null
             : FindActiveGrid is null ? "Not available here" : "Show a table or a query result first";
         var noDialogs = none ?? (grid!.HasExportDialogs ? null : "Not available for this grid");

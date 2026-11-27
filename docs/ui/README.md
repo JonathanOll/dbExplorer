@@ -178,6 +178,12 @@ current-cell frame: 2 px accent, inside the cell).
   `Ctrl+click` on a header or `Ctrl+Space` whole columns (cells lit like selected rows). The cell menu starts with Copy, Copy with
   headers, Advanced copy, "Copy as", Export and Select column. `ExportDialog` and `AdvancedCopyDialog` have the options on the
   left and a monospace preview on the right. Scenes: `grid-selection`, `export-dialog`, `export-dialog-sql`, `advanced-copy`.
+- **Result comparison** (`CompareView`, [docs/compare.md](../compare.md)): a document tab. Toolbar (wraps): previous / next
+  difference (`Shift+F8` / `F8`) with "2 of 6", "Only differences", the Key / Position segments, a Columns flyout, the text
+  options and "Swap A and B". Under it the two sides, count badges, the matching rule, then warning banners (loaded rows only,
+  duplicate keys) and an info banner (columns of one side). The grid marks rows through `IMarkedRow`: the first column says
+  what happened in words, changed cells are bold and read "old → new", removed rows are struck through. Scenes: `compare`,
+  `compare-differences`.
 - **Script tab**: one-row toolbar: Run (accent) and Run all, "Run on group" menu, row-limit dropdown with presets, Statistics
   toggle, icon-only Open and Save, progress + elapsed time + Stop only while running, connection badge (+ read-only badge) and a
   shortcuts flyout. Editor with find (`Ctrl+F`), `Ctrl+/` comments, gutter marks per statement that ran. Results: a run summary

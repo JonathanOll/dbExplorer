@@ -25,6 +25,18 @@ public interface IGridCommands
     Task AdvancedCopyAsync();
 
     Task ExportAsync();
+
+    // The compare members have a default so that a minimal implementation (a test fake) keeps compiling.
+
+    /// <summary>Why the rows of this grid cannot be picked for comparison, or null.</summary>
+    string? SelectForCompareDisabledReason => "Not available for this grid";
+
+    /// <summary>Why this grid cannot be compared with the picked result, or null.</summary>
+    string? CompareWithSelectedDisabledReason => "Not available for this grid";
+
+    Task SelectForCompareAsync() => Task.CompletedTask;
+
+    Task CompareWithSelectedAsync() => Task.CompletedTask;
 }
 
 /// <summary>What the cell menu and the command palette both offer.</summary>

@@ -1126,8 +1126,9 @@ public partial class ResultGrid : UserControl
         var editSeparator = new Separator();
 
         var (copyItems, copyOpening) = BuildCopyMenu();
+        var (compareItems, compareOpening) = BuildCompareMenu();
         var menu = new ContextMenu();
-        foreach (var item in new List<Control>(copyItems)
+        foreach (var item in new List<Control>([.. copyItems, .. compareItems])
                  {
                      new Separator(), viewItem, filterSeparator, filterItem, excludeItem, followItem,
                      editSeparator, editItem, nullItem, deleteItem, restoreItem, addItem,
@@ -1140,6 +1141,7 @@ public partial class ResultGrid : UserControl
             var table = Features is not null;
             var hasValue = GridCellColumn.ValuesOf(_contextCell.Row) is { } vs && _contextCell.Index < vs.Length && vs[_contextCell.Index] is not null;
             copyOpening();
+            compareOpening();
             viewItem.IsEnabled = hasValue;
             filterSeparator.IsVisible = table;
             filterItem.IsVisible = table;

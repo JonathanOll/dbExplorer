@@ -26,6 +26,7 @@ public partial class MainViewModel : ObservableObject
         Tree.TablePickerOpener = ShowTablePicker;
         Tree.DiagramOpener = (connection, request) => OpenDiagram(connection, request);
         Tabs.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmptyState));
+        WatchForCompare();
         // The tree rebuilds (Reset first) whenever groups or connections change: open tabs repaint their database selector.
         Tree.Nodes.CollectionChanged += (_, e) =>
         {
@@ -861,6 +862,7 @@ public partial class MainViewModel : ObservableObject
             RememberClosed(tab);
             (tab as ScriptTabViewModel)?.Close();
             (tab as DiagramTabViewModel)?.Close();
+            (tab as CompareTabViewModel)?.Close();
             Tabs.RemoveAt(index);
             if (ReferenceEquals(ActiveTab, tab) || ActiveTab is null)
                 ActiveTab = Tabs.Count == 0 ? null : Tabs[Math.Min(index, Tabs.Count - 1)];

@@ -326,6 +326,8 @@ internal static partial class Scenes
         ("table-structure", TableStructure),
         ("table-structure-wide", TableStructureWide),
         ("grid-selection", GridSelectionScene),
+        ("compare", d => CompareScene(d, onlyDifferences: false)),
+        ("compare-differences", d => CompareScene(d, onlyDifferences: true)),
         ("export-dialog", d => ExportDialogScene(d, DbExplorer.Core.Export.ExportKind.Csv)),
         ("export-dialog-sql", d => ExportDialogScene(d, DbExplorer.Core.Export.ExportKind.SqlInsert)),
         ("advanced-copy", AdvancedCopyScene),

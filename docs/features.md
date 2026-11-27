@@ -2,7 +2,8 @@
 
 What dbExplorer does day to day: browsing, filtering and editing data, jumping around, running SQL, and coming back
 where you left off. The big topics have their own page: [linked database groups](groups.md), [scripts](scripts.md),
-[execution plans and statistics](plans.md), [database upgrade](database-upgrade.md), [DBeaver import](dbeaver-import.md).
+[execution plans and statistics](plans.md), [database upgrade](database-upgrade.md), [DBeaver import](dbeaver-import.md),
+[compare results](compare.md).
 
 ![Table tab, light](ui/after/main-table-light.png)
 
@@ -48,6 +49,9 @@ Table tabs are labelled `connection · table` with a colour chip per connection,
 
 **Copy and export**: table and script grids copy the selected rows, cells or columns (also as CSV, JSON, Markdown or SQL)
 and export them, or every row of the query, to a file. [Copy and export](export.md)
+
+**Compare results**: right-click a table or query result, **Select for compare**, then **Compare with selected** on
+another one, across tabs and connections. [Compare results](compare.md)
 
 ## Command palette
 

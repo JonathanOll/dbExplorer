@@ -1,0 +1,135 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DbExplorer.App.ViewModels"
+             xmlns:views="using:DbExplorer.App.Views"
+             x:Class="DbExplorer.App.Views.CompareView"
+             x:DataType="vm:CompareTabViewModel">
+  <DockPanel Background="{DynamicResource DbxContentBg}">
+    <!-- Toolbar: navigate | matching | columns and text options | swap. Wraps in a narrow window. -->
+    <Border DockPanel.Dock="Top" Classes="toolbar">
+      <WrapPanel Orientation="Horizontal">
+        <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,10,0">
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconSortUp}" Command="{Binding PreviousDifferenceCommand}"
+                  ToolTip.Tip="{Binding NavigateTip}" ToolTip.ShowOnDisabled="True" AutomationProperties.Name="Previous difference" />
+          <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconSortDown}" Command="{Binding NextDifferenceCommand}"
+                  ToolTip.Tip="{Binding NavigateTip}" ToolTip.ShowOnDisabled="True" AutomationProperties.Name="Next difference" />
+          <TextBlock Classes="dim num" Text="{Binding PositionText}" MinWidth="90" VerticalAlignment="Center" />
+          <ToggleButton Classes="segment" Content="Only differences" IsChecked="{Binding OnlyDifferences}"
+                        ToolTip.Tip="Hide the rows that are the same on both sides" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,10,0">
+          <Border Classes="vsep" />
+          <TextBlock Classes="dim" Text="Match by" VerticalAlignment="Center" />
+          <ToggleButton x:Name="ByKeyButton" Classes="segment" Content="Key" IsChecked="{Binding IsByKey, Mode=OneWay}" Click="OnByKeyClick"
+                        ToolTip.Tip="Pair the rows that have the same values in the key columns (chosen under Columns)" />
+          <ToggleButton x:Name="ByPositionButton" Classes="segment" Content="Position" IsChecked="{Binding IsByPosition, Mode=OneWay}"
+                        Click="OnByPositionClick" ToolTip.Tip="Pair the first row with the first row, the second with the second…" />
+          <Button Content="Columns" ToolTip.Tip="Choose the key columns and the columns to compare">
+            <Button.Flyout>
+              <Flyout Placement="BottomEdgeAlignedLeft">
+                <DockPanel Width="280">
+                  <Grid DockPanel.Dock="Top" ColumnDefinitions="*,56,64" Margin="0,0,0,4">
+                    <TextBlock Classes="section" Text="Column" />
+                    <TextBlock Grid.Column="1" Classes="section" Text="Key" />
+                    <TextBlock Grid.Column="2" Classes="section" Text="Compare" />
+                  </Grid>
+                  <ScrollViewer MaxHeight="360">
+                    <ItemsControl ItemsSource="{Binding Choices}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CompareColumnChoice">
+                          <Grid ColumnDefinitions="*,56,64">
+                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                            <CheckBox Grid.Column="1" MinWidth="0" IsChecked="{Binding IsKey}" AutomationProperties.Name="{Binding KeyName}" />
+                            <CheckBox Grid.Column="2" MinWidth="0" IsChecked="{Binding IsCompared}" AutomationProperties.Name="{Binding ComparedName}" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
+              </Flyout>
+            </Button.Flyout>
+          </Button>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Border Classes="vsep" />
+          <ToggleButton Classes="segment" Content="Ignore case" IsChecked="{Binding IgnoreCase}" ToolTip.Tip="Text that differs only in case is the same" />
+          <ToggleButton Classes="segment" Content="Ignore spaces" IsChecked="{Binding IgnoreSpaces}"
+                        ToolTip.Tip="Leading, trailing and repeated white space in text does not count" />
+          <Border Classes="vsep" />
+          <Button Classes="ghost" Content="Swap A and B" Command="{Binding SwapCommand}" ToolTip.Tip="Compare the other way round" />
+        </StackPanel>
+      </WrapPanel>
+    </Border>
+
+    <!-- The two sides, how the rows are matched, the counts -->
+    <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1" Padding="12,8,12,6">
+      <StackPanel Spacing="4">
+        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+          <Border Classes="badge" Margin="0,0,8,2"><TextBlock Text="A" FontSize="11.5" FontWeight="SemiBold" /></Border>
+          <TextBlock Grid.Column="1" Text="{Binding LeftText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding LeftText}" />
+          <Border Grid.Row="1" Classes="badge" Margin="0,0,8,0"><TextBlock Text="B" FontSize="11.5" FontWeight="SemiBold" /></Border>
+          <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding RightText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                     ToolTip.Tip="{Binding RightText}" />
+        </Grid>
+        <WrapPanel Orientation="Horizontal" IsVisible="{Binding HasResult}">
+          <Border Classes="badge success" Margin="0,2,6,2" IsVisible="{Binding IsIdentical}">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+              <PathIcon Data="{StaticResource IconCheck}" Width="11" Height="11" />
+              <TextBlock Text="Identical" FontSize="11.5" />
+            </StackPanel>
+          </Border>
+          <Border Classes="badge warn" Margin="0,2,6,2" IsVisible="{Binding HasDifferences}"><TextBlock Text="{Binding ChangedText}" FontSize="11.5" /></Border>
+          <Border Classes="badge success" Margin="0,2,6,2" IsVisible="{Binding HasDifferences}"><TextBlock Text="{Binding AddedText}" FontSize="11.5" /></Border>
+          <Border Classes="badge error" Margin="0,2,6,2" IsVisible="{Binding HasDifferences}"><TextBlock Text="{Binding RemovedText}" FontSize="11.5" /></Border>
+          <Border Classes="badge" Margin="0,2,12,2"><TextBlock Text="{Binding SameText}" FontSize="11.5" /></Border>
+          <TextBlock Classes="dim small" Text="{Binding MatchText}" VerticalAlignment="Center" Margin="0,0,6,0" />
+          <TextBlock Classes="dim small" Text="{Binding KeyNote}" VerticalAlignment="Center" />
+        </WrapPanel>
+      </StackPanel>
+    </Border>
+
+    <Border DockPanel.Dock="Top" Classes="banner warn" IsVisible="{Binding HasPartial}">
+      <Grid ColumnDefinitions="Auto,*">
+        <PathIcon Classes="bi" Data="{StaticResource IconWarning}" Margin="0,1,10,0" VerticalAlignment="Top" />
+        <TextBlock Grid.Column="1" Text="{Binding PartialText}" TextWrapping="Wrap" />
+      </Grid>
+    </Border>
+    <Border DockPanel.Dock="Top" Classes="banner warn" IsVisible="{Binding HasDuplicates}">
+      <Grid ColumnDefinitions="Auto,*">
+        <PathIcon Classes="bi" Data="{StaticResource IconWarning}" Margin="0,1,10,0" VerticalAlignment="Top" />
+        <TextBlock Grid.Column="1" Text="{Binding DuplicateText}" TextWrapping="Wrap" />
+      </Grid>
+    </Border>
+    <Border DockPanel.Dock="Top" Classes="banner info" IsVisible="{Binding HasColumnsText}">
+      <Grid ColumnDefinitions="Auto,*">
+        <PathIcon Classes="bi" Data="{StaticResource IconInfo}" Margin="0,1,10,0" VerticalAlignment="Top" />
+        <TextBlock Grid.Column="1" Text="{Binding ColumnsText}" TextWrapping="Wrap" />
+      </Grid>
+    </Border>
+    <Border DockPanel.Dock="Bottom" Classes="toolbar strip" BorderThickness="0,1,0,0" IsVisible="{Binding HasTypesText}">
+      <TextBlock Classes="dim small" Text="{Binding TypesText}" ToolTip.Tip="{Binding TypesText}" VerticalAlignment="Center"
+                 TextTrimming="CharacterEllipsis" />
+    </Border>
+
+    <Grid>
+      <views:ResultGrid x:Name="DiffGrid" Columns="{Binding GridColumns}" ItemsSource="{Binding Rows}" IsVisible="{Binding ShowGrid}" />
+      <StackPanel Classes="empty" IsVisible="{Binding ShowEmpty}">
+        <PathIcon Data="{StaticResource IconCheck}" />
+        <TextBlock Classes="h2" Text="{Binding EmptyText}" />
+      </StackPanel>
+      <StackPanel Classes="empty" IsVisible="{Binding HasProblem}">
+        <PathIcon Data="{StaticResource IconInfo}" />
+        <TextBlock Classes="dim" Text="{Binding Problem}" TextWrapping="Wrap" TextAlignment="Center" />
+        <Button Classes="accent" Content="Compare again" Command="{Binding RecompareCommand}" HorizontalAlignment="Center" />
+      </StackPanel>
+      <Border Classes="card" IsVisible="{Binding IsBusy}" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <PathIcon Classes="spin" Data="{StaticResource IconRefresh}" Width="14" Height="14" IsVisible="{Binding IsBusy}" />
+          <TextBlock Text="Comparing…" VerticalAlignment="Center" />
+          <Button Content="Cancel" Command="{Binding CancelCommand}" />
+        </StackPanel>
+      </Border>
+    </Grid>
+  </DockPanel>
+</UserControl>

@@ -13,6 +13,7 @@ public sealed partial class MainViewModel
         {
             if (tab is TableTabViewModel table) table.ExportServices = services;
             else if (tab is ScriptTabViewModel script) script.ExportServices = services;
+            else if (tab is CompareTabViewModel compare) compare.ExportServices = services;
         }
 
         foreach (var tab in Tabs) Give(tab);

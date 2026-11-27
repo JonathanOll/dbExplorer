@@ -71,8 +71,9 @@ public partial class MainViewModel
     private string[] ContextCategories() => ActiveTab switch
     {
         ScriptTabViewModel { SelectedResultTab: PlanResultTab } => ["Plan", "Script"],
-        ScriptTabViewModel => ["Script", "Grid", "Plan"],
-        TableTabViewModel => ["Table", "Grid"],
+        ScriptTabViewModel => ["Script", "Grid", "Plan", "Compare"],
+        TableTabViewModel => ["Table", "Grid", "Compare"],
+        CompareTabViewModel => ["Compare", "Grid"],
         DiagramTabViewModel => ["Diagram"],
         _ => [],
     };

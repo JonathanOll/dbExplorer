@@ -113,7 +113,29 @@ public sealed class GridCell : TextBlock
         };
         TextDecorations = row is { IsDeleted: true } ? Avalonia.Media.TextDecorations.Strikethrough : null;
         ToolTip.SetTip(this, BuildTip(formatted, row, dirty, untouched));
+        if (Row is IMarkedRow marked) ShowMark(marked);
         ApplyPicked();
+    }
+
+    // A comparison row: changed cells are bold and read "left → right", rows of one side are said in the first column
+    // (a removed one is struck through too), so the colour is never the only sign.
+    private void ShowMark(IMarkedRow row)
+    {
+        var mark = row.MarkOf(Index);
+        if (mark == CellMark.Changed)
+        {
+            FontWeight = FontWeight.SemiBold;
+            TextAlignment = TextAlignment.Left;
+        }
+        Background = mark switch
+        {
+            CellMark.Changed => CellBrushes.Edited,
+            CellMark.Added => CellBrushes.NewRow,
+            CellMark.Removed => CellBrushes.Deleted,
+            _ => Brushes.Transparent,
+        };
+        if (mark == CellMark.Removed) TextDecorations = Avalonia.Media.TextDecorations.Strikethrough;
+        if (row.TipOf(Index) is { } tip) ToolTip.SetTip(this, tip);
     }
 
     private object? BuildTip(FormattedCell formatted, RowViewModel? row, bool dirty, bool untouched)
@@ -189,6 +211,7 @@ public sealed class GridCellColumn(int index, ResultColumn column, bool isLink) 
     {
         RowViewModel row => row.Values,
         object?[] values => values,
+        IMarkedRow marked => marked.Values,
         _ => null,
     };
 

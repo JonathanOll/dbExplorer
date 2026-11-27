@@ -29,6 +29,7 @@ Every shortcut of the app. The same list is in the app (`F1`, and Settings > Sho
 | `Ctrl++` / `Ctrl+-` / `Ctrl+0` | ER diagram | Zoom in / zoom out / fit the whole diagram |
 | `Ctrl+F` | ER diagram | Find a table (`Enter` next match, `Shift+Enter` previous, `Esc` clears) |
 | `Enter` / double-click | ER diagram | Open the data of the selected table |
+| `F8` / `Shift+F8` | result comparison | Next / previous difference (see [Compare results](compare.md)) |
 | `Ctrl+N` | anywhere | New script tab on the active (or selected) connection |
 | `Ctrl+O` | anywhere | Open a script file in a script tab |
 | `Enter` | navigator, a table or view / a procedure or function | Open its data / its definition |

@@ -86,6 +86,10 @@ public static class ShortcutCatalog
             new("Ctrl+Alt+C", "Advanced copy: delimiter, quotes, NULL, dates"),
             new("Ctrl+E", "Export to a file"),
         ]),
+        new("Result comparison", [
+            new("F8", "Next difference"),
+            new("Shift+F8", "Previous difference"),
+        ]),
         new("Linked databases", [
             new("Ctrl+Alt+PageDown", "Next database of the group"),
             new("Ctrl+Alt+PageUp", "Previous database of the group"),
