@@ -169,7 +169,10 @@
                   HorizontalAlignment="Left" IsVisible="{Binding ShowTargets}" AutomationProperties.Name="Run on">
           <ComboBox.ItemTemplate>
             <DataTemplate x:DataType="up:UpgradeTarget">
-              <TextBlock Text="{Binding Label}" />
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+                <views:EnvironmentBadge Environment="{Binding Members, Converter={x:Static views:Icons.HighestEnvironment}}" />
+              </StackPanel>
             </DataTemplate>
           </ComboBox.ItemTemplate>
         </ComboBox>
@@ -178,6 +181,7 @@
           <StackPanel Orientation="Horizontal" Spacing="8">
             <PathIcon Classes="dim" Data="{StaticResource IconDatabase}" Width="13" Height="13" />
             <TextBlock Text="{Binding SelectedTarget.Label, FallbackValue='(no database)'}" FontSize="12.5" />
+            <views:EnvironmentBadge Environment="{Binding SelectedTarget.Members, Converter={x:Static views:Icons.HighestEnvironment}}" />
           </StackPanel>
         </Border>
       </Grid>
@@ -388,6 +392,13 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
+              </Grid>
+            </Border>
+            <Border Classes="banner error" CornerRadius="6" BorderThickness="1" Padding="12,10"
+                    IsVisible="{Binding ProductionTargetsText, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <Grid ColumnDefinitions="Auto,*">
+                <PathIcon Classes="bi" Data="{StaticResource IconWarning}" VerticalAlignment="Top" Margin="0,2,8,0" />
+                <TextBlock Grid.Column="1" Text="{Binding ProductionTargetsText}" TextWrapping="Wrap" />
               </Grid>
             </Border>
             <Border Classes="banner warn" CornerRadius="6" BorderThickness="1" Padding="12,10" IsVisible="{Binding !!ProductionSelectedCount}">

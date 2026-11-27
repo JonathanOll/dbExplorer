@@ -15,4 +15,4 @@ Connections that DBeaver marks `read-only`, or whose connection type is `prod` /
 "prod" in its name or one that forbids data edits), are imported **read-only**, on purpose: an imported production database
 never silently becomes editable. The status bar names them after the import; untick **Read-only** in the connection's
 context menu to edit one. Virtual keys that use "all columns" skip the columns SQL Server / PostgreSQL cannot compare
-with `=` (text, ntext, image, xml, json...).
+with `=` (text, ntext, image, xml, json...). The connection type also sets the [environment](environments.md).

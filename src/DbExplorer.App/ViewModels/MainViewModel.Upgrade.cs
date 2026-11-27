@@ -102,7 +102,7 @@ public partial class MainViewModel
                 catalog = await Task.Run(() => DbUpdateCatalog.Scan(path!));
 
             var targets = UpgradeRules.TargetsFor(Tree.Config, current);
-            var vm = new UpgradeViewModel(catalog, targets, ResolveScriptSessionAsync, CopyToClipboard);
+            var vm = new UpgradeViewModel(catalog, targets, ResolveScriptSessionAsync, CopyToClipboard, guard: Guard);
             await dialogs.ShowUpgradeAsync(vm);
         }
         catch (Exception ex)

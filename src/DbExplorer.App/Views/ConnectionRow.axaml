@@ -23,6 +23,7 @@
     <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="8,0,2,0" HorizontalAlignment="Right">
       <PathIcon Classes="spin" Data="{StaticResource IconRefresh}" Width="13" Height="13" Foreground="{DynamicResource DbxAccent}"
                 IsVisible="{Binding IsConnecting}" />
+      <views:EnvironmentBadge Environment="{Binding ConnectionEnvironment}" />
       <PathIcon Data="{StaticResource IconLock}" Width="12" Height="12" Foreground="{DynamicResource DbxWarn}" IsVisible="{Binding IsReadOnly}" />
       <PathIcon Data="{StaticResource IconError}" Width="13" Height="13" Foreground="{DynamicResource DbxError}" IsVisible="{Binding HasError}" />
     </StackPanel>

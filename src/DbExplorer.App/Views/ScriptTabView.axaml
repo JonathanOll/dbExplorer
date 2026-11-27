@@ -146,6 +146,13 @@
   </UserControl.Resources>
 
   <DockPanel>
+    <!-- Production: said in words on every tab of such a connection -->
+    <Border DockPanel.Dock="Top" Classes="banner error" IsVisible="{Binding ProductionNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <Grid ColumnDefinitions="Auto,*">
+        <PathIcon Classes="bi" Data="{StaticResource IconWarning}" Margin="0,0,8,0" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding ProductionNotice}" TextWrapping="Wrap" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
     <!-- Toolbar: run | group | limit and statistics | files on the left; what is running, Stop, the connection on the right -->
     <Border DockPanel.Dock="Top" Classes="toolbar">
       <Grid ColumnDefinitions="Auto,*,Auto">
@@ -291,6 +298,8 @@
           </StackPanel>
 
           <views:GroupSwitcher />
+
+          <views:EnvironmentBadge Environment="{Binding ConnectionEnvironment}" />
 
           <!-- The connection this script runs on; the selector above replaces it when the connection is in a group -->
           <Border Classes="badge" ToolTip.Tip="{Binding ConnectionDescription}" IsVisible="{Binding !HasGroupSwitch}">

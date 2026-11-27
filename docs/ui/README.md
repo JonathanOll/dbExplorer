@@ -157,6 +157,9 @@ current-cell frame: 2 px accent, inside the cell).
   connections yet") and "No match" state. Context menus are state-aware (Connect / Retry / Disconnect) with icons and gestures;
   `Delete` is `MenuItem.danger`. Drag a connection onto a folder or a group (the target is highlighted). Drag a folder before or
   after another folder (a 2 px accent insertion line; no nesting); the folder menu also has "Move up" / "Move down".
+- **Environment** ([docs/environments.md](../environments.md)): always `views:EnvironmentBadge` (a word on a status-tinted pill:
+  success, info, warn, error for DEV, TEST, PRE-PROD, PROD), wherever a connection is named. Script and table tabs of a
+  production connection add a `banner error` line. The write confirmation (`ProductionDialog`) focuses Cancel. Scenes: `environment-*`.
 - **Document tabs**: `DbxDocTabControl` / `DbxDocTabItem` (main window: `MainDocTabControl`, with a "+" new script button and a tab
   context menu: close, close others, close to the right, close all, reopen). Chrome strip with a hairline; tabs have rounded top
   corners; the active tab takes the content colour and a short accent bar on top. Header = colour chip, type icon

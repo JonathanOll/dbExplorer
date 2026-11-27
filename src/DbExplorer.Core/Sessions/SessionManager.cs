@@ -199,11 +199,11 @@ public class SessionManager(
         }, ct);
 
     /// <summary>
-    /// True when both configs reach the same database (everything but the cosmetic name, folder and read-only flag matches,
+    /// True when both configs reach the same database (everything but the name, folder, read-only flag and environment matches,
     /// the password included): a session of one can serve the other.
     /// </summary>
     public static bool SameTarget(ConnectionConfig a, ConnectionConfig b) =>
-        a with { Name = b.Name, Folder = b.Folder, ReadOnly = b.ReadOnly } == b;
+        a with { Name = b.Name, Folder = b.Folder, ReadOnly = b.ReadOnly, Environment = b.Environment } == b;
 
     /// <summary>
     /// As <see cref="SameTarget"/> but the password is not compared: the same server, database and login, whatever credential

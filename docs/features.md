@@ -125,6 +125,8 @@ Edits are staged in the grid (highlighted), `Ctrl+S` shows the generated SQL, th
 transaction. Insert and delete rows. Tables without a primary key are read-only until you define "virtual key"
 columns for them (persisted, like DBeaver's virtual PK). Edit is disabled on connections flagged read-only.
 
+Connections marked **Production** ask for confirmation before any write: [environments](environments.md).
+
 ## Script runner
 
 A SQL editor tab per connection (AvaloniaEdit, syntax highlighting). `F5` runs the whole script,

@@ -20,4 +20,11 @@ public record ConnectionConfig(
 
     /// <summary>The SSH tunnel the connection goes through; null connects directly.</summary>
     public SshTunnelConfig? Ssh { get; init; }
+
+    /// <summary>What the connection is used for. Init property (not positional) so old configs load as <see cref="DbEnvironment.None"/>.</summary>
+    public DbEnvironment Environment { get; init; }
+
+    /// <summary>The one test for "this is production": writes there are confirmed first.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsProduction => Environment == DbEnvironment.Production;
 }

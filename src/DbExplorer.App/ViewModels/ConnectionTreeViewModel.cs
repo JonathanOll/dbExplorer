@@ -413,9 +413,9 @@ public partial class ConnectionTreeViewModel : ObservableObject
 
         Config.Connections[index] = updated;
 
-        // Name, folder and read-only flag do not affect the connection itself; anything else invalidates a live
+        // Name, folder, read-only flag and environment do not affect the connection itself; anything else invalidates a live
         // session and a connect still in flight.
-        if (old with { Name = updated.Name, Folder = updated.Folder, ReadOnly = updated.ReadOnly } == updated)
+        if (old with { Name = updated.Name, Folder = updated.Folder, ReadOnly = updated.ReadOnly, Environment = updated.Environment } == updated)
             _sessions.Find(updated.Id)?.UpdateConfig(updated);
         else
             Disconnect(updated.Id);

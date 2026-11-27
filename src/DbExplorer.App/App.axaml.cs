@@ -48,6 +48,7 @@ public class App : Application
             settings.Persist = tree.SetSettings;
             var main = new MainViewModel(tree, status, cache) { Banner = startup.Banner };
             var editDialogs = new EditDialogService(window);
+            main.UseProductionDialogs(new ProductionDialogService(window));
             main.UseTableTabs(sessions, editDialogs);
             main.UseScriptTabs(new ScriptFiles(window), new Core.Scripting.ScriptSessionStore(paths.ScriptsDir), editDialogs);
             // The script library lives under the data folder; only its directory listing is read, when the tree is built.

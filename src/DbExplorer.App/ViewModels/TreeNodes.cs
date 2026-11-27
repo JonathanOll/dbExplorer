@@ -123,7 +123,7 @@ public enum ConnectionState { Disconnected, Connecting, Connected, Failed }
 public sealed partial class ConnectionNodeViewModel(ConnectionConfig config) : TreeNodeViewModel
 {
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Title), nameof(IsReadOnly), nameof(Tooltip))]
+    [NotifyPropertyChangedFor(nameof(Title), nameof(IsReadOnly), nameof(ConnectionEnvironment), nameof(Tooltip))]
     private ConnectionConfig _config = config;
 
     [ObservableProperty]
@@ -139,6 +139,7 @@ public sealed partial class ConnectionNodeViewModel(ConnectionConfig config) : T
     /// <summary>Owner whose commands the context menu binds to.</summary>
     public ConnectionTreeViewModel? Tree { get; set; }
     public bool IsReadOnly => Config.ReadOnly;
+    public DbEnvironment ConnectionEnvironment => Config.Environment;
     public bool IsConnecting => State == ConnectionState.Connecting;
     public bool IsConnected => State == ConnectionState.Connected;
     public bool HasError => State == ConnectionState.Failed;
@@ -159,6 +160,7 @@ public sealed partial class ConnectionNodeViewModel(ConnectionConfig config) : T
         get
         {
             var lines = new List<string> { Config.Name, $"{EngineName(Config.Kind)} · {Target(Config)}", StateText };
+            if (Config.Environment != DbEnvironment.None) lines.Add($"Environment: {Config.Environment.Label()}");
             if (Config.ReadOnly) lines.Add("Read-only: no editing, scripts refuse writes");
             if (HasError) lines.Add("Double-click to retry");
             return string.Join(Environment.NewLine, lines);

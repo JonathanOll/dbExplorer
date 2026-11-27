@@ -77,7 +77,8 @@
           <ListBox x:Name="ResultList" Margin="0,6" Background="Transparent" BorderThickness="0" AutomationProperties.Name="Results">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:QuickOpenItem">
-                <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+                  <views:EnvironmentBadge Grid.Column="4" Environment="{Binding Environment}" Margin="6,0,0,0" />
                   <PathIcon Classes="dim" Data="{Binding Icon, Converter={x:Static views:Icons.ByKey}}" Width="15" Height="15" Margin="0,0,10,0" />
                   <views:HighlightText Grid.Column="1" Source="{Binding DisplayLabel}" FontSize="13.5" TextTrimming="CharacterEllipsis"
                                        VerticalAlignment="Center" />

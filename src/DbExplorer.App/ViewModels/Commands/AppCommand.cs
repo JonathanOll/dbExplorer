@@ -19,6 +19,9 @@ public sealed record AppCommand(string Id, string Category, string Title, string
     /// <summary>Faint text after the title, e.g. "connected" or "current".</summary>
     public string? Detail { get; init; }
 
+    /// <summary>Environment of the connection the row stands for (shown as a badge); None for any other command.</summary>
+    public Core.Model.DbEnvironment Environment { get; init; }
+
     /// <summary>Why the command cannot run now (the row is greyed and says so), or null when it can.</summary>
     public string? DisabledReason { get; init; }
 

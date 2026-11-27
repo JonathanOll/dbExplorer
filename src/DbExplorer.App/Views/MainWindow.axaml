@@ -266,6 +266,7 @@
               <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
               <TextBlock Classes="dim" FontSize="12" VerticalAlignment="Center"
                          Text="{Binding Config.Kind, Converter={x:Static views:Icons.EngineName}}" />
+              <views:EnvironmentBadge Environment="{Binding ConnectionEnvironment}" />
               <Border Classes="badge warn" IsVisible="{Binding IsReadOnly}">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                   <PathIcon Data="{StaticResource IconLock}" Width="10" Height="10" />
@@ -395,6 +396,9 @@
                       <StackPanel.ContextMenu>
                         <ContextMenu>
                           <MenuItem Header="Rename…" Command="{Binding Tree.RenameFolderCommand}" CommandParameter="{Binding}" InputGesture="F2" />
+                          <Separator />
+                          <MenuItem Header="Set environment of its connections…" Command="{Binding Tree.SetFolderEnvironmentCommand}"
+                                    CommandParameter="{Binding}" />
                           <Separator />
                           <MenuItem Header="Move up" Command="{Binding Tree.MoveFolderUpCommand}" CommandParameter="{Binding}"
                                     IsEnabled="{Binding CanMoveUp}" ToolTip.Tip="{Binding MoveUpTip}" ToolTip.ShowOnDisabled="True" />
@@ -685,7 +689,7 @@
                       IsVisible="{Binding !IsEmptyState}">
             <TabControl.ItemTemplate>
               <DataTemplate x:DataType="vm:TabViewModel">
-                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" Margin="10,0,4,0" Background="Transparent"
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto" Margin="10,0,4,0" Background="Transparent"
                       ToolTip.Tip="{Binding Title, Converter={x:Static views:Icons.WithoutBullet}}">
                   <Border Grid.Column="0" Width="4" Height="16" CornerRadius="2" Background="{Binding ChipColor}" Margin="0,0,8,0"
                           VerticalAlignment="Center" />
@@ -699,7 +703,8 @@
                             Foreground="{DynamicResource DbxWarn}" VerticalAlignment="Center"
                             IsVisible="{Binding Badge, Converter={x:Static ObjectConverters.IsNotNull}}"
                             ToolTip.Tip="{Binding Badge}" />
-                  <Button Grid.Column="5" Classes="close" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}"
+                  <views:EnvironmentBadge Grid.Column="5" Environment="{Binding ConnectionEnvironment}" Margin="7,0,0,0" />
+                  <Button Grid.Column="6" Classes="close" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}"
                           MinWidth="22" MinHeight="22" Padding="4" Margin="6,0,0,0"
                           Command="{Binding $parent[TabControl].((vm:MainViewModel)DataContext).CloseTabCommand}"
                           CommandParameter="{Binding}" AutomationProperties.Name="Close tab" ToolTip.Tip="Close (Ctrl+W)" />

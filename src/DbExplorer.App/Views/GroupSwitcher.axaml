@@ -26,6 +26,7 @@
           <StackPanel Orientation="Horizontal" Spacing="6">
             <views:EngineIcon Kind="{Binding Kind}" Width="12" Height="12" />
             <TextBlock Text="{Binding Name}" />
+            <views:EnvironmentBadge Environment="{Binding Environment}" />
             <PathIcon Data="{StaticResource IconLock}" Width="10" Height="10" Foreground="{DynamicResource DbxWarn}"
                       IsVisible="{Binding ReadOnly}" ToolTip.Tip="Read-only connection" />
           </StackPanel>

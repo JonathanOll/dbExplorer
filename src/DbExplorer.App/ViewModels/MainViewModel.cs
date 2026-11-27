@@ -145,7 +145,8 @@ public partial class MainViewModel : ObservableObject
             editDialogs,
             () => Tree.Config,
             Tree.SetVirtualKey,
-            SwitchHooks);
+            SwitchHooks,
+            Guard);
 
         TableTabFactory = (session, table) => new TableTabViewModel(session, table, Hooks(session.Config.Id));
         RestoredTableTabFactory = (config, table) => new TableTabViewModel(config, table, Hooks(config.Id));
@@ -153,6 +154,16 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>Creates the tab of a table restored from the last run: no session, loads when first selected. Set by <see cref="UseTableTabs"/>.</summary>
     public Func<ConnectionConfig, TableRef, TableTabViewModel>? RestoredTableTabFactory { get; set; }
+
+    private IProductionDialogs? _productionDialogs;
+    private ProductionGuard? _productionGuard;
+
+    /// <summary>Installs the confirmation of writes on production; without it they are refused.</summary>
+    public void UseProductionDialogs(IProductionDialogs dialogs) => _productionDialogs = dialogs;
+
+    /// <summary>The gate shared by every tab and the upgrade; it reads the latest saved settings of a connection.</summary>
+    private ProductionGuard Guard => _productionGuard ??= new ProductionGuard(
+        _productionDialogs, id => Tree.Config.Connections.FirstOrDefault(c => c.Id == id));
 
     private GroupSwitchHooks? _switchHooks;
 
@@ -617,7 +628,8 @@ public partial class MainViewModel : ObservableObject
     {
         var hooks = new ScriptTabHooks(
             ct => ResolveScriptSessionAsync(connection.Id, ct), _scriptFiles, _scriptStore, Status, _scriptDialogs, SwitchHooks, Tree.FindSession,
-            _library, OnScriptFileUsed, _history, () => Tree.Config.RecordHistory, () => Tree.Config.Format);
+            _library, OnScriptFileUsed, _history, () => Tree.Config.RecordHistory, () => Tree.Config.Format,
+            Guard);
         return new ScriptTabViewModel(connection, Tree.FindSession(connection.Id), hooks, ++_scriptCounter, restored);
     }
 

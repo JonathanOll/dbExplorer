@@ -46,7 +46,8 @@ public sealed record ScriptTabHooks(
     Action<string>? FileUsed = null,
     QueryHistory? History = null,
     Func<bool>? RecordHistory = null,
-    Func<SqlFormatOptions>? FormatOptions = null);
+    Func<SqlFormatOptions>? FormatOptions = null,
+    ProductionGuard? Guard = null);
 
 /// <summary>
 /// A SQL script editor on one connection. Runs the statement under the caret / the selection (Ctrl+Enter) or the
@@ -483,8 +484,49 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
         CancelGroup();
     }
 
+    private readonly ProductionApproval _productionApproval = new();
+    private bool _confirmingWrite;
+
+    /// <summary>
+    /// Asks before statements that may write reach a production connection. An estimated plan runs nothing and a read-only
+    /// connection refuses writes itself, so neither asks. False: nothing must run.
+    /// </summary>
+    private async Task<bool> ConfirmProductionRunAsync(IReadOnlyList<ScriptStatement> statements, PlanMode planRequest)
+    {
+        var guard = _hooks.Guard ?? new ProductionGuard();   // no dialog: refuses on production
+        var config = (_session ?? _hooks.FindSession?.Invoke(Connection.Id))?.Config
+                     ?? _hooks.Switch?.GetConfig().Connections.FirstOrDefault(c => c.Id == Connection.Id) ?? Connection;
+        if (config.ReadOnly || !guard.IsProduction(config)) return true;
+
+        var plan = PlanCapture.Effective(config.Kind, planRequest != PlanMode.None ? planRequest : ActualPlanEnabled ? PlanMode.Actual : PlanMode.None);
+        var writes = ProductionWrites.In(statements.Select(s => s.Text), config.Kind, plan);
+        if (writes.Count == 0) return true;
+        // The gate judged the batches as they are sent; the dialog lists the statements inside them, or a long batch would
+        // show nothing but its DECLARE.
+        var parts = ProductionWrites.In(statements.SelectMany(s => s.IsBatch
+            ? ScriptSplitter.Split(s.Text, config.Kind).Select(p => p.Text)
+            : [s.Text]), config.Kind, plan);
+        if (parts.Count > 0) writes = parts;
+
+        var action = $"Run {Plural(writes.Count, "statement")} that may write"
+                     + (plan == PlanMode.Actual ? " (with the actual plan, which runs them)" : "");
+        var id = Connection.Id;
+        _confirmingWrite = true;
+        try
+        {
+            if (await guard.AllowAsync([config], action, writes, _productionApproval)) return !_closed && Connection.Id == id;
+        }
+        finally
+        {
+            _confirmingWrite = false;
+        }
+        _status.Info("Nothing was run: the write on production was not confirmed.");
+        return false;
+    }
+
     private async Task RunAsync(IReadOnlyList<ScriptStatement> statements, PlanMode planRequest = PlanMode.None)
     {
+        if (_confirmingWrite) return;
         if (IsRunning)
         {
             _status.Info("A script is already running. Stop it first.");
@@ -505,6 +547,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
             _status.Info("Nothing to run.");
             return;
         }
+        if (!await ConfirmProductionRunAsync(statements, planRequest)) return;
 
         IsRunning = true;   // set before the first await: the caller sees it at once
         GroupRun = null;    // the results of this run replace those of a group run

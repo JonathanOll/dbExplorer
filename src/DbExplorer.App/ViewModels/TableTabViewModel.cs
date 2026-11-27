@@ -23,7 +23,8 @@ public sealed record TableTabHooks(
     IEditDialogs? Dialogs = null,
     Func<AppConfig>? GetConfig = null,
     Func<Guid, TableRef, string[], bool>? SetVirtualKey = null,
-    GroupSwitchHooks? Switch = null);
+    GroupSwitchHooks? Switch = null,
+    ProductionGuard? Guard = null);
 
 /// <summary>
 /// A table (or view) opened in its own tab: one page of rows at a time, with per-column filters, a raw WHERE,
@@ -674,6 +675,7 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
             hooks is null ? Task.CompletedTask : hooks.OpenTable(session, table, filters);
 
         public IEditDialogs? Dialogs => hooks?.Dialogs;
+        public ProductionGuard Guard => hooks?.Guard ?? new ProductionGuard();   // no dialog: refuses on production
 
         public Func<Guid, TableRef, string[], bool>? SetVirtualKey => hooks?.SetVirtualKey;
 

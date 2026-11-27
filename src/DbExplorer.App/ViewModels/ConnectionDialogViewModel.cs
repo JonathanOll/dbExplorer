@@ -50,6 +50,7 @@ public partial class ConnectionDialogViewModel : ObservableObject
         Encrypt = existing.Encrypt;
         TrustServerCertificate = existing.TrustServerCertificate;
         ReadOnly = existing.ReadOnly;
+        SelectedEnvironment = existing.Environment;
         Auth = existing.Auth;
         Encrypt = existing.Encrypt;   // choosing the mode above may have ticked it: the saved value wins
         LoadSsh(existing.Ssh);
@@ -68,6 +69,10 @@ public partial class ConnectionDialogViewModel : ObservableObject
         get => Folder ?? NoFolderLabel;
         set => Folder = value == NoFolderLabel ? null : value;
     }
+
+    public IReadOnlyList<DbEnvironment> Environments => DbEnvironments.All;
+
+    [ObservableProperty] private DbEnvironment _selectedEnvironment;
 
     public bool IsEdit => _existing is not null;
     public string Title => IsEdit ? "Edit connection" : "New connection";
@@ -312,6 +317,7 @@ public partial class ConnectionDialogViewModel : ObservableObject
             TrustServerCertificate: IsSqlServer && TrustServerCertificate,
             ReadOnly)
         {
+            Environment = SelectedEnvironment,
             Auth = network ? Auth : AuthMode.Password,
             Ssh = BuildSsh(),
         };

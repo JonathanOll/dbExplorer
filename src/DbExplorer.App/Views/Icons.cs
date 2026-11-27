@@ -33,6 +33,13 @@ public static class Icons
         _ => kind.ToString(),
     });
 
+    /// <summary>"Pre-production": an environment in words.</summary>
+    public static readonly IValueConverter EnvironmentName = new FuncValueConverter<DbEnvironment, string>(e => e.Label());
+
+    /// <summary>The most critical environment among several connections (Production wins): the badge of an upgrade target.</summary>
+    public static readonly IValueConverter HighestEnvironment = new FuncValueConverter<IEnumerable<ConnectionConfig>?, DbEnvironment>(
+        members => members?.Select(m => m.Environment).DefaultIfEmpty().Max() ?? DbEnvironment.None);
+
     /// <summary>The count shown after a folder name, e.g. "(3)".</summary>
     public static readonly IValueConverter CountInParens = new FuncValueConverter<int, string>(n => $"({n})");
 

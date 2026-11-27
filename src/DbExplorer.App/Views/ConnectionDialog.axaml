@@ -90,6 +90,24 @@
             <ComboBox x:Name="FolderBox" Grid.Column="1" HorizontalAlignment="Stretch"
                       ItemsSource="{Binding FolderChoices}" SelectedItem="{Binding SelectedFolderChoice}" />
           </Grid>
+
+          <Grid ColumnDefinitions="92,*">
+            <Label Classes="cap" Content="En_vironment" Target="{Binding #EnvironmentBox}" />
+            <StackPanel Grid.Column="1" Spacing="4">
+              <ComboBox x:Name="EnvironmentBox" HorizontalAlignment="Stretch"
+                        ItemsSource="{Binding Environments}" SelectedItem="{Binding SelectedEnvironment}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="model:DbEnvironment">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="{Binding ., Converter={x:Static views:Icons.EnvironmentName}}" VerticalAlignment="Center" />
+                      <views:EnvironmentBadge Environment="{Binding .}" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBlock Classes="optdesc" Text="On Production, every write asks for confirmation first." />
+            </StackPanel>
+          </Grid>
         </StackPanel>
 
         <StackPanel Spacing="12">

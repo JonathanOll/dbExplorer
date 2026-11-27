@@ -34,6 +34,13 @@
   </UserControl.Styles>
 
   <DockPanel>
+    <!-- Production: said in words on every tab of such a connection -->
+    <Border DockPanel.Dock="Top" Classes="banner error" IsVisible="{Binding ProductionNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <Grid ColumnDefinitions="Auto,*">
+        <PathIcon Classes="bi" Data="{StaticResource IconWarning}" Margin="0,0,8,0" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="1" Text="{Binding ProductionNotice}" TextWrapping="Wrap" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
     <!-- Database selector: only for a connection that is in a group with other databases -->
     <Border DockPanel.Dock="Top" Classes="toolbar" IsVisible="{Binding HasGroupSwitch}">
       <views:GroupSwitcher HorizontalAlignment="Left" />

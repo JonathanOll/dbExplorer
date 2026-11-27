@@ -7,6 +7,8 @@ namespace DbExplorer.App.ViewModels;
 public sealed record QuickOpenColumnOwner(string Table, string? Context, string? Group, Func<string, Task> Open)
 {
     /// <summary>What a qualified query ("orders.total") is matched against, before the column name.</summary>
+    public Core.Model.DbEnvironment Environment { get; init; }
+
     public string Prefix { get; } = Context is null ? Table : $"{Context} · {Table}";
 }
 

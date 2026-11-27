@@ -1,3 +1,4 @@
+using DbExplorer.Core.Export;
 using DbExplorer.Core.Model;
 using DbExplorer.Core.Scripting;
 
@@ -24,6 +25,26 @@ public class ScriptBatchSplitTests
     [InlineData("DECLARE c CURSOR FOR SELECT 1; OPEN c", 2)]
     public void SqlServer_OnlyARealVariableKeepsTheBatch(string script, int count) =>
         Assert.Equal(count, ScriptSplitter.SplitForRun(script, DbKind.SqlServer).Count);
+
+    [Theory]
+    [InlineData("DECLARE @x int = 1;\nDELETE FROM t")]
+    [InlineData("SELECT 1;\nDECLARE @x int = 1\nDELETE FROM t")]
+    [InlineData("DECLARE @x int = 1\nSELECT @x")]
+    public async Task WholeBatch_CannotSlipPastTheGuards(string script)
+    {
+        var batch = Assert.Single(ScriptSplitter.SplitForRun(script, DbKind.SqlServer));
+        Assert.True(batch.IsBatch || !script.Contains(';'));
+
+        Assert.NotEmpty(ProductionWrites.In([batch.Text], DbKind.SqlServer));
+        Assert.False(QueryRows.CanRunAgain(batch.Text, DbKind.SqlServer));   // an export never sends it a second time
+        var connection = new MessagingConnection();
+        var results = new List<StatementResult>();
+        await foreach (var r in ScriptRunner.RunAsync(connection, [batch], new ScriptOptions(ReadOnly: true, Kind: DbKind.SqlServer), CancellationToken.None))
+            results.Add(r);
+
+        Assert.StartsWith("Refused", Assert.Single(results).Error);
+        Assert.Empty(connection.Log);
+    }
 
     [Theory]
     [InlineData(DbKind.Postgres)]

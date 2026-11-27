@@ -100,11 +100,12 @@
                     <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
                       <PathIcon Classes="lead" Data="{Binding Icon, Converter={x:Static views:Icons.ByKey}}" Width="15" Height="15"
                                 Margin="0,0,12,0" />
-                      <!-- title, then the detail or the reason it is greyed -->
-                      <Grid Grid.Column="1" ColumnDefinitions="Auto,*" VerticalAlignment="Center">
+                      <!-- title, the environment of a connection, then the detail or the reason it is greyed -->
+                      <Grid Grid.Column="1" ColumnDefinitions="Auto,Auto,*" VerticalAlignment="Center">
+                        <views:EnvironmentBadge Grid.Column="1" Environment="{Binding Command.Environment}" Margin="8,0,0,0" />
                         <views:HighlightText Source="{Binding Title}" Positions="{Binding Matches}" FontSize="13.5"
                                              TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Classes="faint small" Text="{Binding Note}" Margin="10,1,0,0" VerticalAlignment="Center"
+                        <TextBlock Grid.Column="2" Classes="faint small" Text="{Binding Note}" Margin="10,1,0,0" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Note}" IsVisible="{Binding HasNote}" />
                       </Grid>
                       <TextBlock Grid.Column="2" Classes="faint small" Text="{Binding Category}" Width="80" Margin="12,0,0,0" VerticalAlignment="Center"

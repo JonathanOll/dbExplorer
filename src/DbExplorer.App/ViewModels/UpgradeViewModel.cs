@@ -326,6 +326,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
     private readonly bool _requireSqlServer;
     private readonly Func<Func<ConnectionConfig, CancellationToken, Task<DbConnection>>, UpgradeRunner> _createRunner;
 
+    private readonly ProductionGuard _guard;
     private UpgradePlan? _plan;
     private UpgradeTarget? _confirmedTarget;
     private CancellationTokenSource? _runCts;
@@ -345,8 +346,10 @@ public sealed partial class UpgradeViewModel : ObservableObject
         Func<Guid, CancellationToken, Task<Session?>> resolveSession,
         Func<string, Task>? copyText = null,
         bool requireSqlServer = true,
-        Func<Func<ConnectionConfig, CancellationToken, Task<DbConnection>>, UpgradeRunner>? createRunner = null)
+        Func<Func<ConnectionConfig, CancellationToken, Task<DbConnection>>, UpgradeRunner>? createRunner = null,
+        ProductionGuard? guard = null)
     {
+        _guard = guard ?? new ProductionGuard();   // no dialog: refuses on production
         _catalog = catalog;
         Targets = targets;
         _resolveSession = resolveSession;
@@ -679,6 +682,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
         WarningSummary = total == 0 ? "" : $"{total} {(total == 1 ? "warning" : "warnings")}: {string.Join(", ", parts)}";
 
         OnPropertyChanged(nameof(ConfirmHeading));
+        OnPropertyChanged(nameof(ProductionTargetsText));
         OnPropertyChanged(nameof(TickedText));
         OnPropertyChanged(nameof(RunDisabledReason));
         OnPropertyChanged(nameof(ShowRunReason));
@@ -824,6 +828,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
         ConfirmDatabases = GroupRunViewModel.UniqueNames(target.Members.Select(m => m.Name));
         OnPropertyChanged(nameof(NeedsTypedConfirmation));
         OnPropertyChanged(nameof(ConfirmHeading));
+        OnPropertyChanged(nameof(ProductionTargetsText));
         Phase = UpgradePhase.Confirm;
     }
 
@@ -933,6 +938,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
         OnPropertyChanged(nameof(IsRetry));
         OnPropertyChanged(nameof(NeedsTypedConfirmation));
         OnPropertyChanged(nameof(ConfirmHeading));
+        OnPropertyChanged(nameof(ProductionTargetsText));
         OnPropertyChanged(nameof(RunButtonText));
         OnPropertyChanged(nameof(IsDangerRun));
         Phase = UpgradePhase.Confirm;
@@ -948,11 +954,22 @@ public sealed partial class UpgradeViewModel : ObservableObject
         OnPropertyChanged(nameof(IsRetry));
         OnPropertyChanged(nameof(NeedsTypedConfirmation));
         OnPropertyChanged(nameof(ConfirmHeading));
+        OnPropertyChanged(nameof(ProductionTargetsText));
         OnPropertyChanged(nameof(RunButtonText));
         OnPropertyChanged(nameof(IsDangerRun));
     }
 
     // ---- run ----
+
+    /// <summary>Names the production databases of the confirmation step; null when there is none.</summary>
+    public string? ProductionTargetsText
+    {
+        get
+        {
+            var names = _confirmedTarget?.Members.Where(_guard.IsProduction).Select(c => c.Name).Distinct().ToList() ?? [];
+            return names.Count == 0 ? null : $"Production: {string.Join(", ", names)}. One more confirmation follows.";
+        }
+    }
 
     public ObservableCollection<UpgradeMemberViewModel> Members { get; } = [];
 
@@ -1000,6 +1017,22 @@ public sealed partial class UpgradeViewModel : ObservableObject
             }
             else ReturnToPreview(refusal);
             return;
+        }
+
+        // The last gate before production, whatever was typed in the confirmation step. Always asked: no "don't ask again".
+        var scripts = batches.SelectMany(x => x.Scripts).Select(x => x.Name).Distinct().ToList();
+        var production = configs.Where(_guard.IsProduction).ToList();
+        if (production.Count > 0)
+        {
+            var action = $"Run {scripts.Count} upgrade {(scripts.Count == 1 ? "script" : "scripts")} on {production.Count} production " +
+                         (production.Count == 1 ? "database" : "databases") +
+                         (configs.Count > production.Count ? $" ({configs.Count} databases in this run)" : "");
+            if (!await _guard.AllowAsync(production, action, scripts))
+            {
+                Message = "Nothing was run: the write on production was not confirmed.";
+                return;
+            }
+            if (Phase != UpgradePhase.Confirm || !ReferenceEquals(_confirmedTarget, target)) return;
         }
 
         if (retry)

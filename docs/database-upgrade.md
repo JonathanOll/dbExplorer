@@ -40,6 +40,8 @@ ascending, then folder name, then file name in natural order (`adj - 003` before
    (every database, one `OK` / `FAILED` / `CANCELLED` / `SKIPPED` line per script, the errors) on the clipboard. The sprint is not
    remembered.
 
+When a target is a [production connection](environments.md), one more confirmation follows the confirmation step.
+
 **What blocks a run.** The check happens at Run..., again before any connection is opened, and the runner repeats it, so a
 refusal contacts no database and nothing is run:
 

@@ -91,6 +91,7 @@ public sealed partial class QuickOpenViewModel
             Title = name,
             Name = name,
             Context = owner.Context,
+            Environment = owner.Environment,
             Group = owner.Group,
             Icon = "IconColumn",
             Type = QuickOpenTypes.Columns,

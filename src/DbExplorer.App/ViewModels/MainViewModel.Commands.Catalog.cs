@@ -251,7 +251,8 @@ public partial class MainViewModel
 
         yield return Pick("tab.switch", "Tabs", "Switch to tab…", "IconTable",
             () => Tabs.Select((t, i) => Entry($"tab.switch.{i}", "Tabs", t.Title.TrimStart('•', ' '), t.IconKey, Do(() => ActiveTab = t),
-                detail: ReferenceEquals(t, ActiveTab) ? "current" : t.Connection.Name)).ToList(),
+                detail: ReferenceEquals(t, ActiveTab) ? "current" : t.Connection.Name)
+                with { Environment = t.ConnectionEnvironment }).ToList(),
             none, "activate open");
         yield return Entry("tab.close", "Tabs", "Close tab", "IconClose", () => CloseActiveTabAsync(), none, "Ctrl+W");
         yield return Entry("tab.reopen", "Tabs", "Reopen closed tab", "IconUndo", () => ReopenClosedTabAsync(),
@@ -269,7 +270,7 @@ public partial class MainViewModel
         yield return Pick("tab.switch-database", "Tabs", "Switch database of this tab…", "IconGroup",
             () => tab!.GroupMembers.Select(m => Entry($"tab.switch-database.{m.Id}", "Tabs", m.Name, "IconDatabase",
                 () => tab.SwitchConnectionAsync(m),
-                m.Id == tab.Connection.Id ? "This tab is already on it" : null)).ToList(),
+                m.Id == tab.Connection.Id ? "This tab is already on it" : null) with { Environment = m.Environment }).ToList(),
             noGroup, "group member connection");
         yield return Entry("tab.next-database", "Tabs", "Next database of the group", "IconChevronRight", () => NextGroupMemberAsync(),
             noGroup, "Ctrl+Alt+PageDown");
@@ -291,7 +292,8 @@ public partial class MainViewModel
             {
                 var detail = string.Join(" · ", new[] { node.IsConnected ? "connected" : null, node.Config.Folder }.Where(x => x is not null));
                 return Entry($"{id}.{node.Config.Id}", category, node.Config.Name, "IconDatabase", run(node), disabled?.Invoke(node),
-                    keywords: node.Config.Folder, detail: detail.Length > 0 ? detail : null);
+                    keywords: node.Config.Folder, detail: detail.Length > 0 ? detail : null)
+                    with { Environment = node.Config.Environment };
             })
             .ToList();
     }
@@ -381,6 +383,8 @@ public partial class MainViewModel
         yield return Entry("folder.new", category, "New folder…", "IconFolderAdd", () => Tree.AddFolderCommand.ExecuteAsync(null),
             keywords: "add directory");
         yield return OnFolder("folder.rename", "Rename folder…", "IconFolder", f => () => Tree.RenameFolderCommand.ExecuteAsync(f));
+        yield return OnFolder("folder.environment", "Set environment of folder connections…", "IconDatabase",
+            f => () => Tree.SetFolderEnvironmentCommand.ExecuteAsync(f));
         yield return OnFolder("folder.move-up", "Move folder up…", "IconSortUp", f => Do(Tree.MoveFolderUpCommand, f),
             f => f.CanMoveUp ? null : f.MoveUpTip);
         yield return OnFolder("folder.move-down", "Move folder down…", "IconSortDown", f => Do(Tree.MoveFolderDownCommand, f),

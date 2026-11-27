@@ -43,6 +43,7 @@ public sealed partial class QuickOpenViewModel
         }
 
         var title = objects is null ? $"Go to table in {name}" : $"Go to table or object in {name}";
+        if (session.Config.Environment != DbEnvironment.None) title += $" ({session.Config.Environment.Label()})";
         var vm = new QuickOpenViewModel(title, items, status, initialQuery: initialQuery);
         if (columns is null) return vm;
 
@@ -82,14 +83,14 @@ public sealed partial class QuickOpenViewModel
             {
                 var (cfg, tableRef) = (config, table.Ref);
                 items.Add(TableItem(tableRef, table.IsView, $"{cfg.Name} · {tableRef}",
-                    () => ConnectThenOpen(cfg, tableRef, connect, openTable, status), cfg.Name, cfg.Name));
+                    () => ConnectThenOpen(cfg, tableRef, connect, openTable, status), cfg.Name, cfg.Name) with { Environment = cfg.Environment });
             }
 
             foreach (var routine in routines)
             {
                 var (cfg, wanted) = (config, routine);
                 items.Add(RoutineItem(wanted, $"{cfg.Name} · {wanted.Ref}",
-                    () => ConnectThenOpenRoutine(cfg, wanted, connect, objects!, status), cfg.Name, cfg.Name));
+                    () => ConnectThenOpenRoutine(cfg, wanted, connect, objects!, status), cfg.Name, cfg.Name) with { Environment = cfg.Environment });
             }
         }
 
@@ -106,7 +107,8 @@ public sealed partial class QuickOpenViewModel
         var columns = new Lazy<QuickOpenColumn[]>(() => cached.SelectMany(x => x.Tables.SelectMany(t =>
         {
             var owner = new QuickOpenColumnOwner(t.Ref.ToString(), x.Config.Name, x.Config.Name,
-                column => ConnectThenOpen(x.Config, t.Ref, connect, (s, table) => objects.OpenColumn(s, table, column), status, column));
+                column => ConnectThenOpen(x.Config, t.Ref, connect, (s, table) => objects.OpenColumn(s, table, column), status, column))
+                { Environment = x.Config.Environment };
             return t.Columns.Select(c => new QuickOpenColumn(owner, c));
         })).ToArray());
         vm.Use(new QuickOpenSource(vm._source.Items, columns));

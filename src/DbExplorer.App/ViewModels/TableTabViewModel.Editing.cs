@@ -436,6 +436,8 @@ public sealed partial class TableTabViewModel : ITableEditActions
         await SaveAsync();
     }
 
+    private readonly ProductionApproval _productionApproval = new();
+
     /// <summary>
     /// Applies the pending edits in ONE transaction (see <see cref="EditApplier"/>) and reloads the page. Any failure
     /// leaves the database untouched and the pending edits in place so the user can retry. Never throws.
@@ -463,9 +465,16 @@ public sealed partial class TableTabViewModel : ITableEditActions
         if (plan.Count == 0) return;
 
         var inserted = _pending.Count(r => r.IsNew && !r.IsDeleted);
-        IsSaving = true;
+        IsSaving = true;   // set before the confirmation: a second save must not start behind it
         try
         {
+            if (!await _hooks.Guard.AllowAsync([_session.Config],
+                    plan.Count == 1 ? "Apply 1 change to " + Table : $"Apply {plan.Count} changes to {Table}",
+                    plan.Select(p => p.PreviewSql).ToList(), _productionApproval))
+            {
+                Notice = "Nothing was saved: the write on production was not confirmed. Your edits are kept.";
+                return;
+            }
             await using var connection = await _session.OpenConnectionAsync(CancellationToken.None);
             await EditApplier.ApplyAsync(connection, plan, CancellationToken.None);
         }

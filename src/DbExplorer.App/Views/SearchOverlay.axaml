@@ -103,7 +103,10 @@
                           AutomationProperties.Name="Connection to search" ToolTip.Tip="The connection whose tables are searched (connected when needed)">
                   <ComboBox.ItemTemplate>
                     <DataTemplate>
-                      <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                        <views:EnvironmentBadge Environment="{Binding Environment}" />
+                      </StackPanel>
                     </DataTemplate>
                   </ComboBox.ItemTemplate>
                 </ComboBox>

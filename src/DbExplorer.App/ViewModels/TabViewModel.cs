@@ -97,6 +97,27 @@ public abstract class TabViewModel : ObservableObject
         private set => SetProperty(ref _isSwitching, value);
     }
 
+    // ---- environment ----
+
+    /// <summary>The tab's connection as saved now (its environment may have been edited since the tab opened).</summary>
+    private ConnectionConfig SavedConnection =>
+        GroupHooks?.GetConfig().Connections.FirstOrDefault(c => c.Id == Connection.Id) ?? Connection;
+
+    public DbEnvironment ConnectionEnvironment => SavedConnection.Environment;
+
+    /// <summary>The line of the production banner of script and table tabs; null on any other environment.</summary>
+    public string? ProductionNotice
+    {
+        get
+        {
+            var c = SavedConnection;
+            if (!c.IsProduction) return null;
+            var consequence = c.ReadOnly ? "Read-only: writes are refused." : "Writes ask for confirmation.";
+            var database = c.Kind == DbKind.Sqlite ? Path.GetFileName(c.Database) : c.Database;
+            return $"Production · {c.Name} ({database}). {consequence}";
+        }
+    }
+
     /// <summary>Repaints the selector after the groups or connections of the config changed.</summary>
     public void NotifyGroupsChanged()
     {
@@ -106,6 +127,8 @@ public abstract class TabViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedMember));
         OnPropertyChanged(nameof(HasGroupSwitch));
         OnPropertyChanged(nameof(HasGroupPicker));
+        OnPropertyChanged(nameof(ConnectionEnvironment));
+        OnPropertyChanged(nameof(ProductionNotice));
     }
 
     /// <summary>

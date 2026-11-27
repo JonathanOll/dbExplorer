@@ -62,6 +62,7 @@ public static partial class DBeaverImporter
                 var connection = ToConnection(entry.Name, name, entry.Value, credentials, protector, warnings);
                 if (connection is null) continue;
 
+                connection = connection with { Environment = EnvironmentOf(entry.Value, connectionTypes) };
                 connection = WithAuthentication(connection, entry.Value);
                 connection = WithSshTunnel(connection, entry.Name, entry.Value, credentials, protector, warnings);
 
@@ -112,6 +113,30 @@ public static partial class DBeaverImporter
                 return $"DBeaver connection type '{typeId}' forbids data edits";
         }
         return null;
+    }
+
+    /// <summary>
+    /// The environment named by the connection type (its display name for a custom type, else its id). DBeaver gives
+    /// <c>dev</c> to a connection nobody classified, so that is what it is here too. An unknown name gives none.
+    /// </summary>
+    private static DbEnvironment EnvironmentOf(JsonElement node, JsonElement connectionTypes)
+    {
+        var cfg = node.TryGetProperty("configuration", out var c) ? c : default;
+        if (Str(cfg, "type") is not { } typeId) return DbEnvironment.None;
+        var name = connectionTypes.ValueKind == JsonValueKind.Object && connectionTypes.TryGetProperty(typeId, out var type)
+            ? Str(type, "name") ?? typeId
+            : typeId;
+        var byName = Classify(name);
+        return byName != DbEnvironment.None ? byName : Classify(typeId);
+
+        static DbEnvironment Classify(string s)
+        {
+            bool Has(string part) => s.Contains(part, StringComparison.OrdinalIgnoreCase);
+            if (Has("preprod") || Has("pre-prod") || Has("pre prod") || Has("staging")) return DbEnvironment.PreProduction;
+            if (Has("prod")) return DbEnvironment.Production;
+            if (Has("test") || s.Trim().Equals("qa", StringComparison.OrdinalIgnoreCase)) return DbEnvironment.Test;
+            return Has("dev") ? DbEnvironment.Development : DbEnvironment.None;
+        }
     }
 
     private static bool IsProdName(string s) =>

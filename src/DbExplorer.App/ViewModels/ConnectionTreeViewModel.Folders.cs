@@ -1,4 +1,5 @@
 using CommunityToolkit.Mvvm.Input;
+using DbExplorer.Core.Model;
 
 namespace DbExplorer.App.ViewModels;
 
@@ -49,6 +50,30 @@ public partial class ConnectionTreeViewModel
         result.RemoveAt(from);
         result.Insert(IndexOfFolder(result, target) + (after ? 1 : 0), order[from]);
         return result.SequenceEqual(order) ? null : result;
+    }
+
+    /// <summary>
+    /// Folder context menu "Set environment of its connections…": a one-off change of every connection of the folder (the
+    /// folder itself stores nothing, so a connection moved there later keeps its own).
+    /// </summary>
+    [RelayCommand]
+    private async Task SetFolderEnvironmentAsync(FolderNodeViewModel? node)
+    {
+        if (node is null) return;
+        bool InFolder(ConnectionConfig c) => string.Equals(c.Folder, node.Name, StringComparison.OrdinalIgnoreCase);
+        var count = Config.Connections.Count(InFolder);
+        if (count == 0)
+        {
+            _status.Info($"Folder '{node.Name}' has no connection.");
+            return;
+        }
+        var choice = await _dialogs.ChooseAsync("Set environment",
+            $"Environment of the {(count == 1 ? "connection" : $"{count} connections")} in '{node.Name}'",
+            [.. DbEnvironments.All.Select(e => e.Label())]);
+        if (choice is not { } index) return;
+        var environment = DbEnvironments.All[index];
+        foreach (var connection in Config.Connections.Where(InFolder).ToList())
+            UpdateConnection(connection with { Environment = environment });
     }
 
     /// <summary>Folder context menu "Move up".</summary>

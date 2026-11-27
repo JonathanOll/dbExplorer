@@ -19,6 +19,9 @@ public record QuickOpenItem(string Label, string? Detail, Func<Task> Open)
     /// <summary>Faint chip at the right of the row (the connection of a table found in every connection).</summary>
     public string? Context { get; init; }
 
+    /// <summary>Environment of the row's connection, shown as a badge; None when the row names no connection.</summary>
+    public DbEnvironment Environment { get; init; }
+
     public string DisplayLabel => Title ?? Label;
 
     /// <summary>What kind of database object the row is; null for rows the type filter does not apply to.</summary>
@@ -137,6 +140,7 @@ public sealed partial class QuickOpenViewModel : ObservableObject
             })
             {
                 Icon = "IconDatabase",
+                Environment = c.Environment,
                 Group = c.Folder,
             })
             .ToList();
