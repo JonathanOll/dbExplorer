@@ -24,39 +24,56 @@ public static class FuzzyMatcher
         var m = query.Length;
         if (m > n) return null;
 
-        // Cheap reject: greedy subsequence check.
-        var qi = 0;
-        for (var i = 0; i < n && qi < m; i++)
-            if (Eq(candidate[i], query[qi])) qi++;
-        if (qi < m) return null;
+        // Cheap reject: greedy subsequence check. It also gives the first position each letter can take.
+        Span<int> first = m <= StackLimit ? stackalloc int[m] : new int[m];
+        var at = 0;
+        for (var i = 0; i < m; i++)
+        {
+            var next = Next(candidate.AsSpan(at), query[i]);
+            if (next < 0) return null;
+            first[i] = at + next;
+            at = first[i] + 1;
+        }
+
+        // And the last one, from the end. Outside [first, last] a letter takes part in no alignment, so the DP skips it.
+        Span<int> last = m <= StackLimit ? stackalloc int[m] : new int[m];
+        at = n;
+        for (var i = m - 1; i >= 0; i--)
+            last[i] = at = Previous(candidate.AsSpan(0, at), query[i]);
 
         Span<int> prev = n <= StackLimit ? stackalloc int[n] : new int[n];
         Span<int> cur = n <= StackLimit ? stackalloc int[n] : new int[n];
 
         // Row 0: best score with query[0] matched at candidate[j].
-        for (var j = 0; j < n; j++)
+        for (var j = first[0]; j <= last[0]; j++)
             prev[j] = Eq(candidate[j], query[0]) ? MatchScore + PositionBonus(candidate, j) - GapPenalty * j : NoMatch;
 
         for (var i = 1; i < m; i++)
         {
             var q = query[i];
             var lower = char.ToLowerInvariant(q);   // once per row: this is the hot loop of every keystroke
+            int start = first[i], previousLast = last[i - 1], end = last[i];
             // gapBest = max over k < j-1 of prev[k] - GapPenalty * (j-1-k): best predecessor with at least one skipped char.
             var gapBest = NoMatch;
-            for (var j = 0; j < n; j++)
+            for (var j = first[i - 1]; j <= end; j++)
             {
-                var best = NoMatch;
-                var c = candidate[j];
-                if (c == q || char.ToLowerInvariant(c) == lower)
+                // prev[j - 1], when the row before has a value there.
+                var before = j > first[i - 1] && j - 1 <= previousLast ? prev[j - 1] : NoMatch;
+                if (j >= start)
                 {
-                    if (j > 0 && prev[j - 1] > NoMatch) best = prev[j - 1] + ConsecutiveBonus;
-                    if (gapBest > best) best = gapBest;
-                    if (best > NoMatch) best += MatchScore + PositionBonus(candidate, j);
+                    var best = NoMatch;
+                    var c = candidate[j];
+                    if (c == q || char.ToLowerInvariant(c) == lower)
+                    {
+                        if (before > NoMatch) best = before + ConsecutiveBonus;
+                        if (gapBest > best) best = gapBest;
+                        if (best > NoMatch) best += MatchScore + PositionBonus(candidate, j);
+                    }
+                    cur[j] = best;
                 }
-                cur[j] = best;
 
                 // Advance gapBest so it is valid for j + 1.
-                var candidateBest = j > 0 ? Math.Max(gapBest, prev[j - 1]) : gapBest;
+                var candidateBest = before > gapBest ? before : gapBest;
                 gapBest = candidateBest > NoMatch ? candidateBest - GapPenalty : NoMatch;
             }
 
@@ -66,10 +83,38 @@ public static class FuzzyMatcher
         }
 
         var result = NoMatch;
-        for (var j = 0; j < n; j++)
+        for (var j = first[m - 1]; j <= last[m - 1]; j++)
             if (prev[j] > result) result = prev[j];
 
         return result > NoMatch ? result - LengthPenalty * n : null;
+    }
+
+    // The first and the last character equal to the letter, whatever its case; on the framework's vectorised search for
+    // ASCII letters (the Kelvin sign is the one other character that lowers to one of them).
+    private static int Next(ReadOnlySpan<char> text, char letter)
+    {
+        if (letter < 128)
+        {
+            var lower = char.ToLowerInvariant(letter);
+            var upper = char.ToUpperInvariant(letter);
+            return text.IndexOfAny(lower, upper, lower == 'k' ? '\u212A' : upper);
+        }
+        for (var i = 0; i < text.Length; i++)
+            if (Eq(text[i], letter)) return i;
+        return -1;
+    }
+
+    private static int Previous(ReadOnlySpan<char> text, char letter)
+    {
+        if (letter < 128)
+        {
+            var lower = char.ToLowerInvariant(letter);
+            var upper = char.ToUpperInvariant(letter);
+            return text.LastIndexOfAny(lower, upper, lower == 'k' ? '\u212A' : upper);
+        }
+        for (var i = text.Length - 1; i >= 0; i--)
+            if (Eq(text[i], letter)) return i;
+        return -1;
     }
 
     /// <summary>
@@ -139,62 +184,65 @@ public static class FuzzyMatcher
     /// <summary>
     /// Smallest number of edits (insert, delete, replace, swap of neighbours; case-insensitive) that turns <paramref name="query"/>
     /// into some substring of <paramref name="candidate"/>, or null when it exceeds <paramref name="allowed"/>.
+    /// The query has at most <see cref="MaxTolerantLength"/> letters, so a whole column of the edit matrix fits in the bits of
+    /// one word and each letter of the candidate costs a few operations (Hyyrö's bit-parallel optimal string alignment).
     /// </summary>
     private static int? EditsToContain(string query, string candidate, int allowed)
     {
         var m = query.Length;
         var n = candidate.Length;
-        if (n == 0) return null;
+        // A substring needs at least m - allowed letters.
+        if (n == 0 || n < m - allowed) return null;
 
-        // Lower-case both once: the inner loop then compares plain chars.
-        Span<char> q = m <= StackLimit ? stackalloc char[m] : new char[m];
-        Span<char> c = n <= StackLimit ? stackalloc char[n] : new char[n];
-        for (var i = 0; i < m; i++) q[i] = char.ToLowerInvariant(query[i]);
-        for (var j = 0; j < n; j++) c[j] = char.ToLowerInvariant(candidate[j]);
+        // Cheap reject: each letter of the query that the candidate does not hold at all costs one edit.
+        var missing = 0;
+        foreach (var letter in query)
+            if (Next(candidate, letter) < 0 && ++missing > allowed) return null;
 
-        // Cheap reject: every edit but a swap changes at most one letter, so at least m - allowed query letters must exist
-        // in the candidate (counted as a multiset; buckets by the low 7 bits, collisions only make this weaker, never wrong).
-        Span<int> seen = stackalloc int[128];
-        seen.Clear();
-        for (var j = 0; j < n; j++) seen[c[j] & 127]++;
-        var shared = 0;
+        Span<char> q = stackalloc char[MaxTolerantLength];
+        // For each ASCII character, in either case, the positions of the query that hold it.
+        Span<int> positions = stackalloc int[128];
+        positions.Clear();
         for (var i = 0; i < m; i++)
-            if (seen[q[i] & 127] > 0) { seen[q[i] & 127]--; shared++; }
-        if (shared < m - allowed) return null;
-
-        // d[i][j]: edits to align query[..i] with a substring of candidate ending at j (it may start anywhere).
-        var width = n + 1;
-        Span<int> older = width <= StackLimit ? stackalloc int[width] : new int[width];
-        Span<int> prev = width <= StackLimit ? stackalloc int[width] : new int[width];
-        Span<int> cur = width <= StackLimit ? stackalloc int[width] : new int[width];
-        prev.Clear();   // row 0: an empty query matches anywhere for free
-
-        for (var i = 1; i <= m; i++)
         {
-            cur[0] = i;
-            var rowBest = i;
-            var qi = q[i - 1];
-            for (var j = 1; j <= n; j++)
-            {
-                var best = prev[j - 1] + (qi == c[j - 1] ? 0 : 1);
-                var del = prev[j] + 1;
-                if (del < best) best = del;
-                var ins = cur[j - 1] + 1;
-                if (ins < best) best = ins;
-                if (i > 1 && j > 1 && qi == c[j - 2] && q[i - 2] == c[j - 1] && older[j - 2] + 1 < best) best = older[j - 2] + 1;
-                cur[j] = best;
-                if (best < rowBest) rowBest = best;
-            }
-
-            if (rowBest > allowed) return null;   // no alignment can get back under the limit
-            var tmp = older;
-            older = prev;
-            prev = cur;
-            cur = tmp;
+            q[i] = char.ToLowerInvariant(query[i]);
+            if (q[i] >= 128) continue;
+            positions[q[i]] |= 1 << i;
+            if (char.IsAsciiLetterLower(q[i])) positions[q[i] - 32] |= 1 << i;
         }
 
-        var result = int.MaxValue;
-        for (var j = 0; j <= n; j++) result = Math.Min(result, prev[j]);
+        var bottom = 1 << (m - 1);
+        int vertical = -1, negative = 0, diagonal = 0, previous = 0;
+        var distance = m;
+        var result = m;   // the empty substring: every letter deleted
+        for (var j = 0; j < n; j++)
+        {
+            var c = candidate[j];
+            int match;
+            if (c < 128) match = positions[c];
+            else
+            {
+                match = 0;
+                var lower = char.ToLowerInvariant(c);
+                for (var i = 0; i < m; i++)
+                    if (q[i] == lower) match |= 1 << i;
+            }
+
+            var swap = ((~diagonal & match) << 1) & previous;
+            diagonal = swap | (((match & vertical) + vertical) ^ vertical) | match | negative;
+            var up = negative | ~(diagonal | vertical);
+            var down = diagonal & vertical;
+            if ((up & bottom) != 0) distance++;
+            else if ((down & bottom) != 0) distance--;
+            // No carry into the first row: a match may start anywhere in the candidate.
+            up <<= 1;
+            down <<= 1;
+            vertical = down | ~(diagonal | up);
+            negative = up & diagonal;
+            previous = match;
+            if (distance < result) result = distance;
+        }
+
         return result <= allowed ? result : null;
     }
 
