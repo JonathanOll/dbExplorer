@@ -466,6 +466,7 @@ public sealed partial class TableTabViewModel : ITableEditActions
 
         var inserted = _pending.Count(r => r.IsNew && !r.IsDeleted);
         IsSaving = true;   // set before the confirmation: a second save must not start behind it
+        using var cts = new CancellationTokenSource();
         try
         {
             if (!await _hooks.Guard.AllowAsync([_session.Config],
@@ -475,8 +476,24 @@ public sealed partial class TableTabViewModel : ITableEditActions
                 Notice = "Nothing was saved: the write on production was not confirmed. Your edits are kept.";
                 return;
             }
-            await using var connection = await _session.OpenConnectionAsync(CancellationToken.None);
-            await EditApplier.ApplyAsync(connection, plan, CancellationToken.None);
+            // Off the UI thread: SQLite runs synchronously, and a lock wait or a slow trigger would freeze the window.
+            // No timeout: the save ends, or the user cancels it from the status bar.
+            var session = _session;
+            var ct = cts.Token;
+            using (_hooks.Busy(plan.Count == 1 ? $"Saving 1 change to {Table.Name}…" : $"Saving {plan.Count} changes to {Table.Name}…", cts.Cancel))
+            {
+                await Task.Run(async () =>
+                {
+                    await using var connection = await session.OpenConnectionAsync(ct);
+                    await EditApplier.ApplyAsync(connection, plan, ct);
+                }, ct);
+            }
+        }
+        catch (Exception) when (cts.IsCancellationRequested)
+        {
+            // EditApplier rolls back on any failure, a cancel included; a commit that won the race would not have thrown.
+            Notice = "Save cancelled: nothing was saved (rolled back). Your edits are kept.";
+            return;
         }
         catch (StaleRowException)
         {

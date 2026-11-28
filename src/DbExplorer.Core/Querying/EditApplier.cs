@@ -55,7 +55,8 @@ public static class EditApplier
                 foreach (var p in stmt.Command.Params)
                     cmd.Parameters.Add(ParameterTyping.Create(cmd, p));
 
-                var affected = await cmd.ExecuteNonQueryAsync(ct);
+                // A slow statement (a trigger, a huge table) is interrupted too, not only one that has not started.
+                var affected = await Scripting.ScriptRunner.CancelPump.RunAsync(cmd, () => cmd.ExecuteNonQueryAsync(ct), ct);
                 if (affected == 0) throw new StaleRowException(stmt);
                 if (stmt.ExpectsSingleRow)
                 {

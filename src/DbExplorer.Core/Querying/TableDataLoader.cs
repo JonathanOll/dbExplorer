@@ -65,22 +65,25 @@ public static class TableDataLoader
             return await InReadOnlyContextAsync(session, async (connection, tx) =>
             {
                 await using var cmd = CreateCommand(connection, tx, command);
-                await using var reader = await cmd.ExecuteReaderAsync(ct);
-
-                var names = new string[reader.FieldCount];
-                for (var i = 0; i < names.Length; i++) names[i] = reader.GetName(i);
-
-                var rows = new List<object?[]>(Math.Min(pageSize + 1, 256));
-                while (rows.Count <= pageSize && await reader.ReadAsync(ct))
+                return await ScriptRunner.CancelPump.RunAsync(cmd, async () =>
                 {
-                    var values = new object[names.Length];
-                    reader.GetValues(values);
-                    rows.Add(Array.ConvertAll(values, v => v is DBNull ? null : v));
-                }
+                    await using var reader = await cmd.ExecuteReaderAsync(ct);
 
-                var hasMore = rows.Count > pageSize;
-                if (hasMore) rows.RemoveAt(rows.Count - 1);
-                return new TablePage(names, rows, hasMore, started.Elapsed);
+                    var names = new string[reader.FieldCount];
+                    for (var i = 0; i < names.Length; i++) names[i] = reader.GetName(i);
+
+                    var rows = new List<object?[]>(Math.Min(pageSize + 1, 256));
+                    while (rows.Count <= pageSize && await reader.ReadAsync(ct))
+                    {
+                        var values = new object[names.Length];
+                        reader.GetValues(values);
+                        rows.Add(Array.ConvertAll(values, v => v is DBNull ? null : v));
+                    }
+
+                    var hasMore = rows.Count > pageSize;
+                    if (hasMore) rows.RemoveAt(rows.Count - 1);
+                    return new TablePage(names, rows, hasMore, started.Elapsed);
+                }, ct);
             }, ct);
         }, ct);
     }
@@ -94,7 +97,7 @@ public static class TableDataLoader
         return Task.Run(() => InReadOnlyContextAsync(session, async (connection, tx) =>
         {
             await using var cmd = CreateCommand(connection, tx, command);
-            var scalar = await cmd.ExecuteScalarAsync(ct);
+            var scalar = await ScriptRunner.CancelPump.RunAsync(cmd, () => cmd.ExecuteScalarAsync(ct), ct);
             return Convert.ToInt64(scalar, System.Globalization.CultureInfo.InvariantCulture);
         }, ct), ct);
     }

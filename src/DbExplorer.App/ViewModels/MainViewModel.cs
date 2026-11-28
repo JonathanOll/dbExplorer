@@ -146,7 +146,8 @@ public partial class MainViewModel : ObservableObject
             () => Tree.Config,
             Tree.SetVirtualKey,
             SwitchHooks,
-            Guard);
+            Guard,
+            Status);
 
         TableTabFactory = (session, table) => new TableTabViewModel(session, table, Hooks(session.Config.Id));
         RestoredTableTabFactory = (config, table) => new TableTabViewModel(config, table, Hooks(config.Id));
@@ -876,6 +877,7 @@ public partial class MainViewModel : ObservableObject
             (tab as ScriptTabViewModel)?.Close();
             (tab as DiagramTabViewModel)?.Close();
             (tab as CompareTabViewModel)?.Close();
+            (tab as TableTabViewModel)?.Close();
             Tabs.RemoveAt(index);
             if (ReferenceEquals(ActiveTab, tab) || ActiveTab is null)
                 ActiveTab = Tabs.Count == 0 ? null : Tabs[Math.Min(index, Tabs.Count - 1)];

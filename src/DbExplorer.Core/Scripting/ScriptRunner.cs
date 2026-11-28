@@ -287,5 +287,19 @@ public static class ScriptRunner
         {
             lock (_gate) _stopped = true;
         }
+
+        /// <summary>Runs <paramref name="run"/> (everything done with <paramref name="cmd"/>) so that cancelling also stops a running SQLite statement.</summary>
+        public static async Task<T> RunAsync<T>(DbCommand cmd, Func<Task<T>> run, CancellationToken ct)
+        {
+            var pump = new CancelPump(cmd);
+            try
+            {
+                using (ct.Register(pump.OnCancel)) return await run();
+            }
+            finally
+            {
+                pump.Stop();
+            }
+        }
     }
 }

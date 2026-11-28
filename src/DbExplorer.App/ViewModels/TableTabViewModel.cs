@@ -17,6 +17,7 @@ namespace DbExplorer.App.ViewModels;
 /// <param name="SetVirtualKey">Stores a virtual key in the config and saves it; false when it could not be saved (kept for this session).</param>
 /// <param name="Switch">Lets the tab switch between the members of its connection's group; without it the tab never switches.
 /// When given, Reload resolves the session through it too, so it follows the connection the tab was switched to.</param>
+/// <param name="Status">The status bar: a save or a row count shows there with its Cancel button. Without it they still run, uncancellable by the user.</param>
 public sealed record TableTabHooks(
     Func<CancellationToken, Task<Session?>> ResolveSession,
     Func<Session, TableRef, IReadOnlyDictionary<string, string>?, Task> OpenTable,
@@ -24,7 +25,8 @@ public sealed record TableTabHooks(
     Func<AppConfig>? GetConfig = null,
     Func<Guid, TableRef, string[], bool>? SetVirtualKey = null,
     GroupSwitchHooks? Switch = null,
-    ProductionGuard? Guard = null);
+    ProductionGuard? Guard = null,
+    StatusModel? Status = null);
 
 /// <summary>
 /// A table (or view) opened in its own tab: one page of rows at a time, with per-column filters, a raw WHERE,
@@ -43,6 +45,7 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
     private Session _session;
     private AppliedQuery? _applied;
     private CancellationTokenSource? _loadCts;
+    private CancellationTokenSource? _countCts;
     private int _loadVersion;
 
     [ObservableProperty] private ObservableCollection<RowViewModel> _rows = new();
@@ -235,14 +238,22 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
 
         var applied = _applied ?? CurrentInputs(Sort);
         var session = _session;
+        CancelCount();   // a second count replaces the first
+        var cts = _countCts = new CancellationTokenSource();
         try
         {
-            var total = await TableDataLoader.CountAsync(session, ToQuery(info, applied, 0), CancellationToken.None);
+            using var busy = _hooks.Busy($"Counting the rows of {Table.Name}…", cts.Cancel);
+            var total = await TableDataLoader.CountAsync(session, ToQuery(info, applied, 0), cts.Token);
+            if (cts.IsCancellationRequested) return -1;
             if (ReferenceEquals(_session, session) && (_applied is null || ReferenceEquals(_applied, applied)))
             {
                 TotalCount = total;
             }
             return total;
+        }
+        catch (Exception) when (cts.IsCancellationRequested)
+        {
+            return -1;   // cancelled by the user, a reload or the tab closing: not a failure
         }
         catch (ObjectDisposedException)
         {
@@ -254,6 +265,20 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
             SetError(ErrorText.Describe(e));
             return -1;
         }
+        finally
+        {
+            if (ReferenceEquals(_countCts, cts)) _countCts = null;
+            cts.Dispose();   // its own run is over: nothing holds the token any more
+        }
+    }
+
+    private void CancelCount() => _countCts?.Cancel();
+
+    /// <summary>The tab was closed: stops its page load and row count (a save never runs then: closing asks first and refuses while saving).</summary>
+    public void Close()
+    {
+        _loadCts?.Cancel();
+        CancelCount();
     }
 
     // ---- filters ----
@@ -389,6 +414,7 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
             }
         }
 
+        CancelCount();   // counted on the query and connection being reloaded
         if (await ResolveLiveSessionAsync() is not { } live) return;
         UseSession(live);
         if (_applied is { } q) await RunAsync(q, PageIndex);
@@ -453,6 +479,7 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
         var before = ErrorMessage;
         var loaded = await RunAsync(query, 0, live, info, commit: () =>
         {
+            CancelCount();   // it counts the database the tab is leaving
             Connection = live.Config;
             UseSession(live);
             TotalCount = null;   // counted on the other database
@@ -527,7 +554,7 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
             return false;
         }
 
-        _loadCts?.Cancel();
+        _loadCts?.Cancel();   // the superseded run disposes its own source when it ends
         var cts = _loadCts = new CancellationTokenSource();
         var version = ++_loadVersion;
         var session = targetSession ?? _session;
@@ -583,6 +610,8 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
         }
         finally
         {
+            if (ReferenceEquals(_loadCts, cts)) _loadCts = null;
+            cts.Dispose();
             if (version == _loadVersion)
             {
                 IsLoading = false;
@@ -680,5 +709,14 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
         public Func<Guid, TableRef, string[], bool>? SetVirtualKey => hooks?.SetVirtualKey;
 
         public AppConfig? GetConfig() => hooks?.GetConfig?.Invoke();
+
+        /// <summary>Shows <paramref name="text"/> in the status bar with a Cancel button until disposed (a no-op without a status bar).</summary>
+        public IDisposable Busy(string text, Action cancel) => hooks?.Status?.Busy(text, cancel) ?? NoScope.Instance;
+
+        private sealed class NoScope : IDisposable
+        {
+            public static readonly NoScope Instance = new();
+            public void Dispose() { }
+        }
     }
 }
