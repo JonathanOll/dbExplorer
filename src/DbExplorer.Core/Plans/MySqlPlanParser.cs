@@ -188,6 +188,10 @@ public static partial class MySqlPlanParser
                 break;
             case JsonValueKind.Null:
                 break;
+            // Whole numbers ("rows_examined_per_scan": 96000) read like the other figures of the plan: "96,000".
+            case JsonValueKind.Number when value.TryGetInt64(out var whole):
+                properties.Add(new PlanProperty(GroupOf(name), name, whole.ToString("N0", Inv)));
+                break;
             default:
                 properties.Add(new PlanProperty(GroupOf(name), name, value.ToString()));
                 break;
@@ -315,8 +319,8 @@ public static partial class MySqlPlanParser
         if (actual.Success)
         {
             node.ActualTimeMs = Parse(actual.Groups["last"].Value) * Parse(actual.Groups["loops"].Value);
-            node.Properties.Add(new PlanProperty("Rows", "Actual rows per loop", actual.Groups["rows"].Value));
-            node.Properties.Add(new PlanProperty("Rows", "Loops", actual.Groups["loops"].Value));
+            node.Properties.Add(new PlanProperty("Rows", "Actual rows per loop", ShowplanParser.FormatNumber(Parse(actual.Groups["rows"].Value))));
+            node.Properties.Add(new PlanProperty("Rows", "Loops", ShowplanParser.FormatNumber(Parse(actual.Groups["loops"].Value))));
             node.Properties.Add(new PlanProperty("Time", "Actual time per loop", $"{actual.Groups["first"].Value}..{actual.Groups["last"].Value} ms"));
         }
         var childCost = children.Sum(c => c.SubtreeCost);
@@ -326,7 +330,7 @@ public static partial class MySqlPlanParser
             if (cost.Groups["rows"].Success)
             {
                 node.EstimatedRows = Parse(cost.Groups["rows"].Value) * Math.Max(1, loops ?? 1);
-                node.Properties.Add(new PlanProperty("Rows", "Estimated rows per loop", cost.Groups["rows"].Value));
+                node.Properties.Add(new PlanProperty("Rows", "Estimated rows per loop", ShowplanParser.FormatNumber(Parse(cost.Groups["rows"].Value))));
             }
             node.Properties.Add(new PlanProperty("Costs", "Total cost", cost.Groups["cost"].Value));
         }

@@ -166,7 +166,7 @@ public sealed partial class PlanCompareViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ZoomText))]
     [ObservableProperty] private double _zoom = 1;
 
-    public string ZoomText => $"{Zoom * 100:0}%";
+    public string ZoomText => PlanFormat.Percent(Zoom * 100, "0");
 
     partial void OnZoomChanged(double value)
     {

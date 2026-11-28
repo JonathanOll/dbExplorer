@@ -151,6 +151,22 @@ public class PlanViewModelTests
     }
 
     [Fact]
+    public void Figures_AreInvariant_WhateverTheMachineCulture()
+    {
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("fr-FR");
+        try
+        {
+            var tab = PlanSamples.Tab();
+            tab.Zoom = 0.75;
+            Assert.Equal("75%", tab.ZoomText);
+            Assert.Equal("1,200", PlanNodeViewModel.Count(1200));
+            Assert.Equal("12.3 ms", PlanNodeViewModel.FormatMs(12.34));
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = culture; }
+    }
+
+    [Fact]
     public void Keys_CtrlL_IsTheEstimatedPlan_CtrlM_TogglesTheActualOne()
     {
         Assert.Equal(ScriptKeyAction.EstimatedPlan, ScriptTabKeys.Resolve(Key.L, KeyModifiers.Control));

@@ -116,6 +116,35 @@ public class MySqlPlanTests
     }
 
     [Fact]
+    public void MySqlRowCounts_HaveThousandSeparators_LikeTheRestOfThePlan()
+    {
+        var plan = MySqlPlanParser.Parse("-> Table scan on o  (cost=3400 rows=96000) (actual time=0.4..150 rows=96000 loops=1)", PlanMode.Actual, "SELECT 1");
+        var scan = Assert.Single(plan.Statements).Root!;
+
+        Assert.Equal("96,000", scan.Properties.Single(p => p.Name == "Estimated rows per loop").Value);
+        Assert.Equal("96,000", scan.Properties.Single(p => p.Name == "Actual rows per loop").Value);
+        Assert.Equal("1", scan.Properties.Single(p => p.Name == "Loops").Value);
+    }
+
+    [Fact]
+    public void PlanFormat_IsInvariant_WhateverTheMachineCulture()
+    {
+        var culture = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("fr-FR");
+        try
+        {
+            Assert.Equal("12.3 ms", PlanFormat.Ms(12.34));
+            Assert.Equal("12.5 s", PlanFormat.Ms(12_500));
+            Assert.Equal("71.4%", PlanFormat.Percent(71.4));
+            Assert.Equal("1,200", PlanFormat.Count(1200));
+            Assert.Equal("84K", PlanFormat.Compact(84_000));
+            Assert.Equal("1.2M", PlanFormat.Compact(1_200_000));
+            Assert.Equal("5.12", PlanFormat.Number(5.12));
+        }
+        finally { System.Globalization.CultureInfo.CurrentCulture = culture; }
+    }
+
+    [Fact]
     public void MySqlJsonVersion2_ReadsOperations()
     {
         var st = Parse("""

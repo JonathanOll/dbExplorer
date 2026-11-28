@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DbExplorer.Core.Model;
@@ -39,8 +38,6 @@ public static class PlanCategory
 /// <summary>One operator as the canvas shows it: its box, its labels, how hot it is.</summary>
 public sealed partial class PlanNodeViewModel : ObservableObject
 {
-    private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
-
     public PlanNodeViewModel(PlanNode node, PlanBox box, bool hasCost)
     {
         Node = node;
@@ -49,7 +46,7 @@ public sealed partial class PlanNodeViewModel : ObservableObject
         Title = node.Name;
         Subtitle = node.Object ?? node.Logical;
         HasCost = hasCost;
-        CostText = !hasCost ? null : node.CostShare <= 0 ? "0%" : node.CostShare < 0.005 ? "<1%" : (node.CostShare * 100).ToString("0", Inv) + "%";
+        CostText = !hasCost ? null : node.CostShare <= 0 ? "0%" : node.CostShare < 0.005 ? "<1%" : PlanFormat.Percent(node.CostShare * 100, "0");
         RowsText = RowsLine(node);
         TimeText = node.OwnTimeMs is { } t ? FormatMs(t) : null;
         HasWarning = node.Warnings.Count > 0;
@@ -141,10 +138,9 @@ public sealed partial class PlanNodeViewModel : ObservableObject
     /// <summary>Set when the plan is shown in a comparison: the card's badge, tag and outline.</summary>
     public PlanCompareState? Compare { get; set; }
 
-    internal static string FormatMs(double ms) =>
-        ms >= 10_000 ? $"{ms / 1000:0.#} s" : ms >= 100 ? $"{ms:0} ms" : ms >= 1 ? $"{ms:0.#} ms" : $"{ms:0.###} ms";
+    internal static string FormatMs(double ms) => PlanFormat.Ms(ms);
 
-    internal static string Count(double v) => v >= 1e7 ? $"{v / 1e6:0.#}M" : v.ToString("N0", Inv);
+    internal static string Count(double v) => PlanFormat.Count(v);
 
     private static string? RowsLine(PlanNode n)
     {
@@ -173,7 +169,7 @@ public sealed partial class PlanNodeViewModel : ObservableObject
         return string.Join("\n", lines);
     }
 
-    private static string ShowFormat(double v) => v == 0 ? "0" : v < 0.001 ? v.ToString("0.#####E+0", Inv) : v.ToString("0.####", Inv);
+    private static string ShowFormat(double v) => v == 0 ? "0" : v < 0.001 ? PlanFormat.Number(v, "0.#####E+0") : PlanFormat.Number(v);
 
     internal static string Trim(string s, int max) => s.Length <= max ? s : s[..max] + "…";
 }
@@ -237,7 +233,7 @@ public sealed partial class PlanStatementViewModel : ObservableObject
         var issues = new List<PlanIssue>();
         foreach (var w in statement.Warnings) issues.Add(new PlanIssue("warn", w.Title, w.Detail, null));
         foreach (var m in statement.MissingIndexes)
-            issues.Add(new PlanIssue("index", $"Missing index on {m.Schema}.{m.Table} · saves about {m.ImpactPercent:0.#}%", m.CreateScript, null, m.CreateScript));
+            issues.Add(new PlanIssue("index", $"Missing index on {m.Schema}.{m.Table} · saves about {PlanFormat.Percent(m.ImpactPercent)}", m.CreateScript, null, m.CreateScript));
         foreach (var vm in Nodes)
         {
             foreach (var w in vm.Node.Warnings) issues.Add(new PlanIssue("warn", $"{vm.Title}: {w.Title}", w.Detail, vm));
@@ -255,8 +251,7 @@ public sealed partial class PlanStatementViewModel : ObservableObject
     }
 
     /// <summary>Short row count for the arrows: "840", "84K", "1.2M".</summary>
-    internal static string Compact(double v) =>
-        v >= 1e6 ? $"{v / 1e6:0.#}M" : v >= 1e5 ? $"{v / 1e3:0}K" : v >= 1e4 ? $"{v / 1e3:0.#}K" : v.ToString("N0", CultureInfo.InvariantCulture);
+    internal static string Compact(double v) => PlanFormat.Compact(v);
 
     public QueryPlan Plan { get; }
 
@@ -287,7 +282,7 @@ public sealed partial class PlanStatementViewModel : ObservableObject
     /// <summary>"Query 2 · 45% of the batch" for the chip of a statement.</summary>
     public string Title => $"Query {Number}";
 
-    public string? Subtitle => Statement.HasCost && BatchShare > 0 ? $"{BatchShare * 100:0}% of the batch" : null;
+    public string? Subtitle => Statement.HasCost && BatchShare > 0 ? $"{PlanFormat.Percent(BatchShare * 100, "0")} of the batch" : null;
 
     public string StatementText => Statement.Text;
 
@@ -307,7 +302,7 @@ public sealed partial class PlanStatementViewModel : ObservableObject
     public bool HasMissingIndex => BestMissingIndex is not null;
 
     public string MissingIndexText => BestMissingIndex is { } m
-        ? $"Missing index on {m.Schema}.{m.Table}: the optimizer estimates it would cut this query's cost by {m.ImpactPercent:0.#}%."
+        ? $"Missing index on {m.Schema}.{m.Table}: the optimizer estimates it would cut this query's cost by {PlanFormat.Percent(m.ImpactPercent)}."
         : "";
 
     public string? MissingIndexScript => BestMissingIndex?.CreateScript;
@@ -318,7 +313,7 @@ public sealed partial class PlanStatementViewModel : ObservableObject
         get
         {
             var parts = new List<string>();
-            if (Statement.HasCost) parts.Add($"cost {Statement.TotalCost.ToString("0.####", CultureInfo.InvariantCulture)}");
+            if (Statement.HasCost) parts.Add($"cost {PlanFormat.Number(Statement.TotalCost)}");
             if (Statement.Root?.EstimatedRows is { } e) parts.Add($"~{PlanNodeViewModel.Count(e)} rows estimated");
             if (Statement.Root?.ActualRows is { } a) parts.Add($"{PlanNodeViewModel.Count(a)} rows returned");
             if (Statement.ExecutionTimeMs is { } x) parts.Add($"executed in {PlanNodeViewModel.FormatMs(x)}");
@@ -385,7 +380,7 @@ public sealed partial class PlanStatementViewModel : ObservableObject
 
     /// <summary>The share of the cost (or time) shown in the Top tab: own cost over the statement's.</summary>
     private static string ShareText(PlanNode n, PlanStatement s) =>
-        s.HasCost ? (n.CostShare < 0.005 ? "<1%" : (n.CostShare * 100).ToString("0", CultureInfo.InvariantCulture) + "%")
+        s.HasCost ? (n.CostShare < 0.005 ? "<1%" : PlanFormat.Percent(n.CostShare * 100, "0"))
         : n.OwnTimeMs is { } t ? PlanNodeViewModel.FormatMs(t) : "";
 
     /// <summary>Recolours every operator by <paramref name="metric"/>.</summary>
@@ -488,7 +483,7 @@ public sealed partial class PlanResultTab : ObservableObject, IResultTab
     [NotifyPropertyChangedFor(nameof(ZoomText))]
     [ObservableProperty] private double _zoom = 1;
 
-    public string ZoomText => $"{Zoom * 100:0}%";
+    public string ZoomText => PlanFormat.Percent(Zoom * 100, "0");
 
     partial void OnZoomChanged(double value)
     {

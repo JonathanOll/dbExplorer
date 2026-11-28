@@ -139,7 +139,7 @@ public sealed class PlanDiff
             if (cost is null && time is null)
             {
                 var count = Statement.First(m => m.Name == "Operators");
-                parts.Add($"{count.Before:0} → {count.After:0} operators");
+                parts.Add($"{PlanFormat.Number(count.Before ?? 0, "0")} → {PlanFormat.Number(count.After ?? 0, "0")} operators");
             }
 
             var changes = new List<string>();
@@ -171,14 +171,28 @@ public static class PlanFormat
         PlanUnit.Cost => Cost(v),
         PlanUnit.Milliseconds => Ms(v),
         PlanUnit.Percent => (v * 100).ToString(v < 0.01 && v > 0 ? "0.#" : "0", Inv) + "%",
-        _ => v >= 1e7 ? (v / 1e6).ToString("0.#", Inv) + "M" : v.ToString("N0", Inv),
+        _ => Count(v),
     };
 
     public static string Cost(double v) =>
         v == 0 ? "0" : v >= 100 ? v.ToString("0", Inv) : v >= 10 ? v.ToString("0.#", Inv) : v >= 1 ? v.ToString("0.##", Inv) : v >= 0.001 ? v.ToString("0.####", Inv) : v.ToString("0.###E+0", Inv);
 
+    // Every figure of the plan views is invariant (the UI is English): "1,200 rows", "5.12", "71.4%", never "71,4%" next to "5.12".
     public static string Ms(double ms) =>
-        ms >= 10_000 ? $"{ms / 1000:0.#} s" : ms >= 100 ? $"{ms:0} ms" : ms >= 1 ? $"{ms:0.#} ms" : $"{ms:0.###} ms";
+        ms >= 10_000 ? (ms / 1000).ToString("0.#", Inv) + " s" : ms >= 100 ? ms.ToString("0", Inv) + " ms" : ms >= 1 ? ms.ToString("0.#", Inv) + " ms" : ms.ToString("0.###", Inv) + " ms";
+
+    /// <summary>"71.4%" from 71.4 (a percentage, not a share).</summary>
+    public static string Percent(double percent, string format = "0.#") => percent.ToString(format, Inv) + "%";
+
+    /// <summary>"1,200" or "12.5M": a row or execution count.</summary>
+    public static string Count(double v) => v >= 1e7 ? (v / 1e6).ToString("0.#", Inv) + "M" : v.ToString("N0", Inv);
+
+    /// <summary>Short row count for the arrows: "840", "84K", "1.2M".</summary>
+    public static string Compact(double v) =>
+        v >= 1e6 ? (v / 1e6).ToString("0.#", Inv) + "M" : v >= 1e5 ? (v / 1e3).ToString("0", Inv) + "K" : v >= 1e4 ? (v / 1e3).ToString("0.#", Inv) + "K" : v.ToString("N0", Inv);
+
+    /// <summary>A plain number with up to <paramref name="format"/> decimals, invariant ("5.12").</summary>
+    public static string Number(double v, string format = "0.####") => v.ToString(format, Inv);
 
     /// <summary>"+12" or "-64" with a real minus; <paramref name="format"/> is a .NET number format.</summary>
     public static string Signed(double v, string format) => (v > 0 ? "+" : v < 0 ? "-" : "") + Math.Abs(v).ToString(format, Inv);
