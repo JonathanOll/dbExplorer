@@ -4,7 +4,7 @@
   UserControl.Styles, so the short class names (tile, cost, warn) do not leak into other views and nothing loads before
   the first plan is shown.
   Classes: Border.plannode (+ path / selected), Border.tile (operator icon square), views|HeatBar (+ low / mid / high),
-  TextBlock.cost (+ mid / high), PathIcon.warn / hint / bad.
+  TextBlock.nodetitle / nodemeta (card text), TextBlock.cost (+ mid / high), PathIcon.warn / hint / bad.
 -->
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -28,7 +28,7 @@
   <Style Selector="Border.tile">
     <Setter Property="Width" Value="32" />
     <Setter Property="Height" Value="32" />
-    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="CornerRadius" Value="{DynamicResource DbxRadiusMd}" />
     <Setter Property="Background" Value="{DynamicResource DbxHover}" />
   </Style>
   <Style Selector="Border.tile > PathIcon">
@@ -37,6 +37,12 @@
     <Setter Property="Foreground" Value="{DynamicResource DbxIcon}" />
   </Style>
 
+  <!-- card text: the card's size is fixed by the layout (188 x 74), so its lines are a notch under the UI font -->
+  <Style Selector="TextBlock.nodetitle">
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="FontSize" Value="{DynamicResource DbxMonoFontSize}" />
+  </Style>
+  <Style Selector="TextBlock.nodemeta"><Setter Property="FontSize" Value="11" /></Style>
   <Style Selector="views|HeatBar">
     <Setter Property="Track" Value="{DynamicResource DbxBorder}" />
     <Setter Property="Fill" Value="{DynamicResource DbxTextFaint}" />

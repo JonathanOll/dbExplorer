@@ -16,6 +16,17 @@ public static class FreeCanvasMath
     public static double Pad(double view, double content) =>
         Math.Max(0, view - Math.Max(0, Math.Min(Math.Min(Keep, view / 2), content)));
 
+    /// <summary>
+    /// The offset that frames the content after a Fit: centred when it fits in the viewport with <paramref name="gutter"/> on
+    /// each side, else its start <paramref name="gutter"/> away from the viewport's edge (the rest is reached by scrolling).
+    /// </summary>
+    public static double FrameOffset(double view, double content, double gutter)
+    {
+        var pad = Pad(view, content);
+        var start = content + 2 * gutter <= view ? (view - content) / 2 : gutter;
+        return Clamp(Math.Round(pad - start), view, content);   // whole pixels: crisp cards, no drift on the next zoom
+    }
+
     /// <summary>The offset kept inside the padded extent.</summary>
     public static double Clamp(double offset, double view, double content) =>
         Math.Clamp(offset, 0, Math.Max(0, content + 2 * Pad(view, content) - view));

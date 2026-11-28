@@ -28,6 +28,7 @@ public partial class PlanView : UserControl
         DataContextChanged += (_, _) => Attach();
         _canvas = new FreeCanvas(Scroller, Zoomer, OnWheelZoom);
         Scroller.KeyDown += OnKeyDown;
+        Body.SizeChanged += (_, _) => KeepCanvasWidth();
         Scroller.SizeChanged += (_, _) => Dispatcher.UIThread.Post(() => { if (_fitPending) { _fitPending = false; Fit(auto: true); } }, DispatcherPriority.Loaded);
     }
 
@@ -43,12 +44,12 @@ public partial class PlanView : UserControl
         _tab.PropertyChanged += OnTabChanged;
         if (_statement is not null) _statement.PropertyChanged += OnStatementChanged;
         ApplyZoom();
-        // A big plan opens fitted; a small one at 100%.
-        _fitPending = _statement is { } s && (s.CanvasWidth > 1100 || s.CanvasHeight > 700);
+        // Opens fitted: a small plan at 100%, centred; a big one shrunk down to 70% at most.
+        _fitPending = _statement is not null;
         Dispatcher.UIThread.Post(() =>
         {
             _canvas.Home();
-            if (_fitPending && Scroller.Bounds.Width > 0) { _fitPending = false; Fit(); }
+            if (_fitPending && Scroller.Bounds.Width > 0) { _fitPending = false; Fit(auto: true); }
         }, DispatcherPriority.Loaded);
     }
 
@@ -68,7 +69,21 @@ public partial class PlanView : UserControl
             var show = _tab?.ShowSidePanel == true;
             side.MinWidth = show ? 240 : 0;
             side.Width = show ? new GridLength(360) : new GridLength(0);
+            KeepCanvasWidth();
         }
+    }
+
+    private const double CanvasMinWidth = 420, SideMinWidth = 240;
+
+    // A narrow tab (the Claude panel open beside it) shrinks the details panel before the plan: the canvas keeps 420 px
+    // while the panel can go down to its 240 px minimum.
+    private void KeepCanvasWidth()
+    {
+        if (_tab?.ShowSidePanel != true) return;
+        var side = Body.ColumnDefinitions[2];
+        var room = Body.Bounds.Width - CanvasMinWidth;
+        if (Body.Bounds.Width <= 0 || side.ActualWidth <= room) return;
+        side.Width = new GridLength(Math.Max(SideMinWidth, room));
     }
 
     private void OnStatementChanged(object? sender, PropertyChangedEventArgs e)
@@ -80,14 +95,17 @@ public partial class PlanView : UserControl
 
     private void ApplyZoom() => _canvas.SetZoom(_tab?.Zoom ?? 1, _zoomAnchor);
 
-    /// <param name="auto">On opening: never smaller than 70%, where the text stays readable (the Fit button shows the whole plan whatever the size).</param>
+    /// <summary>Zoom and gutter of Fit: below 70% the operator names are no longer readable, so a bigger plan is scrolled instead.</summary>
+    internal const double MinFitZoom = 0.7, FitGutter = 16;
+
+    /// <param name="auto">On opening and on a new statement: also brings the selected (costliest) operator into view.</param>
     private void Fit(bool auto = false)
     {
         if (_tab is null || _statement is not { CanvasWidth: > 0, CanvasHeight: > 0 } s) return;
         var view = Scroller.Bounds.Size;
         if (view.Width < 50 || view.Height < 50) { _fitPending = auto; return; }
-        _tab.Zoom = Math.Clamp(Math.Min(Math.Min((view.Width - 4) / s.CanvasWidth, (view.Height - 4) / s.CanvasHeight), 1), auto ? 0.7 : 0.25, 1);
-        _canvas.Home();
+        _tab.Zoom = Math.Clamp(Math.Min(Math.Min((view.Width - 2 * FitGutter) / s.CanvasWidth, (view.Height - 2 * FitGutter) / s.CanvasHeight), 1), MinFitZoom, 1);
+        _canvas.Frame(FitGutter);
         // Opening: show the operator that is selected (the costliest), not the empty corner next to the root.
         if (auto && _statement?.SelectedNode is { } hot) Dispatcher.UIThread.Post(() => BringIntoView(hot), DispatcherPriority.Loaded);
     }
@@ -223,26 +241,25 @@ public partial class PlanView : UserControl
 
     private async void OnSavePlanClick(object? sender, RoutedEventArgs e)
     {
-        if (_tab?.Raw is not { } raw || TopLevel.GetTopLevel(this) is not { } top) return;
+        if (_tab is not { } tab || TopLevel.GetTopLevel(this) is not { } top) return;
         try
         {
-            var ext = _tab.FileExtension;
-            var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            // The tab writes the file and reports a failure in its banner; only the picker needs the window.
+            await tab.SaveAsync(async () =>
             {
-                Title = "Save the plan",
-                SuggestedFileName = _tab.SuggestedFileName,
-                DefaultExtension = ext.TrimStart('.'),
-                FileTypeChoices = [new FilePickerFileType(_tab.FileKindName) { Patterns = [$"*{ext}"] }],
+                var ext = tab.FileExtension;
+                var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+                {
+                    Title = "Save the plan",
+                    SuggestedFileName = tab.SuggestedFileName,
+                    DefaultExtension = ext.TrimStart('.'),
+                    FileTypeChoices = [new FilePickerFileType(tab.FileKindName) { Patterns = [$"*{ext}"] }],
+                });
+                return file is null ? null : await file.OpenWriteAsync();
             });
-            if (file is null) return;
-            await using var stream = await file.OpenWriteAsync();
-            stream.SetLength(0);
-            await using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false));
-            await writer.WriteAsync(raw);
         }
         catch (Exception ex)
         {
-            // Saving is a convenience: say what happened in the details panel's place, never crash the tab.
             System.Diagnostics.Trace.WriteLine("Saving the plan failed: " + ex.Message);
         }
     }

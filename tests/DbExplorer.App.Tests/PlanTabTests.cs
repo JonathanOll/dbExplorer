@@ -151,6 +151,40 @@ public class PlanViewModelTests
     }
 
     [Fact]
+    public async Task Save_WritesTheRawPlan_AndAFailureIsShownInTheTab()
+    {
+        var tab = PlanSamples.Tab();
+        var stream = new MemoryStream();
+        await tab.SaveAsync(() => Task.FromResult<Stream?>(new NonClosingStream(stream)));
+        Assert.StartsWith("<ShowPlanXML", System.Text.Encoding.UTF8.GetString(stream.ToArray()));
+        Assert.False(tab.HasSaveError);
+
+        await tab.SaveAsync(() => throw new IOException("the disk is full"));
+        Assert.True(tab.HasSaveError);
+        Assert.Contains("the disk is full", tab.SaveError);
+
+        tab.DismissSaveErrorCommand.Execute(null);
+        Assert.False(tab.HasSaveError);
+
+        await tab.SaveAsync(() => Task.FromResult<Stream?>(null));   // the picker was cancelled: nothing to say
+        Assert.False(tab.HasSaveError);
+    }
+
+    private sealed class NonClosingStream(Stream inner) : Stream
+    {
+        public override bool CanRead => inner.CanRead;
+        public override bool CanSeek => inner.CanSeek;
+        public override bool CanWrite => inner.CanWrite;
+        public override long Length => inner.Length;
+        public override long Position { get => inner.Position; set => inner.Position = value; }
+        public override void Flush() => inner.Flush();
+        public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+        public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
+        public override void SetLength(long value) => inner.SetLength(value);
+        public override void Write(byte[] buffer, int offset, int count) => inner.Write(buffer, offset, count);
+    }
+
+    [Fact]
     public void Figures_AreInvariant_WhateverTheMachineCulture()
     {
         var culture = System.Globalization.CultureInfo.CurrentCulture;

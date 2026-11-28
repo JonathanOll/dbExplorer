@@ -632,6 +632,40 @@ public sealed partial class PlanResultTab : ObservableObject, IResultTab
     /// <summary>"Query 1" or a file name for Save.</summary>
     public string SuggestedFileName => $"plan{(Statements.Count > 1 && Selected is { } s ? "-" + s.Number : "")}{FileExtension}";
 
+    /// <summary>Why the last Save failed, shown as a banner over the plan until dismissed; null when it did not fail.</summary>
+    [NotifyPropertyChangedFor(nameof(HasSaveError))]
+    [ObservableProperty] private string? _saveError;
+
+    public bool HasSaveError => SaveError is not null;
+
+    /// <summary>
+    /// Writes <see cref="Raw"/> to the stream <paramref name="open"/> returns (the view asks the file picker; null = cancelled).
+    /// A failure is reported in <see cref="SaveError"/>: saving is a convenience and never breaks the tab.
+    /// </summary>
+    public async Task SaveAsync(Func<Task<Stream?>> open)
+    {
+        SaveError = null;
+        if (Raw is not { } raw) return;
+        try
+        {
+            var stream = await open();
+            if (stream is null) return;
+            await using (stream)
+            {
+                if (stream.CanSeek) stream.SetLength(0);
+                await using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false));
+                await writer.WriteAsync(raw);
+            }
+        }
+        catch (Exception ex)
+        {
+            SaveError = $"Cannot save the plan: {ErrorText.Describe(ex)}";
+        }
+    }
+
+    [RelayCommand]
+    private void DismissSaveError() => SaveError = null;
+
     partial void OnSelectedChanged(PlanStatementViewModel? value)
     {
         OnPropertyChanged(nameof(Raw));

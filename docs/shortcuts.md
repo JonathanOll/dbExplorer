@@ -25,7 +25,7 @@ Every shortcut of the app. The same list is in the app (`F1`, and Settings > Sho
 | `Esc` | Claude panel | Stop the question, then close the panel |
 | `Mouse wheel` / `Ctrl+wheel` | execution plan | Zoom around the cursor |
 | `Drag` / `Shift+wheel` | execution plan | Pan the plan / pan it sideways |
-| `Ctrl++` / `Ctrl+-` / `Ctrl+0` | execution plan | Zoom in / zoom out / fit the whole plan |
+| `Ctrl++` / `Ctrl+-` / `Ctrl+0` | execution plan, plan comparison | Zoom in / zoom out / fit the plan (both plans when comparing) |
 | `Mouse wheel` / `Ctrl+wheel` | ER diagram | Zoom around the cursor |
 | `Drag` / `Shift+wheel` | ER diagram | Pan the canvas (or move a table) / pan sideways; arrows pan too |
 | `Ctrl++` / `Ctrl+-` / `Ctrl+0` | ER diagram | Zoom in / zoom out / fit the whole diagram |

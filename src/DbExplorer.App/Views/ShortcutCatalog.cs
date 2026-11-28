@@ -72,7 +72,7 @@ public static class ShortcutCatalog
             new("Mouse wheel", "Zoom around the cursor (with or without Ctrl)"),
             new("Drag", "Pan the plan (Shift+wheel pans sideways)"),
             new("Ctrl++ / Ctrl+-", "Zoom in or out"),
-            new("Ctrl+0", "Fit the whole plan in the window"),
+            new("Ctrl+0", "Fit the plan (or both compared plans) in the window"),
         ]),
         new("ER diagram", [
             new("Mouse wheel", "Zoom around the cursor (with or without Ctrl)"),

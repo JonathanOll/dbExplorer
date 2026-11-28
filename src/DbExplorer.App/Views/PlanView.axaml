@@ -32,11 +32,11 @@
           <StackPanel Orientation="Horizontal" Spacing="4" IsVisible="{Binding Selected.CanColour}">
           <TextBlock Classes="dim small" Text="Colour by" VerticalAlignment="Center" Margin="4,0,4,0" />
           <ToggleButton Classes="segment" Content="Cost" IsChecked="{Binding IsCost, Mode=TwoWay}" IsEnabled="{Binding Selected.CanColourByCost}" Click="OnMetricClick"
-                        ToolTip.ShowOnDisabled="True" ToolTip.Tip="Estimated cost of each operator: the optimizer's own measure of where the work is" />
+                        ToolTip.ShowOnDisabled="True" ToolTip.Tip="Estimated cost of each operator: the optimizer's own measure of where the work is. Only a plan with costs has it (SQLite reports none)." />
           <ToggleButton Classes="segment" Content="Time" IsChecked="{Binding IsTime, Mode=TwoWay}" IsEnabled="{Binding Selected.CanColourByTime}" Click="OnMetricClick"
                         ToolTip.ShowOnDisabled="True" ToolTip.Tip="Time really spent in each operator. Only an actual plan has it." />
           <ToggleButton Classes="segment" Content="Rows" IsChecked="{Binding IsRows, Mode=TwoWay}" IsEnabled="{Binding Selected.CanColourByRows}" Click="OnMetricClick"
-                        ToolTip.ShowOnDisabled="True" ToolTip.Tip="Rows each operator produces (log scale)" />
+                        ToolTip.ShowOnDisabled="True" ToolTip.Tip="Rows each operator produces (log scale). Only a plan with row counts or estimates has it." />
           <Border Classes="vsep" />
           </StackPanel>
           <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRemove}" Click="OnZoomOutClick" AutomationProperties.Name="Zoom out">
@@ -50,9 +50,9 @@
               <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Zoom in (or mouse wheel)" /><Border Classes="kbd"><TextBlock Text="Ctrl++" /></Border></StackPanel>
             </ToolTip.Tip>
           </Button>
-          <Button Classes="ghost" MinHeight="28" Padding="8,0" Content="Fit" Click="OnFitClick" AutomationProperties.Name="Fit the plan to the window">
+          <Button Classes="ghost" MinHeight="28" Padding="8,0" Content="Fit" VerticalContentAlignment="Center" Click="OnFitClick" AutomationProperties.Name="Fit the plan to the window">
             <ToolTip.Tip>
-              <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Fit the whole plan in the window" /><Border Classes="kbd"><TextBlock Text="Ctrl+0" /></Border></StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="Fit the plan in the window (never below 70%: scroll for the rest)" /><Border Classes="kbd"><TextBlock Text="Ctrl+0" /></Border></StackPanel>
             </ToolTip.Tip>
           </Button>
         </StackPanel>
@@ -64,11 +64,11 @@
           </Button>
           <Button Classes="ghost" MinHeight="28" Padding="8,0" Command="{Binding PinPlanCommand}" IsEnabled="{Binding CanPin}" IsVisible="{Binding !IsSelectedPinned}"
                   ToolTip.ShowOnDisabled="True" ToolTip.Tip="{Binding PinTooltip}" AutomationProperties.Name="Pin this plan as the baseline">
-            <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource IconLocate}" Width="12" Height="12" /><TextBlock Text="Pin plan" /></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource IconPin}" Width="12" Height="12" /><TextBlock Text="Pin plan" /></StackPanel>
           </Button>
           <Button Classes="ghost" MinHeight="28" Padding="8,0" Command="{Binding UnpinPlanCommand}" IsVisible="{Binding IsSelectedPinned}"
                   ToolTip.Tip="This plan is the pinned baseline. Click to unpin it." AutomationProperties.Name="Unpin the plan">
-            <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource IconLocate}" Width="12" Height="12" /><TextBlock Text="Pinned" FontWeight="SemiBold" /></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource IconPin}" Width="12" Height="12" /><TextBlock Text="Pinned" FontWeight="SemiBold" /></StackPanel>
           </Button>
           <Button x:Name="CompareButton" Classes="ghost" MinHeight="28" Padding="8,0" AutomationProperties.Name="Compare this plan with another"
                   ToolTip.Tip="Compare this plan with another one: operator by operator, before and after an index or a rewrite">
@@ -83,13 +83,13 @@
                         <Button Classes="planrow" Tag="{Binding}" Click="OnCompareChoiceClick">
                           <StackPanel>
                             <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
-                            <TextBlock Classes="dim num" Text="{Binding Detail}" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Classes="dim num small" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
                           </StackPanel>
                         </Button>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
-                  <TextBlock Classes="dim" TextWrapping="Wrap" FontSize="12" Margin="4,2,4,4" IsVisible="{Binding HasNoCompareChoices}"
+                  <TextBlock Classes="dim small" TextWrapping="Wrap" Margin="4,2,4,4" IsVisible="{Binding HasNoCompareChoices}"
                              Text="No other plan to compare with yet. Pin this plan, change the query or add an index, then run again: the new plan can be compared with the pinned one." />
                 </StackPanel>
               </Flyout>
@@ -115,8 +115,8 @@
           <DataTemplate x:DataType="vm:PlanStatementViewModel">
             <Button Classes="ghost" MinHeight="26" Padding="10,0" Margin="0,0,6,4" Tag="{Binding}" Click="OnStatementClick" ToolTip.Tip="{Binding StatementPreview}">
               <StackPanel Orientation="Horizontal" Spacing="6">
-                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
-                <TextBlock Classes="dim" Text="{Binding Subtitle}" FontSize="11.5" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="{DynamicResource DbxMonoFontSize}" VerticalAlignment="Center" />
+                <TextBlock Classes="dim small" Text="{Binding Subtitle}" VerticalAlignment="Center" />
               </StackPanel>
             </Button>
           </DataTemplate>
@@ -128,12 +128,22 @@
     <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1" Padding="12,6">
       <StackPanel Spacing="2">
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <TextBlock Text="{Binding Selected.Title}" FontWeight="SemiBold" FontSize="12.5" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding Selected.Title}" FontWeight="SemiBold" FontSize="{DynamicResource DbxMonoFontSize}" VerticalAlignment="Center" />
           <TextBlock Classes="dim num" Text="{Binding Selected.Summary}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
         </StackPanel>
-        <TextBlock Text="{Binding Selected.StatementPreview}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="11.5"
+        <TextBlock Text="{Binding Selected.StatementPreview}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="{DynamicResource DbxMonoFontSize}"
                    Foreground="{DynamicResource DbxTextDim}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Selected.StatementText}" />
       </StackPanel>
+    </Border>
+
+    <!-- Save plan failed: said here, the tab stays usable -->
+    <Border DockPanel.Dock="Top" Classes="banner error" IsVisible="{Binding HasSaveError}">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <PathIcon Classes="bi" Data="{StaticResource IconError}" Margin="0,1,10,0" VerticalAlignment="Center" />
+        <SelectableTextBlock Grid.Column="1" Text="{Binding SaveError}" TextWrapping="Wrap" VerticalAlignment="Center" />
+        <Button Grid.Column="2" Theme="{StaticResource DbxToolButton}" Classes="close" Tag="{StaticResource IconClose}" Margin="12,0,0,0" VerticalAlignment="Center"
+                Command="{Binding DismissSaveErrorCommand}" ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss the save error" />
+      </Grid>
     </Border>
 
     <!-- A missing index is the one thing worth saying before the picture -->
@@ -143,7 +153,8 @@
         <TextBlock Grid.Column="1" Text="{Binding Selected.MissingIndexText}" TextWrapping="Wrap" VerticalAlignment="Center" />
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" Margin="12,0,0,0" VerticalAlignment="Center">
           <Button Classes="ghost" MinHeight="26" Padding="8,0" Content="Copy CREATE INDEX" Click="OnCopyIndexClick" ToolTip.Tip="Copy the statement that creates the suggested index" />
-          <Button Classes="ghost" MinHeight="26" Padding="8,0" Content="Details" Click="OnShowIssuesClick" />
+          <Button Classes="ghost" MinHeight="26" Padding="8,0" Content="Show issues" Click="OnShowIssuesClick"
+                  ToolTip.Tip="Open the Issues tab of the details panel: the suggested index and every other warning" AutomationProperties.Name="Show the issues of the plan" />
         </StackPanel>
       </Grid>
     </Border>
@@ -180,9 +191,9 @@
                           <PathIcon Data="{Binding IconKey, Converter={x:Static views:Icons.ByKey}}" />
                         </Border>
                         <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center" Spacing="0">
-                          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12.5" TextTrimming="CharacterEllipsis" />
-                          <TextBlock Classes="dim" Text="{Binding Subtitle}" FontSize="11" TextTrimming="CharacterEllipsis" IsVisible="{Binding Subtitle, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                          <TextBlock Classes="dim" Text="{Binding RowsText}" FontSize="11" TextTrimming="CharacterEllipsis" IsVisible="{Binding RowsText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                          <TextBlock Classes="nodetitle" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Classes="dim nodemeta" Text="{Binding Subtitle}" TextTrimming="CharacterEllipsis" IsVisible="{Binding Subtitle, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                          <TextBlock Classes="dim nodemeta" Text="{Binding RowsText}" TextTrimming="CharacterEllipsis" IsVisible="{Binding RowsText, Converter={x:Static ObjectConverters.IsNotNull}}" />
                         </StackPanel>
                         <PathIcon Grid.Column="2" Classes="warn" Data="{StaticResource IconWarning}" Width="13" Height="13" VerticalAlignment="Top" Margin="4,0,0,0" IsVisible="{Binding HasWarning}" />
                         <PathIcon Grid.Column="2" Classes="hint" Data="{StaticResource IconInfo}" Width="13" Height="13" VerticalAlignment="Top" Margin="4,0,0,0"
@@ -191,10 +202,10 @@
                       <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="8,0,8,7" IsVisible="{Binding HasCost}">
                         <views:HeatBar Classes.low="{Binding IsLow}" Classes.mid="{Binding IsMid}" Classes.high="{Binding IsHigh}"
                                        Value="{Binding Heat}" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Classes="cost" Classes.mid="{Binding IsMid}" Classes.high="{Binding IsHigh}" Text="{Binding CostText}"
-                                   FontSize="11" Margin="8,0,0,0" MinWidth="26" TextAlignment="Right" />
+                        <TextBlock Grid.Column="1" Classes="cost nodemeta" Classes.mid="{Binding IsMid}" Classes.high="{Binding IsHigh}" Text="{Binding CostText}"
+                                   Margin="8,0,0,0" MinWidth="26" TextAlignment="Right" />
                       </Grid>
-                      <TextBlock Grid.Row="1" Classes="dim" FontSize="11" Margin="8,0,8,7" Text="{Binding TimeText}"
+                      <TextBlock Grid.Row="1" Classes="dim nodemeta" Margin="8,0,8,7" Text="{Binding TimeText}"
                                  IsVisible="{Binding !HasCost}" />
                     </Grid>
                   </Border>
@@ -222,10 +233,14 @@
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:PlanIssue">
                         <Border Classes="banner" Classes.warn="{Binding IsWarning}" Classes.info="{Binding IsHintKind}" Margin="0,0,0,6" Padding="10,6">
-                          <StackPanel Spacing="2">
-                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                            <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="12" IsVisible="{Binding Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                          </StackPanel>
+                          <Grid ColumnDefinitions="Auto,*">
+                            <PathIcon Classes="bi" Data="{StaticResource IconWarning}" Margin="0,1,8,0" VerticalAlignment="Top" Width="14" Height="14" IsVisible="{Binding IsWarning}" />
+                            <PathIcon Classes="bi" Data="{StaticResource IconInfo}" Margin="0,1,8,0" VerticalAlignment="Top" Width="14" Height="14" IsVisible="{Binding IsHintKind}" />
+                            <StackPanel Grid.Column="1" Spacing="2">
+                              <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                              <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="{DynamicResource DbxMonoFontSize}" IsVisible="{Binding Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                            </StackPanel>
+                          </Grid>
                         </Border>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -236,8 +251,8 @@
                         <Grid>
                           <TextBlock Classes="section" Text="{Binding Name}" IsVisible="{Binding IsHeader}" Margin="12,10,12,2" />
                           <Grid ColumnDefinitions="128,*" Margin="12,2,12,2" IsVisible="{Binding IsEntry}">
-                            <TextBlock Classes="dim" Text="{Binding Name}" TextWrapping="Wrap" FontSize="12" Margin="0,0,8,0" />
-                            <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" FontSize="12" />
+                            <TextBlock Classes="dim" Text="{Binding Name}" TextWrapping="Wrap" FontSize="{DynamicResource DbxMonoFontSize}" Margin="0,0,8,0" />
+                            <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" FontSize="{DynamicResource DbxMonoFontSize}" />
                           </Grid>
                         </Grid>
                       </DataTemplate>
@@ -260,8 +275,8 @@
                         <Grid ColumnDefinitions="22,*,Auto,Auto">
                           <TextBlock Classes="dim num" Text="{Binding Rank}" VerticalAlignment="Center" />
                           <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="12.5" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Classes="dim" Text="{Binding Object}" FontSize="11" TextTrimming="CharacterEllipsis" IsVisible="{Binding Object, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="{DynamicResource DbxMonoFontSize}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Classes="dim small" Text="{Binding Object}" TextTrimming="CharacterEllipsis" IsVisible="{Binding Object, Converter={x:Static ObjectConverters.IsNotNull}}" />
                           </StackPanel>
                           <TextBlock Grid.Column="2" Classes="dim num" Text="{Binding Rows}" Margin="8,0,0,0" VerticalAlignment="Center" />
                           <TextBlock Grid.Column="3" Classes="cost" Classes.mid="{Binding Node.IsMid}" Classes.high="{Binding Node.IsHigh}" Text="{Binding Share}"
@@ -292,8 +307,8 @@
                           <PathIcon Classes="bi" Data="{StaticResource IconKey}" Margin="0,1,8,0" VerticalAlignment="Top" Width="14" Height="14" IsVisible="{Binding IsIndex}" />
                           <StackPanel Grid.Column="1" Spacing="3">
                             <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                            <SelectableTextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="12" IsVisible="{Binding !IsIndex}" />
-                            <SelectableTextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="12" IsVisible="{Binding IsIndex}"
+                            <SelectableTextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="{DynamicResource DbxMonoFontSize}" IsVisible="{Binding !IsIndex}" />
+                            <SelectableTextBlock Text="{Binding Detail}" TextWrapping="Wrap" FontSize="{DynamicResource DbxMonoFontSize}" IsVisible="{Binding IsIndex}"
                                                  FontFamily="{DynamicResource DbxMonoFont}" />
                             <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,2,0,0">
                               <Button Classes="ghost" MinHeight="24" Padding="8,0" Content="Show in plan" Tag="{Binding Node}" Click="OnIssueShowClick" IsVisible="{Binding HasNode}" />

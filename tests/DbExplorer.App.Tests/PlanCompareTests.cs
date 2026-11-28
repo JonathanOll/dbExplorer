@@ -1,5 +1,7 @@
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using DbExplorer.App.ViewModels;
@@ -216,6 +218,30 @@ public class PlanCompareViewTests
         Dispatcher.UIThread.RunJobs();
         var candidatePane = window.GetVisualDescendants().OfType<DockPanel>().Single(d => d.Name == "CandidatePane");
         Assert.Equal(vm.Stacked ? 1 : 0, Grid.GetRow(candidatePane));
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void CtrlPlusMinusAndZero_ZoomAndFit_LikeThePlanView()
+    {
+        var plan = ShowplanParser.Parse(PlanSamples.Xml, PlanMode.Actual);
+        var s = plan.Statements[0];
+        var vm = new PlanCompareViewModel(new PlanCompareSource("Baseline", plan, s), new PlanCompareSource("New", plan, s));
+        var window = new Window { Content = new PlanCompareView { DataContext = vm }, Width = 1300, Height = 800 };
+        window.Show();
+        for (var i = 0; i < 4; i++) Dispatcher.UIThread.RunJobs();
+        window.GetVisualDescendants().OfType<ScrollViewer>().Single(x => x.Name == "BaselineScroller").Focus();
+        var fitted = vm.Zoom;
+
+        window.KeyPressQwerty(PhysicalKey.Minus, RawInputModifiers.Control);
+        Assert.Equal(fitted - 0.1, vm.Zoom, 6);
+        window.KeyPressQwerty(PhysicalKey.Equal, RawInputModifiers.Control);
+        window.KeyPressQwerty(PhysicalKey.Equal, RawInputModifiers.Control);
+        Assert.Equal(fitted + 0.1, vm.Zoom, 6);
+        window.KeyPressQwerty(PhysicalKey.Digit0, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(fitted, vm.Zoom, 6);
+        Assert.True(vm.Zoom >= PlanView.MinFitZoom);
         window.Close();
     }
 

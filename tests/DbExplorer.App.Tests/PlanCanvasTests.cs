@@ -54,6 +54,18 @@ public class FreeCanvasMathTests
         Assert.Equal(before, (next + anchor - FreeCanvasMath.Pad(view, content * to)) / to, 6);
     }
 
+    [Theory]
+    [InlineData(800, 300)]    // fits: centred
+    [InlineData(800, 2000)]   // too big: its start a gutter away from the edge
+    public void Frame_CentresWhatFits_AndLeavesAGutterOtherwise(double view, double content)
+    {
+        const double gutter = 16;
+        var offset = FreeCanvasMath.FrameOffset(view, content, gutter);
+        var start = FreeCanvasMath.Pad(view, content) - offset;   // where the content starts in the viewport
+
+        Assert.Equal(content <= view ? (view - content) / 2 : gutter, start, 0);
+    }
+
     [Fact]
     public void Reveal_MovesOnlyWhenNeeded()
     {

@@ -57,13 +57,24 @@ internal sealed class FreeCanvas
             FreeCanvasMath.ZoomOffset(offset.X, at.X, view.Width, content.Width, old, zoom),
             FreeCanvasMath.ZoomOffset(offset.Y, at.Y, view.Height, content.Height, old, zoom));
         Sync();
-        _scroller.Offset = target;
+        _scroller.Offset = new Vector(Math.Round(target.X), Math.Round(target.Y));   // whole pixels: the presenter rounds them anyway
     }
 
     /// <summary>The content back in its place: its top left corner at the top left of the viewport.</summary>
     public void Home()
     {
         if (Sync()) _scroller.Offset = new Vector(_pad.Width, _pad.Height);
+    }
+
+    /// <summary>Frames the content after a Fit: centred when it fits, else from its top left corner with a small gutter.</summary>
+    public void Frame(double gutter = 16)
+    {
+        if (!Sync()) return;
+        var view = _scroller.Bounds.Size;
+        var content = _zoomer.Bounds.Size;
+        _scroller.Offset = new Vector(
+            FreeCanvasMath.FrameOffset(view.Width, content.Width, gutter),
+            FreeCanvasMath.FrameOffset(view.Height, content.Height, gutter));
     }
 
     /// <summary>Pans so a rectangle of the content (at zoom 1) is fully visible.</summary>

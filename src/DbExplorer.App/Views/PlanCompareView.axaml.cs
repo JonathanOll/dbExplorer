@@ -27,6 +27,8 @@ public partial class PlanCompareView : UserControl
         _baseline = new FreeCanvas(BaselineScroller, BaselineZoomer, OnWheelZoom);
         _candidate = new FreeCanvas(CandidateScroller, CandidateZoomer, OnWheelZoom);
         DataContextChanged += (_, _) => Attach();
+        // Tunnel: the scroll viewers would take Ctrl+- / Ctrl++ before the view sees them (same keys as the plan view).
+        AddHandler(KeyDownEvent, OnKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         SizeChanged += (_, _) => { if (_fitPending && BaselineScroller.Bounds.Width > 50) { _fitPending = false; Fit(auto: true); } };
     }
 
@@ -114,7 +116,8 @@ public partial class PlanCompareView : UserControl
         _zoomAnchor = null;
     }
 
-    /// <param name="auto">On opening: never smaller than 70%, where the text stays readable.</param>
+    /// <param name="auto">On opening: also brings the selected pair into view.</param>
+    /// <remarks>Never below 70%, where the operator names stay readable (a bigger plan is scrolled), with a gutter so no card touches the edge.</remarks>
     private void Fit(bool auto = false)
     {
         if (_vm is null) return;
@@ -122,9 +125,10 @@ public partial class PlanCompareView : UserControl
         if (view.Width < 50 || view.Height < 50) { _fitPending = auto; return; }
         var width = Math.Max(_vm.Baseline.CanvasWidth, _vm.Candidate.CanvasWidth);
         var height = Math.Max(_vm.Baseline.CanvasHeight, _vm.Candidate.CanvasHeight);
-        _vm.Zoom = Math.Clamp(Math.Min(Math.Min((view.Width - 4) / width, (view.Height - 4) / height), 1), auto ? 0.7 : 0.25, 1);
-        _baseline.Home();
-        _candidate.Home();
+        const double gutter = PlanView.FitGutter;
+        _vm.Zoom = Math.Clamp(Math.Min(Math.Min((view.Width - 2 * gutter) / width, (view.Height - 2 * gutter) / height), 1), PlanView.MinFitZoom, 1);
+        _baseline.Frame(gutter);
+        _candidate.Frame(gutter);
         if (auto && _vm.SelectedPair is { } pair)
             Dispatcher.UIThread.Post(() =>
             {
@@ -138,6 +142,20 @@ public partial class PlanCompareView : UserControl
     private void OnZoomOutClick(object? sender, RoutedEventArgs e) { if (_vm is not null) _vm.Zoom -= 0.1; }
 
     private void OnFitClick(object? sender, RoutedEventArgs e) => Fit();
+
+    // Ctrl+- / Ctrl++ / Ctrl+0, as in the plan view and the ER diagram.
+    private void OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (_vm is null || e.KeyModifiers != KeyModifiers.Control) return;
+        switch (e.Key)
+        {
+            case Key.OemPlus or Key.Add: _vm.Zoom += 0.1; break;
+            case Key.OemMinus or Key.Subtract: _vm.Zoom -= 0.1; break;
+            case Key.D0 or Key.NumPad0: Fit(); break;
+            default: return;
+        }
+        e.Handled = true;
+    }
 
     // ---- selection ----
 
