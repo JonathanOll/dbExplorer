@@ -560,7 +560,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
             node.State = ConnectionState.Connected;
             _ = LoadRoutinesInBackgroundAsync(node, session);
             var count = session.Schema.Count;
-            _status.Success($"Connected to {config.Name}: {count} {(count == 1 ? "table or view" : "tables and views")}.");
+            _status.Success($"Connected to {config.Name}: {count} {(count == 1 ? "table or view" : "tables and views")}.", config.Id);
         }
         catch (OperationCanceledException)
         {

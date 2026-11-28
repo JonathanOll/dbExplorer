@@ -66,11 +66,16 @@
                 <TextBlock Classes="dim small" Text="{Binding ScopeHint}" VerticalAlignment="Center" />
               </StackPanel>
             </StackPanel>
-            <TextBlock Grid.Column="1" Classes="dim small" Text="{Binding Notice}" TextWrapping="Wrap" TextAlignment="Right"
-                       Margin="12,0" VerticalAlignment="Center"
-                       IsVisible="{Binding Notice, Converter={x:Static ObjectConverters.IsNotNull}}" />
             <TextBlock Grid.Column="2" Classes="faint small" Text="{Binding CountText}" VerticalAlignment="Center"
                        IsVisible="{Binding !IsEmpty}" />
+          </Grid>
+        </Border>
+        <!-- a note about the list (e.g. what was left out): its own line above the hints, never squeezed next to the count -->
+        <Border DockPanel.Dock="Bottom" Classes="banner info" CornerRadius="0" BorderThickness="0,1,0,0"
+                IsVisible="{Binding Notice, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <Grid ColumnDefinitions="Auto,*">
+            <PathIcon Classes="bi" Data="{StaticResource IconInfo}" Margin="0,1,8,0" VerticalAlignment="Top" />
+            <TextBlock Grid.Column="1" Text="{Binding Notice}" TextWrapping="Wrap" VerticalAlignment="Center" />
           </Grid>
         </Border>
         <!-- rows of other connections are listed too: said in words, above them -->

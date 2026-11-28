@@ -41,6 +41,8 @@ public partial class MainViewModel : ObservableObject
                 OnPropertyChanged(nameof(HasTarget));
                 OnPropertyChanged(nameof(WelcomeHint));
                 OnPropertyChanged(nameof(WindowTitle));
+                // with no tab open, the selection is what the status bar names: a message about another connection goes
+                if (ActiveTab is null) Status.ClearOtherConnections(CurrentConnection?.Id);
             }
         };
         Tree.Nodes.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasConnections));
@@ -54,7 +56,7 @@ public partial class MainViewModel : ObservableObject
 
     /// <summary>The welcome page line that says what the two connection-bound actions will use, or why they wait.</summary>
     public string WelcomeHint => !HasConnections ? "Add a connection first: the table and script actions work on it."
-        : CurrentConnection is { } c ? $"Works on {c.Name}" : "Select a connection in the navigator first.";
+        : CurrentConnection is { } c ? $"Selected connection: {c.Name}" : "Select a connection in the navigator first.";
 
     /// <summary>Window title: the active tab and its connection, then the app name.</summary>
     public string WindowTitle => ActiveTab is { } tab
@@ -90,6 +92,34 @@ public partial class MainViewModel : ObservableObject
     public bool HasActiveScript => ActiveTab is ScriptTabViewModel;
 
     public bool HasActiveTable => ActiveTab is TableTabViewModel;
+
+    private const string NoScriptTab = "Open a script tab first";
+
+    /// <summary>Tooltip of the Script menu entries: why they are disabled, null while a script tab is active.</summary>
+    public string? ScriptMenuTip => HasActiveScript ? null : NoScriptTab;
+
+    /// <summary>Tooltip of File, Save script as: what it does, or why it is disabled.</summary>
+    public string SaveAsMenuTip => HasActiveScript ? "Choose any file with the system file dialog" : NoScriptTab;
+
+    /// <summary>Tooltip of View, Go to column: why it is disabled, null while a table tab is active.</summary>
+    public string? TableMenuTip => HasActiveTable ? null : "Open a table first";
+
+    /// <summary>Why "Include actual plan" is disabled, null when it can be used.</summary>
+    public string? ActualPlanMenuTip => ActiveScript is not { } s ? NoScriptTab
+        : s.CanUseActualPlan ? null : "SQLite only has an estimated plan";
+
+    /// <summary>Why "Include statistics" is disabled, null when it can be used.</summary>
+    public string? StatisticsMenuTip => ActiveScript is not { } s ? NoScriptTab
+        : s.CanUseStatistics ? null : "Only SQL Server has IO and time statistics";
+
+    private void NotifyMenuTips()
+    {
+        OnPropertyChanged(nameof(ScriptMenuTip));
+        OnPropertyChanged(nameof(SaveAsMenuTip));
+        OnPropertyChanged(nameof(TableMenuTip));
+        OnPropertyChanged(nameof(ActualPlanMenuTip));
+        OnPropertyChanged(nameof(StatisticsMenuTip));
+    }
 
     public ConnectionConfig? CurrentConnection => ActiveTab?.Connection ?? Tree.SelectedConnection;
 
@@ -227,6 +257,8 @@ public partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(ActiveScript));
         OnPropertyChanged(nameof(HasActiveScript));
         OnPropertyChanged(nameof(HasActiveTable));
+        NotifyMenuTips();
+        Status.ClearOtherConnections(CurrentConnection?.Id);
         // A restored table tab connects and loads when it is first selected (never before).
         if (!_restoringTabs && newValue is TableTabViewModel { IsDeferred: true } deferred) _ = deferred.EnsureLoadedAsync();
         ScheduleSessionSave();
@@ -234,7 +266,12 @@ public partial class MainViewModel : ObservableObject
 
     private void OnActiveTabPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(TabViewModel.Connection)) { OnPropertyChanged(nameof(CurrentConnection)); OnPropertyChanged(nameof(CurrentConnectionNode)); }
+        if (e.PropertyName == nameof(TabViewModel.Connection))
+        {
+            OnPropertyChanged(nameof(CurrentConnection));
+            OnPropertyChanged(nameof(CurrentConnectionNode));
+            NotifyMenuTips();
+        }
         if (e.PropertyName is nameof(TabViewModel.Title) or nameof(TabViewModel.HasUnsavedWork)) OnPropertyChanged(nameof(WindowTitle));
     }
 

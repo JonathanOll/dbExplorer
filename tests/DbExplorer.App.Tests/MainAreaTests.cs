@@ -374,8 +374,48 @@ public class MainAreaTests : IDisposable
 
         main.Tree.SelectedNode = main.Tree.Nodes.OfType<ConnectionNodeViewModel>().Single();
         Assert.True(main.HasTarget);
-        Assert.Equal("Works on Shop", main.WelcomeHint);
+        Assert.Equal("Selected connection: Shop", main.WelcomeHint);
         Assert.Equal("Shop", main.CurrentConnectionNode!.Title);
+    }
+
+    [Fact]
+    public async Task Main_SwitchingToAnotherConnectionsTab_ClearsTheConnectedMessageOfTheFirst()
+    {
+        var shop = TreeFixture.Conn("Shop", database: CreateDb("shop-msg.db", "CREATE TABLE t (id INTEGER)"));
+        var billing = TreeFixture.Conn("Billing", database: CreateDb("billing-msg.db", "CREATE TABLE u (id INTEGER)"));
+        var main = NewMain(shop, billing);
+        await main.OpenTable(await _fx.Sessions.GetOrOpenAsync(shop, CancellationToken.None), new TableRef(null, "t"));
+        await main.OpenTable(await _fx.Sessions.GetOrOpenAsync(billing, CancellationToken.None), new TableRef(null, "u"));
+
+        main.Status.Success("Connected to Billing: 1 table or view.", billing.Id);
+        main.ActiveTab = main.Tabs[1];   // still Billing: the message is about it
+        Assert.Equal("Connected to Billing: 1 table or view.", main.Status.Message);
+
+        main.ActiveTab = main.Tabs[0];   // Shop: the message would read as if it were about this tab
+        Assert.Equal("", main.Status.Message);
+
+        main.Status.Error("Billing failed");
+        main.ActiveTab = main.Tabs[1];
+        Assert.Equal("Billing failed", main.Status.Message);   // errors stay until dismissed
+    }
+
+    [Fact]
+    public void Main_MenuTips_SayWhyScriptAndTableEntriesAreDisabled()
+    {
+        var shop = TreeFixture.Conn("Shop", database: CreateDb("shop-tips.db", "CREATE TABLE users (id INTEGER)"));
+        var main = NewMain(shop);
+        Assert.Equal("Open a script tab first", main.ScriptMenuTip);
+        Assert.Equal("Open a script tab first", main.SaveAsMenuTip);
+        Assert.Equal("Open a script tab first", main.ActualPlanMenuTip);
+        Assert.Equal("Open a table first", main.TableMenuTip);
+
+        main.Tree.SelectedNode = main.Tree.Nodes.OfType<ConnectionNodeViewModel>().Single();
+        Assert.NotNull(main.NewScript());
+        Assert.Null(main.ScriptMenuTip);
+        Assert.Equal("Choose any file with the system file dialog", main.SaveAsMenuTip);
+        Assert.Equal("SQLite only has an estimated plan", main.ActualPlanMenuTip);
+        Assert.Equal("Only SQL Server has IO and time statistics", main.StatisticsMenuTip);
+        Assert.Equal("Open a table first", main.TableMenuTip);
     }
 
     [Fact]

@@ -95,6 +95,18 @@ public class QuickOpenObjectsTests : IDisposable
     }
 
     [Fact]
+    public async Task RoutineWithoutArguments_SaysItsKindWithoutEmptyParentheses()
+    {
+        var vm = await Picker(Driver());
+
+        vm.Query = "close_orders";
+        Assert.Equal("procedure", vm.Results.First(r => r.Type == QuickOpenTypes.Procedures).Detail);
+
+        vm.Query = "order_total";
+        Assert.Equal("function (integer)", vm.Results.First(r => r.Type == QuickOpenTypes.Functions).Detail);
+    }
+
+    [Fact]
     public async Task ExactColumn_RisesAboveScatteredMatches_AndQualifiedQueryFindsIt()
     {
         var vm = await Picker(Driver());

@@ -48,6 +48,8 @@
     <Style Selector="PathIcon.status.success"><Setter Property="Foreground" Value="{DynamicResource DbxSuccess}" /></Style>
     <Style Selector="PathIcon.status.warn"><Setter Property="Foreground" Value="{DynamicResource DbxWarn}" /></Style>
     <Style Selector="PathIcon.status.error"><Setter Property="Foreground" Value="{DynamicResource DbxError}" /></Style>
+    <!-- a welcome card that waits for a connection reads as unavailable (its tooltip says why) -->
+    <Style Selector="Button.card:disabled"><Setter Property="Opacity" Value="0.5" /></Style>
     <Style Selector="TextBlock.statusText.error"><Setter Property="Foreground" Value="{DynamicResource DbxError}" /></Style>
     <!-- navigator drop target while a connection is dragged -->
     <Style Selector="TreeViewItem.drop /template/ Border#PART_LayoutRoot">
@@ -65,9 +67,10 @@
           <MenuItem Header="_File">
             <MenuItem Header="_New SQL script" Command="{Binding NewScriptTabCommand}" InputGesture="Ctrl+N" />
             <MenuItem Header="_Open script file…" Command="{Binding OpenScriptFileCommand}" InputGesture="Ctrl+O" />
-            <MenuItem Header="_Save script" Command="{Binding ActiveScript.SaveCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Ctrl+S" />
+            <MenuItem Header="_Save script" Command="{Binding ActiveScript.SaveCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Ctrl+S"
+                      ToolTip.Tip="{Binding ScriptMenuTip}" ToolTip.ShowOnDisabled="True" />
             <MenuItem Header="Save script _as…" Command="{Binding SaveScriptAsCommand}" IsEnabled="{Binding HasActiveScript}"
-                      ToolTip.Tip="Choose any file with the system file dialog" />
+                      ToolTip.Tip="{Binding SaveAsMenuTip}" ToolTip.ShowOnDisabled="True" />
             <Separator />
             <!-- the entries are built when the submenu opens (OnRecentMenuOpened); this one only makes it a submenu -->
             <MenuItem x:Name="RecentMenu" Header="Recent _scripts" SubmenuOpened="OnRecentMenuOpened">
@@ -97,7 +100,7 @@
               <MenuItem.Icon><PathIcon Data="{StaticResource IconImport}" /></MenuItem.Icon>
             </MenuItem>
             <Separator />
-            <MenuItem Header="_Refresh the schema" Command="{Binding Tree.RefreshSelectedCommand}" InputGesture="F5" />
+            <MenuItem Header="_Refresh schema" Command="{Binding Tree.RefreshSelectedCommand}" InputGesture="F5" />
             <MenuItem Header="Collapse _all" Command="{Binding Tree.CollapseAllCommand}" />
             <Separator />
             <MenuItem Header="_Upgrade database…" Command="{Binding OpenUpgradeCommand}" />
@@ -126,7 +129,8 @@
             </MenuItem>
             <MenuItem Header="Go to _table…" Command="{Binding ShowTablePickerCommand}" InputGesture="Ctrl+T" />
             <MenuItem Header="Go to table in _all connections…" Command="{Binding ShowAllTablesPickerCommand}" InputGesture="Ctrl+Shift+P" />
-            <MenuItem Header="Go to _column…" Command="{Binding JumpToColumnCommand}" IsEnabled="{Binding HasActiveTable}" InputGesture="Ctrl+L" />
+            <MenuItem Header="Go to _column…" Command="{Binding JumpToColumnCommand}" IsEnabled="{Binding HasActiveTable}" InputGesture="Ctrl+L"
+                      ToolTip.Tip="{Binding TableMenuTip}" ToolTip.ShowOnDisabled="True" />
             <MenuItem Header="Search in scripts and _data…" Command="{Binding ShowSearchCommand}" InputGesture="Ctrl+Alt+F">
               <MenuItem.Icon><PathIcon Data="{StaticResource IconSearch}" /></MenuItem.Icon>
             </MenuItem>
@@ -136,19 +140,26 @@
           </MenuItem>
 
           <MenuItem Header="_Script">
-            <MenuItem Header="_Run statement" Command="{Binding ActiveScript.RunStatementCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Ctrl+Enter" />
-            <MenuItem Header="Run _all" Command="{Binding ActiveScript.RunScriptCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="F5" />
-            <MenuItem Header="S_top" Command="{Binding ActiveScript.CancelCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Escape" />
+            <MenuItem Header="_Run statement" Command="{Binding ActiveScript.RunStatementCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Ctrl+Enter"
+                      ToolTip.Tip="{Binding ScriptMenuTip}" ToolTip.ShowOnDisabled="True" />
+            <MenuItem Header="Run _all" Command="{Binding ActiveScript.RunScriptCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="F5"
+                      ToolTip.Tip="{Binding ScriptMenuTip}" ToolTip.ShowOnDisabled="True" />
+            <MenuItem Header="S_top" Command="{Binding ActiveScript.CancelCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Escape"
+                      ToolTip.Tip="{Binding ScriptMenuTip}" ToolTip.ShowOnDisabled="True" />
             <Separator />
-            <MenuItem Header="_Format SQL" Command="{Binding ActiveScript.FormatSqlCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Ctrl+Shift+F">
+            <MenuItem Header="_Format SQL" Command="{Binding ActiveScript.FormatSqlCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Ctrl+Shift+F"
+                      ToolTip.Tip="{Binding ScriptMenuTip}" ToolTip.ShowOnDisabled="True">
               <MenuItem.Icon><PathIcon Data="{StaticResource IconFormat}" /></MenuItem.Icon>
             </MenuItem>
             <Separator />
-            <MenuItem Header="_Estimated execution plan" Command="{Binding ActiveScript.ShowEstimatedPlanCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Ctrl+L" />
+            <MenuItem Header="_Estimated execution plan" Command="{Binding ActiveScript.ShowEstimatedPlanCommand, FallbackValue={x:Null}}" IsEnabled="{Binding HasActiveScript}" InputGesture="Ctrl+L"
+                      ToolTip.Tip="{Binding ScriptMenuTip}" ToolTip.ShowOnDisabled="True" />
             <MenuItem Header="Include actual _plan" ToggleType="CheckBox" IsChecked="{Binding ActiveScript.ActualPlanEnabled, Mode=TwoWay, FallbackValue=False}"
-                      IsEnabled="{Binding ActiveScript.CanUseActualPlan, FallbackValue=False}" InputGesture="Ctrl+M" />
+                      IsEnabled="{Binding ActiveScript.CanUseActualPlan, FallbackValue=False}" InputGesture="Ctrl+M"
+                      ToolTip.Tip="{Binding ActualPlanMenuTip}" ToolTip.ShowOnDisabled="True" />
             <MenuItem Header="Include _statistics (SQL Server)" ToggleType="CheckBox" IsChecked="{Binding ActiveScript.StatisticsEnabled, Mode=TwoWay, FallbackValue=False}"
-                      IsEnabled="{Binding ActiveScript.CanUseStatistics, FallbackValue=False}" />
+                      IsEnabled="{Binding ActiveScript.CanUseStatistics, FallbackValue=False}"
+                      ToolTip.Tip="{Binding StatisticsMenuTip}" ToolTip.ShowOnDisabled="True" />
           </MenuItem>
 
           <MenuItem Header="_Tools">
@@ -174,7 +185,7 @@
         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
           <PathIcon Classes="bi" Data="{StaticResource IconError}" VerticalAlignment="Center" />
           <TextBlock Grid.Column="1" Text="{Binding Banner}" TextWrapping="Wrap" VerticalAlignment="Center" />
-          <Button Grid.Column="2" Theme="{StaticResource DbxToolButton}" Classes="close" Tag="{StaticResource IconClose}" MinWidth="24" MinHeight="24" Padding="4"
+          <Button Grid.Column="2" Theme="{StaticResource DbxToolButton}" Classes="close" Tag="{StaticResource IconClose}" MinWidth="22" MinHeight="22" Padding="4"
                   Command="{Binding DismissBannerCommand}" AutomationProperties.Name="Dismiss" ToolTip.Tip="Dismiss for this session" />
         </Grid>
       </Border>
@@ -216,7 +227,7 @@
                           Classes.error="{Binding Status.IsError}" Width="13" Height="13" Margin="0,0,7,0" VerticalAlignment="Center"
                           Data="{Binding Status.Severity, Converter={x:Static views:StatusIcons.Severity}}" />
                 <TextBlock Grid.Column="1" Classes="statusText" Classes.error="{Binding Status.IsError}" Text="{Binding Status.Message}"
-                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="12" />
+                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="{DynamicResource DbxSmallFontSize}" />
               </Grid>
               <Button.Flyout>
                 <Flyout Placement="Top">
@@ -231,7 +242,7 @@
                                         Width="13" Height="13" Margin="0,2,8,0" VerticalAlignment="Top"
                                         Data="{Binding Severity, Converter={x:Static views:StatusIcons.Severity}}" />
                               <TextBlock Grid.Column="1" Classes="faint small" Text="{Binding TimeText}" Margin="0,1,10,0" VerticalAlignment="Top" />
-                              <SelectableTextBlock Grid.Column="2" Text="{Binding Message}" TextWrapping="Wrap" FontSize="12" />
+                              <SelectableTextBlock Grid.Column="2" Text="{Binding Message}" TextWrapping="Wrap" FontSize="{DynamicResource DbxSmallFontSize}" />
                             </Grid>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -250,7 +261,7 @@
           <Grid Grid.Column="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10" VerticalAlignment="Center" Margin="8,0"
                 IsVisible="{Binding Status.IsBusy}">
             <ProgressBar Classes="thin" IsIndeterminate="{Binding Status.IsBusy}" Width="90" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Classes="dim" FontSize="12" Text="{Binding Status.BusyText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="1" Classes="dim small" Text="{Binding Status.BusyText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
             <Button Grid.Column="2" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconClose}" Content="Cancel" MinHeight="24"
                     Command="{Binding Status.CancelBusyCommand}" IsVisible="{Binding Status.CanCancel}"
                     ToolTip.Tip="Cancel this operation" AutomationProperties.Name="Cancel the running operation" />
@@ -268,14 +279,14 @@
                        IsVisible="{Binding IsDisconnected}" />
               <PathIcon Classes="spin" Data="{StaticResource IconRefresh}" Width="12" Height="12" Foreground="{DynamicResource DbxAccent}"
                         IsVisible="{Binding IsConnecting}" />
-              <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
-              <TextBlock Classes="dim" FontSize="12" VerticalAlignment="Center"
+              <TextBlock Classes="small" Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <TextBlock Classes="dim small" VerticalAlignment="Center"
                          Text="{Binding Config.Kind, Converter={x:Static views:Icons.EngineName}}" />
               <views:EnvironmentBadge Environment="{Binding ConnectionEnvironment}" />
               <Border Classes="badge warn" IsVisible="{Binding IsReadOnly}">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                   <PathIcon Data="{StaticResource IconLock}" Width="10" Height="10" />
-                  <TextBlock Text="Read-only" FontSize="11" />
+                  <TextBlock Text="Read-only" />
                 </StackPanel>
               </Border>
             </StackPanel>
@@ -344,7 +355,7 @@
                     </Button.Flyout>
                   </Button>
                   <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRefresh}" Command="{Binding Tree.RefreshSelectedCommand}"
-                          MinWidth="30" Padding="4,0" AutomationProperties.Name="Refresh the schema">
+                          MinWidth="30" Padding="4,0" AutomationProperties.Name="Refresh schema">
                     <ToolTip.Tip>
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock Text="Refresh the schema of the selected connection" />
@@ -378,7 +389,8 @@
             <Panel>
               <TreeView x:Name="ConnectionTree" ItemsSource="{Binding Tree.Nodes}"
                         SelectedItem="{Binding Tree.SelectedNode, Mode=TwoWay}"
-                        DragDrop.AllowDrop="True" Background="Transparent" Padding="2,4" AutomationProperties.Name="Connections">
+                        DragDrop.AllowDrop="True" Background="Transparent" Padding="2,4" AutomationProperties.Name="Connections"
+                        ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <TreeView.Styles>
                   <Style Selector="TreeViewItem" x:DataType="vm:TreeNodeViewModel">
                     <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
@@ -410,7 +422,7 @@
                           <MenuItem Header="Move down" Command="{Binding Tree.MoveFolderDownCommand}" CommandParameter="{Binding}"
                                     IsEnabled="{Binding CanMoveDown}" ToolTip.Tip="{Binding MoveDownTip}" ToolTip.ShowOnDisabled="True" />
                           <Separator />
-                          <MenuItem Classes="danger" Header="Delete folder" Command="{Binding Tree.DeleteFolderCommand}" CommandParameter="{Binding}" InputGesture="Delete">
+                          <MenuItem Classes="danger" Header="Delete" Command="{Binding Tree.DeleteFolderCommand}" CommandParameter="{Binding}" InputGesture="Delete">
                             <MenuItem.Icon><PathIcon Data="{StaticResource IconDelete}" /></MenuItem.Icon>
                           </MenuItem>
                         </ContextMenu>
@@ -496,7 +508,7 @@
                           <MenuItem Header="Rename…" Command="{Binding Tree.RenameGroupCommand}" CommandParameter="{Binding Group}" InputGesture="F2" />
                           <MenuItem Header="New group…" Command="{Binding Tree.NewGroupCommand}" />
                           <Separator />
-                          <MenuItem Classes="danger" Header="Delete group" Command="{Binding Tree.DeleteGroupCommand}" CommandParameter="{Binding Group}" InputGesture="Delete">
+                          <MenuItem Classes="danger" Header="Delete" Command="{Binding Tree.DeleteGroupCommand}" CommandParameter="{Binding Group}" InputGesture="Delete">
                             <MenuItem.Icon><PathIcon Data="{StaticResource IconDelete}" /></MenuItem.Icon>
                           </MenuItem>
                         </ContextMenu>
@@ -552,7 +564,7 @@
                       <TextBlock Text="{Binding Title}" FontWeight="Medium" VerticalAlignment="Center" />
                       <StackPanel.ContextMenu>
                         <ContextMenu>
-                          <MenuItem Header="New script here…" Command="{Binding Tree.NewScriptHereCommand}" CommandParameter="{Binding}">
+                          <MenuItem Header="New script…" Command="{Binding Tree.NewScriptHereCommand}" CommandParameter="{Binding}">
                             <MenuItem.Icon><PathIcon Data="{StaticResource IconScript}" /></MenuItem.Icon>
                           </MenuItem>
                           <MenuItem Header="New folder…" Command="{Binding Tree.NewScriptFolderCommand}" CommandParameter="{Binding}">
@@ -563,7 +575,7 @@
                           <MenuItem Header="Move to folder…" Command="{Binding Tree.MoveScriptNodeCommand}" CommandParameter="{Binding}" />
                           <MenuItem Header="Show in Explorer" Command="{Binding Tree.ShowScriptInExplorerCommand}" CommandParameter="{Binding}" />
                           <Separator />
-                          <MenuItem Classes="danger" Header="Delete folder" Command="{Binding Tree.DeleteScriptNodeCommand}" CommandParameter="{Binding}" InputGesture="Delete">
+                          <MenuItem Classes="danger" Header="Delete" Command="{Binding Tree.DeleteScriptNodeCommand}" CommandParameter="{Binding}" InputGesture="Delete">
                             <MenuItem.Icon><PathIcon Data="{StaticResource IconDelete}" /></MenuItem.Icon>
                           </MenuItem>
                         </ContextMenu>
@@ -619,18 +631,19 @@
                   </TreeDataTemplate>
 
                   <TreeDataTemplate DataType="vm:RoutineNodeViewModel">
-                    <StackPanel Orientation="Horizontal" Spacing="7" Background="Transparent">
+                    <!-- the signature takes what is left of the row and ends in an ellipsis: a long one never scrolls the navigator sideways -->
+                    <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="7" Background="Transparent">
                       <PathIcon Classes="dim" Width="14" Height="14" Data="{Binding IconKey, Converter={x:Static views:Icons.ByKey}}" />
-                      <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
-                      <TextBlock Classes="faint small" Text="{Binding Signature}" VerticalAlignment="Center" MaxWidth="110" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Signature}"
+                      <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Classes="faint small" Text="{Binding Signature}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Signature}"
                                  IsVisible="{Binding Signature, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                      <StackPanel.ContextMenu>
+                      <Grid.ContextMenu>
                         <ContextMenu>
                           <MenuItem Header="Open definition" Click="OnOpenDefinition" FontWeight="SemiBold" InputGesture="Enter" />
                           <MenuItem Header="Copy name" Click="OnCopyNodeName" />
                         </ContextMenu>
-                      </StackPanel.ContextMenu>
-                    </StackPanel>
+                      </Grid.ContextMenu>
+                    </Grid>
                   </TreeDataTemplate>
 
                   <TreeDataTemplate DataType="vm:MessageNodeViewModel">
@@ -645,7 +658,6 @@
                     <StackPanel Orientation="Horizontal" Spacing="7" Background="Transparent">
                       <PathIcon Classes="dim" Width="14" Height="14" Data="{Binding IsView, Converter={x:Static views:Icons.TableOrView}}" />
                       <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
-                      <TextBlock Classes="faint small" Text="view" VerticalAlignment="Center" IsVisible="{Binding IsView}" />
                       <StackPanel.ContextMenu>
                         <ContextMenu>
                           <MenuItem Header="Open" Click="OnOpenTableNode" FontWeight="SemiBold" InputGesture="Enter" />
@@ -696,7 +708,7 @@
               <DataTemplate x:DataType="vm:TabViewModel">
                 <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto" Margin="10,0,4,0" Background="Transparent"
                       ToolTip.Tip="{Binding Title, Converter={x:Static views:Icons.WithoutBullet}}">
-                  <Border Grid.Column="0" Width="4" Height="16" CornerRadius="2" Background="{Binding ChipColor}" Margin="0,0,8,0"
+                  <Border Grid.Column="0" Width="4" Height="16" CornerRadius="{DynamicResource DbxRadiusXs}" Background="{Binding ChipColor}" Margin="0,0,8,0"
                           VerticalAlignment="Center" />
                   <PathIcon Grid.Column="1" Classes="dim" Width="13" Height="13" Margin="0,0,6,0"
                             Data="{Binding IconKey, Converter={x:Static views:Icons.ByKey}}" />
@@ -770,7 +782,7 @@
                     <PathIcon Classes="dim" Data="{StaticResource IconDatabaseAdd}" Width="20" Height="20" Margin="0,0,12,0" />
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                       <TextBlock Text="Add a connection" FontWeight="SemiBold" />
-                      <TextBlock Classes="dim small" Text="PostgreSQL, SQL Server, MySQL or a SQLite file" />
+                      <TextBlock Classes="dim small" Text="PostgreSQL, SQL Server, MySQL, MariaDB or a SQLite file" />
                     </StackPanel>
                   </Grid>
                 </Button>
@@ -786,7 +798,7 @@
               </StackPanel>
 
               <StackPanel Spacing="4" IsVisible="{Binding HasRecentTabs}">
-                <TextBlock Classes="section" Text="RECENTLY CLOSED" Margin="0,0,0,4" />
+                <TextBlock Classes="section" Text="Recently closed" Margin="0,0,0,4" />
                 <ItemsControl ItemsSource="{Binding RecentTabs}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:MainViewModel+RecentTab">
@@ -805,7 +817,7 @@
 
               <Border BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,1,0,0" Padding="0,16,0,0">
                 <StackPanel Spacing="8">
-                  <TextBlock Classes="section" Text="SHORTCUTS" Margin="0" />
+                  <TextBlock Classes="section" Text="Shortcuts" Margin="0" />
                   <ItemsControl ItemsSource="{x:Static views:ShortcutCatalog.Highlights}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="views:ShortcutItem">
@@ -866,7 +878,7 @@
           <Border DockPanel.Dock="Top" Padding="20,14,12,12" BorderBrush="{DynamicResource DbxBorderSubtle}" BorderThickness="0,0,0,1">
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock Classes="h2" Text="Keyboard shortcuts" VerticalAlignment="Center" />
-              <Button Grid.Column="1" Theme="{StaticResource DbxToolButton}" Classes="close" Tag="{StaticResource IconClose}" MinWidth="28" MinHeight="28"
+              <Button Grid.Column="1" Theme="{StaticResource DbxToolButton}" Classes="close" Tag="{StaticResource IconClose}" MinWidth="22" MinHeight="22" Padding="4"
                       Command="{Binding HideShortcutsCommand}" AutomationProperties.Name="Close" ToolTip.Tip="Close (Esc)" />
             </Grid>
           </Border>

@@ -28,6 +28,7 @@ public partial class StatusModel : ObservableObject
     private readonly List<Action> _cancels = [];
     private int _busyCount;
     private int _generation;
+    private Guid? _connectionId;
 
     [ObservableProperty] private string _message = "";
     [ObservableProperty] private bool _isError;
@@ -60,6 +61,22 @@ public partial class StatusModel : ObservableObject
 
     public void Success(string message) => Set(message, StatusSeverity.Success);
 
+    /// <summary>A success about one connection: <see cref="ClearOtherConnections"/> drops it when the user moves to another one.</summary>
+    public void Success(string message, Guid connectionId)
+    {
+        Set(message, StatusSeverity.Success);
+        _connectionId = connectionId;
+    }
+
+    /// <summary>
+    /// Removes an information or success message about a connection other than <paramref name="current"/>: once another
+    /// connection's tab is active, "Connected to X" reads as if it were about the tab. Warnings and errors stay.
+    /// </summary>
+    public void ClearOtherConnections(Guid? current)
+    {
+        if (_connectionId is { } id && id != current && !IsSticky) Clear();
+    }
+
     public void Warn(string message) => Set(message, StatusSeverity.Warn);
 
     public void Error(string message) => Set(message, StatusSeverity.Error);
@@ -67,6 +84,7 @@ public partial class StatusModel : ObservableObject
     private void Set(string message, StatusSeverity severity)
     {
         var generation = ++_generation;
+        _connectionId = null;
         Message = message;
         Severity = severity;
         IsError = severity == StatusSeverity.Error;
@@ -115,6 +133,7 @@ public partial class StatusModel : ObservableObject
     private void Clear()
     {
         _generation++;
+        _connectionId = null;
         Message = "";
         IsError = false;
         Severity = StatusSeverity.Info;

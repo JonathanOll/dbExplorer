@@ -248,7 +248,7 @@ public partial class MainViewModel
         yield return Entry("file.clear-recent", "File", "Clear recent scripts", "IconDelete", Do(ClearRecentScriptsCommand), noLibrary);
         yield return Entry("file.library-folder", "File", "Open script library folder", "IconFolderOpen", Do(OpenLibraryFolderCommand),
             noLibrary, keywords: "explorer scripts");
-        yield return Entry("file.exit", "File", "Exit dbExplorer", "IconClose", Do(() => ExitRequested?.Invoke()),
+        yield return Entry("file.exit", "File", "Exit dbExplorer", "IconExit", Do(() => ExitRequested?.Invoke()),
             ExitRequested is null ? "Not available here" : null, "Alt+F4", "quit close application");
     }
 
@@ -260,7 +260,7 @@ public partial class MainViewModel
         var none = tab is null ? "No tab is open" : null;
         var several = Tabs.Count > 1 ? null : "There is no other tab";
 
-        yield return Pick("tab.switch", "Tabs", "Switch to tab…", "IconTable",
+        yield return Pick("tab.switch", "Tabs", "Switch to tab…", "IconTabs",
             () => Tabs.Select((t, i) => Entry($"tab.switch.{i}", "Tabs", t.Title.TrimStart('•', ' '), t.IconKey, Do(() => ActiveTab = t),
                 detail: ReferenceEquals(t, ActiveTab) ? "current" : t.Connection.Name)
                 with { Environment = t.ConnectionEnvironment }).ToList(),
@@ -327,8 +327,8 @@ public partial class MainViewModel
             {
                 Tree.SelectedNode = node;
                 return Tree.ConnectAsync(node);
-            }, disabled: n => n.IsConnected ? "Already connected" : null, keywords: "open server");
-        yield return OnConnection("connection.disconnect", "Disconnect from…", "IconClose",
+            }, disabled: n => n.IsConnected ? "Connected" : null, keywords: "open server");
+        yield return OnConnection("connection.disconnect", "Disconnect from…", "IconDisconnect",
             node => Do(() => Tree.Disconnect(node.Config.Id)), noneConnected, NotConnected, "close");
         yield return Entry("connection.new", category, "New connection…", "IconDatabaseAdd",
             () => Tree.AddConnectionCommand.ExecuteAsync(null), keywords: "add server database postgres sqlite");
@@ -342,7 +342,7 @@ public partial class MainViewModel
             }), keywords: "show find connection");
         yield return OnConnection("connection.refresh", "Refresh schema of…", "IconRefresh",
             node => () => Tree.RefreshCommand.ExecuteAsync(node), noneConnected, NotConnected, "reload tables");
-        yield return Entry("connection.refresh-selected", category, "Refresh the schema", "IconRefresh",
+        yield return Entry("connection.refresh-selected", category, "Refresh schema", "IconRefresh",
             () => Tree.RefreshSelectedCommand.ExecuteAsync(null),
             Tree.SelectedConnection is { } selected && Tree.NodeOf(selected.Id) is { IsConnected: true } ? null
                 : "Select a connected connection in the navigator", keywords: "reload tables");

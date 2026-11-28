@@ -371,6 +371,15 @@ public class CommandPaletteShellTests : ShellTestBase
         Assert.Null(main.CommandPalette);
         Assert.NotNull(main.Tree.FindSession(T.Config.Id));
         Assert.Equal(["connection.connect"], main.Tree.Config.RecentCommands);
+
+        // connected now: the same word as the "connected" detail of the other connection pickers
+        main.ShowCommandPalette();
+        palette = main.CommandPalette!;
+        palette.Query = "connect to";
+        await palette.ConfirmAsync();
+        var row = Assert.Single(palette.Rows);
+        Assert.False(row.IsEnabled);
+        Assert.Equal("Connected", row.Note);
     }
 
     [Fact]

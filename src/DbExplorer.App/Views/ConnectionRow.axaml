@@ -9,7 +9,7 @@
        so it never relies on colour alone. -->
   <Grid ColumnDefinitions="Auto,Auto,*,Auto" Background="Transparent" MinWidth="150"
         ToolTip.Tip="{Binding Tooltip}" AutomationProperties.Name="{Binding Title}" AutomationProperties.HelpText="{Binding StateText}">
-    <Border Width="3" Height="14" CornerRadius="2" Background="{Binding ChipColor}" VerticalAlignment="Center" Margin="0,0,7,0" />
+    <Border Width="3" Height="14" CornerRadius="{DynamicResource DbxRadiusXs}" Background="{Binding ChipColor}" VerticalAlignment="Center" Margin="0,0,7,0" />
     <Panel Grid.Column="1" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,7,0">
       <views:EngineIcon Kind="{Binding Config.Kind}" Width="16" Height="16" />
       <Ellipse Width="8" Height="8" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-2,-2"
@@ -20,12 +20,23 @@
                IsVisible="{Binding HasError}" />
     </Panel>
     <TextBlock Grid.Column="2" Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+    <!-- the pill, then one fixed slot for the lock / error / spinner, so the pills line up whatever follows them -->
     <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="8,0,2,0" HorizontalAlignment="Right">
-      <PathIcon Classes="spin" Data="{StaticResource IconRefresh}" Width="13" Height="13" Foreground="{DynamicResource DbxAccent}"
-                IsVisible="{Binding IsConnecting}" />
       <views:EnvironmentBadge Environment="{Binding ConnectionEnvironment}" />
-      <PathIcon Data="{StaticResource IconLock}" Width="12" Height="12" Foreground="{DynamicResource DbxWarn}" IsVisible="{Binding IsReadOnly}" />
-      <PathIcon Data="{StaticResource IconError}" Width="13" Height="13" Foreground="{DynamicResource DbxError}" IsVisible="{Binding HasError}" />
+      <Panel Width="13" Height="13" VerticalAlignment="Center">
+        <PathIcon Data="{StaticResource IconLock}" Width="12" Height="12" Foreground="{DynamicResource DbxWarn}">
+          <PathIcon.IsVisible>
+            <MultiBinding Converter="{x:Static BoolConverters.And}">
+              <Binding Path="IsReadOnly" />
+              <Binding Path="!HasError" />
+              <Binding Path="!IsConnecting" />
+            </MultiBinding>
+          </PathIcon.IsVisible>
+        </PathIcon>
+        <PathIcon Data="{StaticResource IconError}" Width="13" Height="13" Foreground="{DynamicResource DbxError}" IsVisible="{Binding HasError}" />
+        <PathIcon Classes="spin" Data="{StaticResource IconRefresh}" Width="13" Height="13" Foreground="{DynamicResource DbxAccent}"
+                  IsVisible="{Binding IsConnecting}" />
+      </Panel>
     </StackPanel>
   </Grid>
 </UserControl>

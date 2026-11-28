@@ -15,7 +15,7 @@ connection can be in several groups, and deleting a connection removes it from i
 count; a group expands to its members, which are shortcuts to the real connections (double-click connects one). Create a group
 with the **New group** button of the navigator toolbar or from a group's menu; a connection's menu has **Add to group...**
 (one of the groups it could join, or a new group started with it). A group's menu: **Check schema differences**, **Edit
-group...**, **Rename...**, **Delete group** (the connections are kept) and **New group...**; a member's menu: **Connect** and
+group...**, **Rename...**, **Delete** (the connections are kept) and **New group...**; a member's menu: **Connect** and
 **Remove from group**.
 
 **Group editor.** A name plus two lists: the available connections and the members in order (add, remove, move up / down;

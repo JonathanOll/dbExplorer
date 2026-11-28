@@ -33,7 +33,7 @@ public static class ShortcutCatalog
             new("Enter", "Connect, open the selected table, or the definition of a routine"),
             new("F2", "Edit or rename the selected node"),
             new("Delete", "Delete the selected node"),
-            new("F5", "Refresh the schema (navigator focused)"),
+            new("F5", "Refresh schema (navigator focused)"),
         ]),
         new("Tabs", [
             new("Ctrl+N", "New SQL script"),

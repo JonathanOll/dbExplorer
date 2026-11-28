@@ -170,7 +170,7 @@ public partial class MainWindow : Window
         }
         if (items.Count == 0)
         {
-            var none = new MenuItem { Header = "No recent scripts yet", IsEnabled = false };
+            var none = new MenuItem { Header = "No recent scripts", IsEnabled = false };
             ToolTip.SetTip(none, "Scripts you open or save appear here.");
             ToolTip.SetShowOnDisabled(none, true);
             items.Add(none);

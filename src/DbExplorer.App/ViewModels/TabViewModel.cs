@@ -114,7 +114,7 @@ public abstract class TabViewModel : ObservableObject
             if (!c.IsProduction) return null;
             var consequence = c.ReadOnly ? "Read-only: writes are refused." : "Writes ask for confirmation.";
             var database = c.Kind == DbKind.Sqlite ? Path.GetFileName(c.Database) : c.Database;
-            return $"Production · {c.Name} ({database}). {consequence}";
+            return $"Production · {c.Name} · {database}. {consequence}";
         }
     }
 

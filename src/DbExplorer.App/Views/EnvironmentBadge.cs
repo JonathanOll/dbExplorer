@@ -15,8 +15,9 @@ public sealed class EnvironmentBadge : Border
     public static readonly StyledProperty<DbEnvironment> EnvironmentProperty =
         AvaloniaProperty.Register<EnvironmentBadge, DbEnvironment>(nameof(Environment));
 
-    private readonly TextBlock _text = new() { FontSize = 10.5, VerticalAlignment = VerticalAlignment.Center };
+    private readonly TextBlock _text = new() { VerticalAlignment = VerticalAlignment.Center };
 
+    // Its text size is DbxBadgeFontSize, from the Border.badge > TextBlock style (no local value, so it follows the theme).
     public EnvironmentBadge()
     {
         Classes.Add("badge");

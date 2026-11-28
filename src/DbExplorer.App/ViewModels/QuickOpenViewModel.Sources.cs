@@ -163,7 +163,7 @@ public sealed partial class QuickOpenViewModel
     {
         var procedure = routine.Kind == RoutineKind.Procedure;
         var kind = procedure ? "procedure" : "function";
-        return new QuickOpenItem(label, routine.Arguments is null ? kind : $"{kind} ({routine.Arguments})", open)
+        return new QuickOpenItem(label, string.IsNullOrWhiteSpace(routine.Arguments) ? kind : $"{kind} ({routine.Arguments})", open)
         {
             Group = group,
             Title = context is null ? null : routine.Ref.ToString(),

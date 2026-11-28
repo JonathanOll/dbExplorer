@@ -26,8 +26,12 @@ public sealed class HighlightText : TextBlock
     public static readonly StyledProperty<string?> ElsewhereProperty =
         AvaloniaProperty.Register<HighlightText, string?>(nameof(Elsewhere));
 
+    public static readonly StyledProperty<bool> ShowMarksProperty =
+        AvaloniaProperty.Register<HighlightText, bool>(nameof(ShowMarks), true);
+
     static HighlightText()
     {
+        ShowMarksProperty.Changed.AddClassHandler<HighlightText>((t, _) => t.Rebuild());
         WholeWordsProperty.Changed.AddClassHandler<HighlightText>((t, _) => t.Rebuild());
         ElsewhereProperty.Changed.AddClassHandler<HighlightText>((t, _) => t.Rebuild());
         PositionsProperty.Changed.AddClassHandler<HighlightText>((t, _) => t.Rebuild());
@@ -62,6 +66,13 @@ public sealed class HighlightText : TextBlock
     {
         get => GetValue(ElsewhereProperty);
         set => SetValue(ElsewhereProperty, value);
+    }
+
+    /// <summary>False draws the text plain: a disabled row must not shout its matched letters.</summary>
+    public bool ShowMarks
+    {
+        get => GetValue(ShowMarksProperty);
+        set => SetValue(ShowMarksProperty, value);
     }
 
     public static string? GetQuery(Control control) => control.GetValue(QueryProperty);
@@ -116,7 +127,7 @@ public sealed class HighlightText : TextBlock
     {
         var text = Source ?? "";
         Inlines?.Clear();
-        var hits = Positions ?? Match(text, GetQuery(this), WholeWords, Elsewhere);
+        var hits = !ShowMarks ? [] : Positions ?? Match(text, GetQuery(this), WholeWords, Elsewhere);
         if (hits.Count == 0)
         {
             Text = text;
