@@ -515,8 +515,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
         while (generation == _tickGeneration && Phase == UpgradePhase.Running && _clock is { } clock)
         {
             ElapsedText = FormatElapsed(clock.Elapsed);
-            try { await Task.Delay(500); }
-            catch (Exception) { return; }
+            await Task.Delay(500);
         }
     }
 

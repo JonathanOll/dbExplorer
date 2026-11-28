@@ -232,7 +232,7 @@ public sealed class ScriptLibrary
         }
         catch
         {
-            try { File.Delete(path); } catch (IOException) { /* the empty reservation stays: harmless */ }
+            try { File.Delete(path); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* the empty reservation stays: harmless */ }
             throw;
         }
         return path;
@@ -250,7 +250,7 @@ public sealed class ScriptLibrary
         }
         catch
         {
-            try { File.Delete(copy); } catch (IOException) { /* harmless */ }
+            try { File.Delete(copy); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { /* harmless */ }
             throw;
         }
         return copy;
