@@ -69,6 +69,7 @@ public class App : Application
                 if (window.Clipboard is { } clipboard) await clipboard.SetTextAsync(text);
             };
             tree.CopyText = main.CopyToClipboard;
+            Claude.ClaudeStartup.Wire(window, main, paths, dialogs);
             // After the window is up: restoring the tabs (their editors, views) must not delay the first paint. Only tab shells
             // are built; nothing connects until a table tab is first selected (the active one loads at once).
             SessionStartup.Wire(window, main, startup, new Core.Config.TabSessionStore(paths.SessionFile),

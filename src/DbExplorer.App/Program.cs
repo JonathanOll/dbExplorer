@@ -11,6 +11,9 @@ internal static class Program
     {
         StartupTrace.Mark("main");
 
+        // Claude Code starts the exe as its MCP server: no window, nothing of the UI is loaded.
+        if (Array.IndexOf(args, Claude.McpMode.Flag) >= 0) return Claude.McpMode.Run(args);
+
         // A flag without a value is reported in a message box (and exits) instead of crashing inside the startup prefetch.
         if (AppPaths.CheckArguments(args) is { } problem)
         {

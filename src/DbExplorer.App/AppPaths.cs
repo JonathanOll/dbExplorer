@@ -29,6 +29,12 @@ public sealed record AppPaths(string DataDir, string DBeaverDir)
     /// <summary>The statements run from script tabs (JSON lines, at most 5000, read when the history opens).</summary>
     public string HistoryFile => Path.Combine(DataDir, "history.jsonl");
 
+    /// <summary>What Claude Code asked through the MCP server (JSON lines).</summary>
+    public string ClaudeActivityFile => Path.Combine(DataDir, "claude-activity.jsonl");
+
+    /// <summary>The MCP configuration written for "Open in Claude Code".</summary>
+    public string ClaudeMcpConfigFile => Path.Combine(DataDir, "claude", "mcp.json");
+
     public const string Usage = "Usage: dbExplorer [--data-dir <path>] [--dbeaver-dir <path>] [--no-update-check]";
 
     /// <summary>

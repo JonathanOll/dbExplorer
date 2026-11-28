@@ -249,7 +249,7 @@ dotnet run --project tools/UiShots -- --scroll 3        # scroll benchmark of a 
 Scenes: `er-diagram`, `er-diagram-focus`, `er-diagram-hover`, `er-diagram-large`, `er-diagram-export`, `empty`, `main-table`, `table-edit`, `table-structure`, `table-structure-wide`, `script`, `script-error`, `quick-open`, `quick-open-extended`, `quick-open-words`, `connection-dialog`, `connection-dialog-entra`, `connection-dialog-ssh`, `connection-dialog-tls`, `host-key-dialog`,
 `sql-preview`, `virtual-key`, `history` (the Query history window), `search`, `search-data`, `format-sql`, `confirm-dialog`, `live-theme-switch` (flips the theme while the window shows),
 `main-table-125` (1024x640 DIP, the 1280x800 window at 125 percent scaling), the Settings dialog (`settings-appearance`,
-`settings-editor`, `settings-results`, `settings-history`, `settings-format`, `settings-shortcuts`, `settings-upgrade`, `settings-search`, `settings-appearance-125`),
+`settings-editor`, `settings-results`, `settings-history`, `settings-format`, `settings-shortcuts`, `settings-upgrade`, `settings-search`, `settings-appearance-125`), `settings-claude`, `settings-claude-activity`, `script-claude`,
 `main-table-settings` and `script-settings` (UI scale 125 %, purple accent, Compact density), the script preview of the Upgrade
 dialog (`upgrade-scripts`, `upgrade-scripts-filter`, `upgrade-scripts-nomatch`), and for linked groups `groups-tree` (the Groups
 section of the navigator), `group-editor`, `group-editor-warning` (one member + a name clash: warning and error bands) and

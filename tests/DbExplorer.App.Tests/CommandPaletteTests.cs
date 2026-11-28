@@ -347,6 +347,8 @@ public class CommandPaletteShellTests : ShellTestBase
             SetFormat = _ => { },
             ShowFolders = new(() => true, _ => { }),
             MonospaceFonts = ["Consolas"],
+            Claude = new ClaudeSettingsAccess(() => new(), () => [], _ => true,
+                new DbExplorer.Core.Claude.ClaudeActivityLog(Path.Combine(Path.GetTempPath(), "dbx-no-activity.jsonl")), ""),
         };
 
         Assert.Equal(SettingsPages.Create(context).Select(p => (p.Id, p.Title)),

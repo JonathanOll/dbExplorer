@@ -101,6 +101,11 @@
             <MenuItem Header="Collapse _all" Command="{Binding Tree.CollapseAllCommand}" />
             <Separator />
             <MenuItem Header="_Upgrade database…" Command="{Binding OpenUpgradeCommand}" />
+            <Separator />
+            <MenuItem Header="Open in _Claude Code" Command="{Binding OpenInClaudeCodeCommand}"
+                      ToolTip.Tip="Open a terminal running Claude Code with the dbExplorer tools (set up in Settings, Claude Code)">
+              <MenuItem.Icon><PathIcon Data="{StaticResource IconConsole}" /></MenuItem.Icon>
+            </MenuItem>
           </MenuItem>
 
           <MenuItem Header="_View">

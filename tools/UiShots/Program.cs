@@ -9,6 +9,7 @@ using DbExplorer.App.Appearance;
 using DbExplorer.App.Settings;
 using DbExplorer.App.ViewModels;
 using DbExplorer.App.Views;
+using DbExplorer.Core.Claude;
 using DbExplorer.Core.Config;
 using DbExplorer.Core.Metadata;
 using DbExplorer.Core.Model;
@@ -381,6 +382,9 @@ internal static partial class Scenes
         ("settings-format", d => SettingsDialogScene(d, "format")),
         ("settings-shortcuts", d => SettingsDialogScene(d, "shortcuts")),
         ("settings-upgrade", d => SettingsDialogScene(d, "upgrade")),
+        ("settings-claude", d => ClaudeSettingsScene(d, bottom: false)),
+        ("settings-claude-activity", d => ClaudeSettingsScene(d, bottom: true)),
+        ("script-claude", ClaudeProposalScene),
         ("upgrade-scripts", d => UpgradeScripts(d, "")),
         ("upgrade-scripts-filter", d => UpgradeScripts(d, "supplier")),
         ("upgrade-scripts-nomatch", d => UpgradeScripts(d, "zzz")),
@@ -830,6 +834,52 @@ internal static partial class Scenes
         dialog.Show(d.Window);
         await Settle();
         return dialog;
+    }
+
+    // The Claude Code page: one connection per access level, a production one, and a few logged calls.
+    private static async Task<Window?> ClaudeSettingsScene(Demo d, bool bottom)
+    {
+        await Open(d);
+        d.Tree.UpdateConnection(d.Tree.Config.Connections.First(c => c.Name == "Billing") with { Environment = DbEnvironment.Production });
+        d.Tree.UpdateConnection(d.Shop with { Environment = DbEnvironment.Development });
+        var claude = new ClaudeSettings
+        {
+            Enabled = true,
+            Connections = { [d.Shop.Id] = ClaudeAccess.SchemaAndData, [d.Scratch.Id] = ClaudeAccess.Schema },
+        };
+        var log = new ClaudeActivityLog(Path.Combine(d.Dir, "claude-activity.jsonl"));
+        var now = DateTimeOffset.Now;
+        log.Append(new ClaudeActivity(now.AddMinutes(-6), "list_connections", null, null, "ok"));
+        log.Append(new ClaudeActivity(now.AddMinutes(-5), "describe_object", d.Shop.Name, "orders", "ok"));
+        log.Append(new ClaudeActivity(now.AddMinutes(-4), "query", d.Shop.Name, "SELECT status, count(*) FROM orders GROUP BY status", "ok"));
+        log.Append(new ClaudeActivity(now.AddMinutes(-2), "query", d.Scratch.Name, "SELECT * FROM notes", "refused",
+            "This connection is schema only: reading data was not allowed by the user."));
+        var ctx = new SettingsContext(SettingsService.Instance)
+        {
+            Claude = new ClaudeSettingsAccess(() => claude, () => d.Tree.Config.Connections, next => { claude = next; return true; }, log,
+                ClaudeLauncher.AddCommand(@"C:\Tools\dbExplorer\DbExplorer.exe", @"C:\Users\me\AppData\Roaming\dbExplorer")),
+        };
+        var dialog = new SettingsDialog { DataContext = new SettingsViewModel(ctx, "claude") };
+        dialog.Show(d.Window);
+        await Settle();
+        if (bottom)
+        {
+            dialog.GetVisualDescendants().OfType<ClaudePageView>().Single().FindAncestorOfType<ScrollViewer>()!.ScrollToEnd();
+            await Settle();
+        }
+        return dialog;
+    }
+
+    // A script tab as Claude Code opens it: named, headed, not executed.
+    private static async Task<Window?> ClaudeProposalScene(Demo d)
+    {
+        await Open(d);
+        d.Tree.Config.Claude = new ClaudeSettings { Enabled = true, Connections = { [d.Shop.Id] = ClaudeAccess.Schema } };
+        var reply = d.Main.HandleClaudeRequest(new ClaudeAppRequest(ClaudeAppRequest.OpenScript, d.Shop.Id, "late orders",
+            "SELECT o.id, o.created, c.name\nFROM orders o\nJOIN customers c ON c.id = o.customer_id\nWHERE o.status = 'paid'\nORDER BY o.created;"));
+        if (!reply.Ok) throw new InvalidOperationException(reply.Message);
+        await Settle();
+        return null;
     }
 
     // The Upgrade dialog on its script preview, over a throw-away dbupdate tree; narrowed when a search is given. Nothing is run.

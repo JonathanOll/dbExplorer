@@ -412,6 +412,9 @@ public partial class ConnectionTreeViewModel : ObservableObject
         }
 
         Config.Connections[index] = updated;
+        // The choice was made for this database, outside production: pointed elsewhere or flagged, it must be made again.
+        if (!SessionManager.SameDatabase(old, updated) || updated.IsProduction)
+            Config.Claude.Connections.Remove(updated.Id);
 
         // Name, folder, read-only flag and environment do not affect the connection itself; anything else invalidates a live
         // session and a connect still in flight.
@@ -427,6 +430,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
     {
         Config.Connections.RemoveAll(c => c.Id == connection.Id);
         Config.VirtualKeys.Remove(connection.Id);
+        Config.Claude.Connections.Remove(connection.Id);
         GroupRules.RemoveConnection(Config, connection.Id);   // a group only references ids: it must not dangle
         _connecting.GetValueOrDefault(connection.Id)?.Cancel();
         _sessions.Remove(connection.Id);
@@ -625,6 +629,13 @@ public partial class ConnectionTreeViewModel : ObservableObject
     public bool SetSettings(AppSettings settings)
     {
         Config.Settings = settings;
+        return SaveSetting();
+    }
+
+    /// <summary>Stores the Claude Code integration choices, with the same contract as <see cref="SetAutoUpdateCheck"/>.</summary>
+    public bool SetClaude(ClaudeSettings claude)
+    {
+        Config.Claude = claude.Normalized();
         return SaveSetting();
     }
 

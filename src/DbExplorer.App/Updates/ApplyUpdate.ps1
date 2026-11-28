@@ -1,7 +1,8 @@
 # Relay script of the auto-update (embedded in DbExplorer.exe, written to a temp dir and run by Windows PowerShell 5.1,
 # so keep it 5.1-compatible). The running app cannot overwrite its own exe/dlls: it starts this script and exits.
 # Steps: wait for the app to exit, extract the zip to a staging dir, check it holds DbExplorer.exe, move the current files
-# to <InstallDir>\.update-backup, copy the new files in. On any failure the backup is restored and the OLD exe relaunched;
+# to <InstallDir>\.update-backup (.update-backup-<pid> while an older one is in use), copy the new files in. On any failure
+# the backup is restored and the OLD exe relaunched;
 # on success the new exe is relaunched and backup, staging, zip and this script's dir are deleted.
 # User data (%APPDATA%\dbExplorer) lives outside InstallDir and is never touched.
 # Exit codes: 0 updated, 1 failed (old version relaunched), 2 the app did not exit in time (nothing touched).
@@ -62,7 +63,7 @@ function Start-App([string]$Exe) {
     catch { Write-Log "could not start ${Exe}: $($_.Exception.Message)" }
 }
 
-function Get-InstallItems { @(Get-ChildItem -LiteralPath $InstallDir -Force | Where-Object { $_.Name -ne '.update-backup' }) }
+function Get-InstallItems { @(Get-ChildItem -LiteralPath $InstallDir -Force | Where-Object { $_.Name -notlike '.update-backup*' }) }
 
 # $RemoveNew: also delete what is in InstallDir now (new files copied before the failure).
 function Restore-Backup([bool]$RemoveNew) {
@@ -97,10 +98,19 @@ if ($ProcessId -gt 0) {
 
 $phase = 'none'     # none -> backup (moving old files out) -> copy (copying new files in)
 try {
-    # A backup left by an interrupted run: restore it when the install is broken, otherwise drop it.
-    if (Test-Path -LiteralPath $backup) {
-        if (Test-Path -LiteralPath $newExe) { Remove-Item -LiteralPath $backup -Recurse -Force }
-        else { Write-Log 'broken install, restoring the backup of an interrupted update'; Restore-Backup $true }
+    # A backup left by an interrupted run: restore it when the install is broken, otherwise drop it. A process started from
+    # the old exe may still run (Claude Code keeps its "--mcp" server open across an update: a running exe can be moved,
+    # not deleted), so a backup that cannot be deleted stays and this run uses another folder.
+    $left = @(Get-ChildItem -LiteralPath $InstallDir -Force -Directory -Filter '.update-backup*' | Sort-Object CreationTimeUtc)
+    if ($left.Count -gt 0) {
+        if (Test-Path -LiteralPath $newExe) { foreach ($old in $left) { Remove-Quietly $old.FullName } }
+        else {
+            Write-Log 'broken install, restoring the backup of an interrupted update'
+            $backup = $left[-1].FullName
+            Restore-Backup $true
+            $backup = Join-Path $InstallDir '.update-backup'
+        }
+        if (Test-Path -LiteralPath $backup) { $backup = Join-Path $InstallDir ".update-backup-$PID" }
     }
 
     # 2. extract + sanity check

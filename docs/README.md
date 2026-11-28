@@ -6,6 +6,7 @@ The [project README](../README.md) is the short tour and the install command. Th
 | --- | --- |
 | [Install and update](install.md) | The one-line installer, its switches, install locations, uninstall, rate limit, offline install, automatic updates |
 | [Features](features.md) | Connection tree, table tabs, filters, row editing, quick open, script runner, tab restore |
+| [Claude Code](claude-code.md) | Let Claude Code explore chosen databases and propose SQL: setup, what is sent to Anthropic, safety |
 | [Environments](environments.md) | Production badges and the confirmation before any write there |
 | [Compare results](compare.md) | Compare two query results or table pages: key matching, changed, added and removed rows |
 | [Linked database groups](groups.md) | Switch a tab between databases of a group, run a read-only query on all of them, compare schemas |

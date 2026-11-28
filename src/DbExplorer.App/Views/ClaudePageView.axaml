@@ -1,0 +1,94 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DbExplorer.App.ViewModels"
+             xmlns:views="using:DbExplorer.App.Views"
+             x:Class="DbExplorer.App.Views.ClaudePageView"
+             x:DataType="vm:ClaudeSettingsPage">
+  <StackPanel Spacing="18">
+    <Border Classes="banner info" CornerRadius="{DynamicResource DbxRadius}" Padding="12,10">
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+        <PathIcon Classes="bi" Data="{StaticResource IconInfo}" VerticalAlignment="Top" />
+        <TextBlock Grid.Column="1" Text="{Binding PrivacyNotice}" TextWrapping="Wrap" />
+      </Grid>
+    </Border>
+
+    <CheckBox IsChecked="{Binding IsEnabled}" AutomationProperties.Name="Turn on the Claude Code integration">
+      <StackPanel Spacing="2">
+        <TextBlock Text="Turn on the Claude Code integration" />
+        <TextBlock Classes="dim small" TextWrapping="Wrap"
+                   Text="Off: the dbExplorer MCP server refuses every request and the app does not listen." />
+      </StackPanel>
+    </CheckBox>
+
+    <StackPanel Spacing="4">
+      <TextBlock Classes="section" Text="CONNECTIONS" Margin="0,0,0,6" />
+      <TextBlock Classes="dim small" TextWrapping="Wrap" IsVisible="{Binding HasNoConnections}" Text="No connection yet." />
+      <ItemsControl ItemsSource="{Binding Connections}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="vm:ClaudeConnectionRow">
+            <Border Padding="0,8" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource DbxBorderSubtle}">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                <StackPanel Spacing="2" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <views:EnvironmentBadge Environment="{Binding Environment}" />
+                  </StackPanel>
+                  <TextBlock Classes="dim small" Text="{Binding Detail}" TextWrapping="Wrap" />
+                </StackPanel>
+                <ComboBox Grid.Column="1" ItemsSource="{Binding Options}" SelectedItem="{Binding Selected}" IsEnabled="{Binding CanChoose}"
+                          Width="180" VerticalAlignment="Center" ToolTip.Tip="{Binding DisabledReason}" ToolTip.ShowOnDisabled="True"
+                          AutomationProperties.Name="{Binding AccessName}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate DataType="vm:ClaudeAccessOption"><TextBlock Text="{Binding Label}" /></DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <StackPanel Spacing="6">
+      <TextBlock Classes="section" Text="USE IT" Margin="0" />
+      <TextBlock Classes="dim small" TextWrapping="Wrap"
+                 Text="Tools, Open in Claude Code starts a session with these tools. To have them in your own sessions too, run this command once:" />
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <TextBox Text="{Binding AddCommand, Mode=OneWay}" IsReadOnly="True" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12"
+                 AutomationProperties.Name="Command that adds the server to Claude Code" />
+        <Button Grid.Column="1" Command="{Binding CopyAddCommandCommand}" ToolTip.Tip="Copy the command"
+                AutomationProperties.Name="Copy the command" Content="Copy" />
+      </Grid>
+    </StackPanel>
+
+    <StackPanel Spacing="4">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+        <TextBlock Classes="section" Text="ACTIVITY" Margin="0" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="Refresh" Command="{Binding LoadActivityCommand}" ToolTip.Tip="Read the activity log again" />
+        <Button Grid.Column="2" Content="Clear" Command="{Binding ClearActivityCommand}" ToolTip.Tip="Empty the activity log" />
+      </Grid>
+      <TextBlock Classes="dim small" TextWrapping="Wrap" IsVisible="{Binding HasNoActivity}" Text="Claude Code has not asked anything yet." />
+      <ItemsControl ItemsSource="{Binding Activity}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="vm:ClaudeActivityRow">
+            <Border Padding="0,6" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource DbxBorderSubtle}" Background="Transparent"
+                    ToolTip.Tip="{Binding Tip}">
+              <StackPanel Spacing="2">
+                <Grid ColumnDefinitions="140,150,*,Auto" ColumnSpacing="8">
+                  <TextBlock Classes="dim small" Text="{Binding Time}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Classes="small" Text="{Binding Tool}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="2" Classes="small" Text="{Binding Connection}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  <Border Grid.Column="3" Classes="badge" Classes.error="{Binding Failed}" Classes.success="{Binding !Failed}">
+                    <TextBlock Text="{Binding Outcome}" FontSize="10.5" />
+                  </Border>
+                </Grid>
+                <TextBlock Classes="dim small" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" MaxLines="1"
+                           FontFamily="{DynamicResource DbxMonoFont}" IsVisible="{Binding HasDetail}" />
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

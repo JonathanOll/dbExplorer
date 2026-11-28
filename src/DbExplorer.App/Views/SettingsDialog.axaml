@@ -26,6 +26,10 @@
       <views:DatabaseUpgradePageView />
     </DataTemplate>
 
+    <DataTemplate DataType="vm:ClaudeSettingsPage">
+      <views:ClaudePageView />
+    </DataTemplate>
+
     <DataTemplate DataType="vm:ShortcutsSettingsPage">
       <views:ShortcutsPageView />
     </DataTemplate>

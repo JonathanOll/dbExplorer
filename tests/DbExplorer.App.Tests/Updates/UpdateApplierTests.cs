@@ -126,6 +126,26 @@ public sealed class UpdateApplierTests : IDisposable
         Assert.Empty(Directory.GetFileSystemEntries(Relay));   // script, staging and log dir are gone
     }
 
+    // An MCP server started from the old exe may still run after an update: its file stays in the backup, undeletable.
+    [PowerShellFact]
+    public void ABackupStillInUse_DoesNotStopTheNextUpdate()
+    {
+        MakeZip();
+        var backup = Path.Combine(Install, ".update-backup");
+        Directory.CreateDirectory(backup);
+        var held = Path.Combine(backup, "held.dll");
+        File.WriteAllText(held, "running");
+        using (new FileStream(held, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            Assert.Equal(0, RunRelay());
+
+            Assert.Equal("new", ReadVersion());
+            Assert.Equal("new", WaitForMarker());
+            Assert.True(File.Exists(held));
+            Assert.Equal([".update-backup"], Directory.GetDirectories(Install, ".update-backup*").Select(Path.GetFileName));
+        }
+    }
+
     [PowerShellFact]
     public void BadZip_LeavesTheOldFilesIntact_AndRelaunchesTheOldExe()
     {

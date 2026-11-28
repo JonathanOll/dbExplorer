@@ -485,6 +485,7 @@ public partial class MainViewModel
         ("history", "Query history", "IconHistory"),
         ("format", "SQL formatting", "IconFormat"),
         ("shortcuts", "Shortcuts", "IconKeyboard"),
+        ("claude", "Claude Code", "IconConsole"),
         ("updates", "Updates", "IconRefresh"),
         ("upgrade", "Database upgrade", "IconImport"),
     ];
@@ -497,10 +498,10 @@ public partial class MainViewModel
         yield return Entry("app.settings", category, "Settings…", "IconSettings", () => OpenOptionsCommand.ExecuteAsync(null),
             noDialogs, "Ctrl+,", "options preferences");
         yield return Pick("app.settings-page", category, "Open settings page…", "IconSettings",
-            () => SettingsPageChoices.Where(p => p.Id != "history" || _history is not null)
+            () => SettingsPageChoices.Where(p => (p.Id != "history" || _history is not null) && (p.Id != "claude" || _claude is not null))
                 .Select(p => Entry("app.settings-page." + p.Id, category, p.Title, p.Icon,
                     () => OpenOptionsCommand.ExecuteAsync(p.Id))).ToList(),
-            noDialogs, "options preferences general appearance editor results history format shortcuts updates upgrade");
+            noDialogs, "options preferences general appearance editor results history format shortcuts claude updates upgrade");
         // The folder is only checked when the command runs: it may be on a slow share.
         yield return Entry("app.upgrade", category, "Upgrade database…", "IconImport", () =>
             {
@@ -509,6 +510,9 @@ public partial class MainViewModel
             },
             noDialogs ?? (string.IsNullOrWhiteSpace(Tree.Config.DbUpdatePath) ? "Set the dbupdate folder in Settings, Database upgrade"
                 : CurrentConnection is null ? "Select a connection first" : null), keywords: "migration scripts dbupdate");
+        yield return Entry("app.claude-code", category, "Open in Claude Code", "IconConsole",
+            () => OpenInClaudeCodeCommand.ExecuteAsync(null), _claude is null ? "Not available here" : null,
+            keywords: "ai assistant mcp terminal anthropic");
         yield return Entry("app.shortcuts", category, "Keyboard shortcuts", "IconKeyboard", Do(ShowShortcuts), shortcut: "F1",
             keywords: "help keys");
         yield return Entry("app.auto-update", category, "Check for updates automatically", "IconRefresh",

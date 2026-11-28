@@ -153,6 +153,9 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
     private IReadOnlyList<ScriptStatement> _lastStatements = [];
     private string _runText = "";
     private bool _lastRunWasGroup;
+    private Guid _lastRunConnection;
+    private bool _lastRunOnProduction;
+    private string? _lastRunError;
     private PlanMode _lastPlanRequest;   // what the last run asked for explicitly (Ctrl+L), not the toggle
     private bool _lastGroupWhole;
     private int _totalStatements;
@@ -220,6 +223,22 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
         IsDirty = false;
         OnPropertyChanged(nameof(Title));
     }
+
+    /// <summary>Names a tab holding SQL someone proposed; the text set afterwards is unsaved work like any other.</summary>
+    public void NameProposal(string name)
+    {
+        DocumentName = name;
+        OnPropertyChanged(nameof(Title));
+    }
+
+    /// <summary>
+    /// The error of the last run, for Claude Code. Nothing when the run was on another connection than the tab's now, on a
+    /// production one, or on a group: the message may quote values of a database that is not the allowed one.
+    /// </summary>
+    public (string? Error, string? Note) ErrorToShare =>
+        GroupRun is not null || _lastRunWasGroup ? (null, "The last run was a group run: its errors are not shared.")
+        : _lastRunError is null || _lastRunOnProduction || _lastRunConnection != Connection.Id ? (null, null)
+        : (_lastRunError, null);
 
     /// <summary>The selected range (start inclusive, end exclusive) in <see cref="Text"/>; null or empty when nothing is selected.</summary>
     public (int Start, int End)? Selection { get; set; }
@@ -559,6 +578,9 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
         _lastStatements = statements;
         _lastRunWasGroup = false;
         _lastPlanRequest = planRequest;
+        _lastRunConnection = Connection.Id;
+        _lastRunOnProduction = Connection.IsProduction;
+        _lastRunError = null;
         _runText = Text;    // the result tabs point into this text
         _totalStatements = statements.Count;
         RunStartedAt = DateTime.Now;
@@ -586,6 +608,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
             var session = _session ?? await ResolveSessionAsync(ct);
             if (session is null || _closed) return;
 
+            _lastRunOnProduction |= session.Config.IsProduction;
             var maxRows = RowLimit;
             // The connection's current flag (it can be toggled while connected) and its kind drive the guard.
             var kind = session.Config.Kind;
@@ -694,6 +717,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
         }
         finally
         {
+            _lastRunError = Results.LastOrDefault(r => r.HasError)?.Error ?? (ErrorIsWarning ? null : ErrorMessage);
             _runCts = null;
             RunStartedAt = null;
             RunProgressText = null;

@@ -110,9 +110,10 @@ How it works:
 4. Unsaved work is handled as when you close the window: a table tab with staged edits asks Save / Discard / Cancel (Cancel
    keeps the app open and the download for the next click); unsaved scripts are kept by their autosave and come back, with the
    tabs, at the next start.
-5. A hidden Windows PowerShell relay waits for the app to exit, moves the current files to `.update-backup` inside the install
-   folder, copies the new ones and starts the new exe with the same arguments. On any failure it puts the backup back and
-   starts the old version again; the backup, the zip and the relay are deleted after a success.
+5. A hidden Windows PowerShell relay waits for the app to exit, moves the current files to `.update-backup` inside the
+   install folder, copies the new ones and starts the new exe with the same arguments. On any failure it puts the backup
+   back and starts the old version again; the backup, the zip and the relay are deleted after a success. Files a
+   [Claude Code](claude-code.md) MCP server still runs from stay in the backup until a later update deletes them.
 
 Requirement: the app runs from its install folder, which must be writable ([`install.ps1`](#install) creates one). Nothing is
 offered for development runs (`dotnet run`, `bin\Debug`, `bin\Release`), for a build without a stamped version (v1.0.0 is

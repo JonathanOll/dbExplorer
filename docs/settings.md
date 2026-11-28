@@ -20,6 +20,7 @@ status bar says the setting is not saved (it still applies for the run).
 | Query history | Record the query history on or off, **Clear history** (confirmed), entry count and file size |
 | SQL formatting | Keyword case, indent (2, 4, 8 spaces or tab), comma position, maximum line width, live preview of a sample statement |
 | Shortcuts | Every shortcut (from the same list as F1) with a filter box and **Copy as markdown**. Read only |
+| Claude Code | The [Claude Code integration](claude-code.md): off by default, access per connection, activity log |
 | Updates | Automatic update check |
 | Database upgrade | The dbupdate folder (see [Database upgrade](database-upgrade.md)) |
 
@@ -34,12 +35,14 @@ Everything lives in `%APPDATA%\dbExplorer`:
 | Path | Content |
 | --- | --- |
 | `ssh_known_hosts.json` | SSH host key fingerprints accepted in the trust question, one per server ([SSH tunnels](features.md#sign-in-and-ssh-tunnels)) |
-| `config.json` | folders, connections (passwords, client secrets and SSH secrets DPAPI-encrypted for the current Windows user), virtual keys, linked groups, the automatic-update setting, the dbupdate folder (`DbUpdatePath`, empty = upgrade off), the SQL formatting style (`Format`), the query-history switch (`RecordHistory`), the recently used palette commands (`RecentCommands`), the copy and export choices (`Export`), the Settings dialog values (`Settings`) |
+| `config.json` | folders, connections (passwords, client secrets and SSH secrets DPAPI-encrypted for the current Windows user), virtual keys, linked groups, the automatic-update setting, the dbupdate folder (`DbUpdatePath`, empty = upgrade off), the SQL formatting style (`Format`), the query-history switch (`RecordHistory`), the recently used palette commands (`RecentCommands`), the copy and export choices (`Export`), the Settings dialog values (`Settings`), the Claude Code choices (`Claude`) |
 | `cache\` | per-connection metadata cache (schema/table/column names) used by `Ctrl+Shift+P` |
 | `scripts\` | unsaved script tabs, restored at the next start |
 | `library\` | the script library: your saved `.sql` scripts and their folders ([Script library](scripts.md#script-library)) |
 | `recent-scripts.json` | the last 20 scripts opened or saved |
 | `history.jsonl` | the query history, one JSON line per statement, latest 5,000 ([Query history](scripts.md#query-history)) |
+| `claude-activity.jsonl` (and `.old`) | what [Claude Code](claude-code.md) asked, one JSON line per call, no returned data |
+| `claude\mcp.json` | the MCP configuration written by **Open in Claude Code** (no secret) |
 | `window.json` | size, position and maximised state of the main window |
 | `session.json` | the open tabs (order, active tab, table filters / WHERE / sort, script files); delete it to forget them (only unsaved scripts then come back) |
 

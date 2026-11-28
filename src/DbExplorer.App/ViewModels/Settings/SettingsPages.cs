@@ -36,6 +36,9 @@ public sealed record SettingsContext(SettingsService Service)
     /// <summary>Installed monospace font families offered by the editor page; null reads them from the platform when the page is built.</summary>
     public IReadOnlyList<string>? MonospaceFonts { get; init; }
 
+    /// <summary>The Claude Code integration; null hides its page.</summary>
+    public ClaudeSettingsAccess? Claude { get; init; }
+
     /// <summary>Applies an edit of <see cref="AppSettings"/> through the service (live and persisted).</summary>
     public void Edit(Func<AppSettings, AppSettings> change) => Service.Update(change);
 }
@@ -56,6 +59,7 @@ public static class SettingsPages
         if (ctx.RecordHistory is not null) pages.Add(new HistorySettingsPage(ctx));
         if (ctx.GetFormat is not null && ctx.SetFormat is not null) pages.Add(new FormatSettingsPage(ctx));
         pages.Add(new ShortcutsSettingsPage(ctx));
+        if (ctx.Claude is not null) pages.Add(new ClaudeSettingsPage(ctx, ctx.Claude));
         if (ctx.AutoUpdateCheck is not null) pages.Add(new UpdatesSettingsPage(ctx));
         if (ctx.Upgrade is not null) pages.Add(new DatabaseUpgradeSettingsPage(ctx));
         return pages;

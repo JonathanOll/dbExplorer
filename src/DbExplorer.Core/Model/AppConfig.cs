@@ -53,5 +53,8 @@ public record AppConfig(
     /// <summary>What the copy and export dialogs remember. Missing in old files: the defaults.</summary>
     public ExportPreferences Export { get; set; } = new();
 
+    /// <summary>The Claude Code integration. Missing in old files: off, no connection allowed.</summary>
+    public ClaudeSettings Claude { get; set; } = new();
+
     public static AppConfig Empty() => new(new(), new(), new());
 }

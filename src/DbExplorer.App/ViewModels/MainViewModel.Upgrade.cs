@@ -44,6 +44,7 @@ public partial class MainViewModel
     private SettingsContext SettingsContextFor(OptionsViewModel upgrade) => new(Settings.SettingsService.Instance)
     {
         Upgrade = upgrade,
+        Claude = ClaudeSettingsAccess,
         ApplyDbUpdatePath = ApplyDbUpdatePath,
         RecordHistory = new(() => Tree.Config.RecordHistory, v => Tree.SetRecordHistory(v)),
         History = _history,

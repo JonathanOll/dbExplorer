@@ -62,6 +62,13 @@ connection string.
 All connections are opened by `ConnectionLink` (driver plus optional tunnel), owned by the `Session`. A new engine supports
 tunnels by implementing `IDbDriver.NetworkTarget` and `IDbDriver.CreateTunneledConnection`.
 
+## Claude Code server
+
+`DbExplorer.exe --mcp --data-dir <folder>` speaks MCP on stdin and stdout ([Claude Code](claude-code.md)); point it at a
+throw-away data folder when trying it. Its tests (`ClaudeToolsTests`) use real SQLite files and drive the server through the
+SDK's client; `ClaudeSqlServerTests` runs when `DBX_MSSQL` is set. When adding a tool, add it to `ClaudeToolCatalog` and
+`ClaudeTools`, treat every argument as hostile, and go through `ClaudePolicy`.
+
 ## Startup performance
 
 The pass/fail bar from the design is a usable window in under about 1 s. Measured on the dev machine (Windows 11,
