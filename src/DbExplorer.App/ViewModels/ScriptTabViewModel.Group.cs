@@ -84,9 +84,6 @@ public sealed partial class ScriptTabViewModel
         catch (ObjectDisposedException) { /* the run just finished */ }
     }
 
-    /// <summary>Cancels one member of the running group run; the others go on. No-op when none runs.</summary>
-    public void CancelGroupMember(Guid connectionId) => GroupRun?.CancelMember(connectionId);
-
     /// <summary>
     /// Runs the statement under the caret / the selection (<paramref name="wholeScript"/> false, the rules of Ctrl+Enter) or the
     /// whole script on every member of the active group. Nothing runs, and nobody is contacted, when the tab is not in a

@@ -150,7 +150,6 @@ public sealed partial class QuickOpenViewModel
         public int Count { get; private set; }
         public int Matched { get; private set; }
         public int Index(int position) => _indexes[position];
-        public int ScoreAt(int position) => _scores[position];
 
         public void Add(int score, int index)
         {

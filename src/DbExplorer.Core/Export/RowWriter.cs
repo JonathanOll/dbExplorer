@@ -17,20 +17,3 @@ public abstract class RowWriter
 
     protected static object? Value(object?[] row, int i) => i < row.Length && row[i] is not DBNull ? row[i] : null;
 }
-
-/// <summary>Passes on only the chosen columns, in the chosen order (the selection of a grid).</summary>
-public sealed class ProjectingWriter(RowWriter inner, IReadOnlyList<int> indices) : RowWriter
-{
-    public override string? Warning => inner.Warning;
-
-    public override void Begin(IReadOnlyList<ExportColumn> columns) => inner.Begin(indices.Select(i => columns[i]).ToList());
-
-    public override void Write(object?[] row)
-    {
-        var picked = new object?[indices.Count];
-        for (var i = 0; i < picked.Length; i++) picked[i] = Value(row, indices[i]);
-        inner.Write(picked);
-    }
-
-    public override void End() => inner.End();
-}

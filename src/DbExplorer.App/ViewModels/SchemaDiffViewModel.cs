@@ -21,7 +21,6 @@ public sealed record DiffFinding(string Label, string Severity, string Subject, 
     /// <summary>The column name, or an empty text for a finding about a whole table.</summary>
     public string ColumnText => Column ?? "";
 
-    public bool HasColumn => Column is not null;
     public bool HasDetail => !string.IsNullOrEmpty(Detail);
 }
 

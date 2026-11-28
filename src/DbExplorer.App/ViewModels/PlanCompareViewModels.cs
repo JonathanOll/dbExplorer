@@ -133,8 +133,6 @@ public sealed partial class PlanCompareViewModel : ObservableObject
 
     public bool IsNeutral => Overall is PlanVerdict.Same or PlanVerdict.Changed;
 
-    public string OverallIconKey => Overall switch { PlanVerdict.Better => "IconCheck", PlanVerdict.Worse => "IconWarning", _ => "IconInfo" };
-
     public string OverallWord => Overall switch { PlanVerdict.Better => "Better", PlanVerdict.Worse => "Worse", _ => Diff.IsIdentical ? "Identical" : "Similar" };
 
     public int AddedCount => Diff.Added.Count();
@@ -325,8 +323,6 @@ public sealed record PlanCompareState(string Kind, string? Tag, string? Badge, s
     public bool HasTag => Tag is not null;
 
     public bool HasBadge => Badge is not null;
-
-    public bool IsOutlined => IsAdded || IsRemoved;
 
     /// <summary>The badge for screen readers and tooltips: the colour is never the only signal.</summary>
     public string Spoken => string.Join(", ", new[] { Tag, Badge, Kind is "better" or "worse" ? Kind : null }.Where(s => s is not null));

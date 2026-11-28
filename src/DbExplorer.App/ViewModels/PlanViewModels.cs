@@ -280,13 +280,9 @@ public sealed partial class PlanStatementViewModel : ObservableObject
 
     public IReadOnlyList<PlanIssue> Issues { get; }
 
-    public bool HasIssues => Issues.Count > 0;
-
     public int IssueCount => Issues.Count;
 
     public bool HasNoIssues => Issues.Count == 0;
-
-    public bool HasRoot => Statement.Root is not null;
 
     /// <summary>"Query 2 · 45% of the batch" for the chip of a statement.</summary>
     public string Title => $"Query {Number}";
@@ -469,8 +465,6 @@ public sealed partial class PlanResultTab : ObservableObject, IResultTab
     public IReadOnlyList<PlanStatementViewModel> Statements { get; }
 
     public bool HasSeveralStatements => Statements.Count > 1;
-
-    public bool HasStatements => Statements.Count > 0;
 
     public bool IsEmpty => Statements.Count == 0;
 
