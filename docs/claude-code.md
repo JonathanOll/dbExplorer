@@ -69,6 +69,61 @@ Remove it with `claude mcp remove dbexplorer`. dbExplorer never edits Claude Cod
 Limits of `query`: 100 rows by default, 1,000 at most; values cut at 2,000 characters; about 40,000 characters per result;
 30 seconds by default, 120 at most; SQLite values over 4 MB are refused by the engine.
 
+## Ask Claude from dbExplorer
+
+With the integration on and a connection allowed, dbExplorer can also ask Claude itself, through `claude -p`. The answer
+streams into a side panel. It uses your Claude Code sign-in and counts against your plan or API credit.
+
+![Optimise a query](ui/after/claude-diff-light.png)
+
+| Question | Where | What comes back |
+| --- | --- | --- |
+| Explain error | **Explain with Claude** on a failed statement, the **Claude** button of a script tab | Why it failed; a corrected text when a change fixes it |
+| Optimise query | **Claude** button: the selection or the statement at the caret, with the plan and `STATISTICS IO` / `TIME` of the last run when it has them | A rewrite and index suggestions |
+| Generate SQL | **Claude** button: describe what you want | SQL to insert at the caret or in place of the selection |
+| Analyse plan | **Ask Claude** on an execution plan | The costly operators explained, index DDL as text |
+| Review upgrade scripts | **Review with Claude** in the [Upgrade](database-upgrade.md) dialog, for the ticked scripts | Locks, long operations, statements that cannot run twice, data loss risks |
+
+The same questions are in the command palette (`Ctrl+Shift+K`, "Claude:").
+
+Proposed SQL is shown as a difference. **Apply** puts it in the editor as one undo step; **Reject** drops it. It is not
+applied when the script or the database of the tab changed since the question. Nothing Claude writes is ever run, index
+DDL included.
+
+### What is sent
+
+The first question of a connection shows the exact text, before anything is sent. It is shown again after you change the
+access of that connection. Afterwards, **Show what was sent** unfolds it. Rows of tables are never part of a question.
+
+| | Schema only | Schema and data |
+| --- | --- | --- |
+| SQL and upgrade scripts | string and number literals and comments replaced by placeholders (type sizes stay) | as written |
+| Error message | only lines of a known shape, values replaced by `?`; the rest withheld | as shown |
+| Execution plan | operators, objects, rows, costs, warning titles, missing index suggestions | also predicates and the other operator properties |
+| Statistics | `STATISTICS IO` / `TIME` counters (other server messages never) | the same |
+| Schema | names, columns, types, keys and indexes of the tables involved, when loaded | the same |
+| Your description (Generate SQL) | as typed | as typed |
+
+Placeholders are turned back into your values on your machine, in the proposed SQL. A proposal that holds a placeholder
+that cannot be turned back cannot be applied. Stored secrets are masked. For several databases (an upgrade of a group), the
+lowest access applies, and one database that is not allowed (production included) refuses the whole question.
+
+### How Claude Code is run
+
+`claude -p` with the question on standard input (never on the command line), in an empty folder of dbExplorer's data folder:
+
+```text
+--output-format stream-json --verbose --include-partial-messages
+--safe-mode --tools "" --disallowedTools "*" --strict-mcp-config --disable-slash-commands
+--no-session-persistence --no-chrome --permission-mode dontAsk --permission-prompts none --system-prompt <fixed text>
+```
+
+So it has no tool that could touch your machine, no MCP server, none of your hooks, plugins, skills or `CLAUDE.md`, and
+saves no session. A run that announces a tool or an MCP server anyway (a managed policy) is stopped. **Stop**, closing the
+panel, the tab or the window kills the whole process tree; a question is stopped after 5 minutes. A recent Claude Code is
+needed (`claude update` when dbExplorer says it is too old). Questions are listed in the activity log (`ask:...`), without
+their text.
+
 ## Safety
 
 - **Off by default, connection by connection, schema only unless you say otherwise.** The server reads the settings again
@@ -86,6 +141,7 @@ Limits of `query`: 100 rows by default, 1,000 at most; values cut at 2,000 chara
   as a last check they are masked (`***`) in every reply and log line.
 - **No silent prompts.** A connection that signs in interactively (Microsoft Entra with MFA) cannot be opened by Claude
   Code. An SSH server whose host key you have not accepted in the app is refused: connect to it once in dbExplorer.
+- **Questions from the app** have their own rules: see [Ask Claude](#ask-claude-from-dbexplorer).
 - **Proposed SQL is only shown.** The tab starts with a comment saying so, is never run by dbExplorer, and does not take
   the front while you are working in the window. Line breaks and invisible or text-reordering characters are normalised so
   that what you read is what would run. Running it is your own action, with your own rights: read it first.

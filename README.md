@@ -55,7 +55,8 @@ All switches, install locations, GitHub rate limit (`$env:GITHUB_TOKEN`) and man
 - **Statistics** (SQL Server): `STATISTICS IO` and `TIME` captured per statement, also per database in a group run.
   [Plans](docs/plans.md#execution-statistics)
 - **Claude Code** (off by default): let it explore the connections you choose (schema only, or read-only queries too;
-  never production) and open proposed SQL in a tab. What it reads is sent to Anthropic. [Claude Code](docs/claude-code.md)
+  never production) and open proposed SQL in a tab. Ask it from the editor to explain an error, optimise or write a
+  query, read a plan or review upgrade scripts. What is sent goes to Anthropic. [Claude Code](docs/claude-code.md)
 - **DBeaver import**: folders, connections, credentials and virtual keys. [DBeaver import](docs/dbeaver-import.md)
 - **Settings and themes**: light, dark or system, accent colour, UI scale, row density, editor and results options.
   [Settings](docs/settings.md)
@@ -103,8 +104,8 @@ Built with .NET 10, Avalonia 11 and native ADO.NET drivers (Npgsql, Microsoft.Da
 - Configuration, scripts, history and session live in `%APPDATA%\dbExplorer` (see [docs/settings.md](docs/settings.md)).
 - Passwords are stored encrypted with Windows DPAPI, for the current Windows user.
 - Nothing is sent anywhere, except the update check to GitHub (it can be turned off in Settings > Updates) and, only if you
-  turn on the [Claude Code integration](docs/claude-code.md), what Claude Code reads from the connections you allow (sent to
-  Anthropic).
+  turn on the [Claude Code integration](docs/claude-code.md), what Claude Code reads from the connections you allow and the
+  questions you send it (sent to Anthropic).
 
 ## Documentation
 

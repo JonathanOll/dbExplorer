@@ -34,6 +34,7 @@ public interface IScriptFiles
 /// <param name="FileUsed">Told the path of every script file opened or saved (recent scripts, library refresh).</param>
 /// <param name="History">Every statement that ran is appended to it (when <paramref name="RecordHistory"/> says so).</param>
 /// <param name="RecordHistory">The "record history" setting, read at each statement; null means on.</param>
+/// <param name="Claude">The questions to Claude Code; without it nothing of them shows.</param>
 public sealed record ScriptTabHooks(
     Func<CancellationToken, Task<Session?>> ResolveSession,
     IScriptFiles? Files = null,
@@ -47,7 +48,8 @@ public sealed record ScriptTabHooks(
     QueryHistory? History = null,
     Func<bool>? RecordHistory = null,
     Func<SqlFormatOptions>? FormatOptions = null,
-    ProductionGuard? Guard = null);
+    ProductionGuard? Guard = null,
+    ClaudeAssistant? Claude = null);
 
 /// <summary>
 /// A SQL script editor on one connection. Runs the statement under the caret / the selection (Ctrl+Enter) or the
@@ -438,6 +440,8 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
             OnPropertyChanged(nameof(ActualPlanTip));
             OnPropertyChanged(nameof(IsReadOnly));
             OnPropertyChanged(nameof(ConnectionDescription));
+            ClaudePanel?.Close();   // the question was about the other database
+            RefreshClaude();
         }
         else if (e.PropertyName == nameof(IsSwitching)) OnPropertyChanged(nameof(RunDisabledReason));
     }
@@ -679,6 +683,9 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
             if (planMode != PlanMode.None && plans.Count > 0)
             {
                 var planTab = new PlanResultTab(plans, planMode, kind) { Host = this };
+                var analysed = planTab;
+                planTab.Analyse = () => AnalysePlanAsync(analysed);
+                planTab.CanAnalyseNow = () => ClaudeEnabled;
                 ResultTabs.Add(planTab);
                 // Estimated: the plan is the answer. Actual: the rows stay in front, the plan is one click away.
                 if (_estimatedRun || SelectedResultTab is null) SelectedResultTab = planTab;
@@ -1285,6 +1292,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
     {
         DiscardPersisted(keepOpen: false);
         Cancel();
+        ClaudePanel?.Close();
         CloseGroupRun();
         _script?.Dispose();
         _script = null;

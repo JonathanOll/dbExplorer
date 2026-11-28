@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using DbExplorer.App.ViewModels;
 using DbExplorer.Core.Claude;
+using DbExplorer.Core.Claude.Assist;
 
 namespace DbExplorer.App.Claude;
 
@@ -24,7 +25,8 @@ internal static class ClaudeStartup
             start => Process.Start(start)?.Dispose(),
             dialogs,
             handle => ClaudeBridge.Listen(ClaudeBridge.PipeName(paths.DataDir), handle),
-            () => window.IsActive));
+            () => window.IsActive,
+            new ClaudeProcessRunner()));
         main.ClaudeDispatch = async work => await Dispatcher.UIThread.InvokeAsync(work);
         // After the first paint, and only when the user turned the integration on (a flag of the config already loaded).
         window.Opened += (_, _) => Dispatcher.UIThread.Post(main.SyncClaudeListener, DispatcherPriority.Background);

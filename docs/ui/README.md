@@ -195,6 +195,11 @@ current-cell frame: 2 px accent, inside the cell).
   Statements with nothing to show get no tab; a run made only of them shows a check mark with the outcome instead.
   Chords: `Ctrl+Enter` / `F5` run here, `Ctrl+Shift+Enter` / `Ctrl+Shift+F5` run on the group, `Esc` stops a run, `F6` switches pane,
   `Ctrl+1…9` pick a result tab (`ScriptTabKeys`).
+- **Claude panel** (`ClaudePanelView`, 400 px right of the editor and results, 380 in the Upgrade dialog; only while the
+  integration is on): title and access level, close; the request box (Generate), or what will be sent with its exact text
+  (first question of a connection), then the proposed change (removed on error tint, added on success tint) above the answer.
+  One primary button per step (Continue, Send to Claude, Apply). Scenes: `claude-preview`, `claude-diff`,
+  `claude-generate`, `claude-plan`, `claude-upgrade`.
 - **Group run panel** (below the editor, replaces the result tabs while a group run is shown): a header with a summary and a
   Close button; one clickable state chip per database (spinner while running, check, error, stop); info and warning banners
   split by severity; an "All rows | Differences" segmented control with a "N differ" / "Identical" chip, and one tab per database.
@@ -250,6 +255,7 @@ Scenes: `er-diagram`, `er-diagram-focus`, `er-diagram-hover`, `er-diagram-large`
 `sql-preview`, `virtual-key`, `history` (the Query history window), `search`, `search-data`, `format-sql`, `confirm-dialog`, `live-theme-switch` (flips the theme while the window shows),
 `main-table-125` (1024x640 DIP, the 1280x800 window at 125 percent scaling), the Settings dialog (`settings-appearance`,
 `settings-editor`, `settings-results`, `settings-history`, `settings-format`, `settings-shortcuts`, `settings-upgrade`, `settings-search`, `settings-appearance-125`), `settings-claude`, `settings-claude-activity`, `script-claude`,
+`claude-preview`, `claude-diff`, `claude-generate`, `claude-plan`, `claude-upgrade`,
 `main-table-settings` and `script-settings` (UI scale 125 %, purple accent, Compact density), the script preview of the Upgrade
 dialog (`upgrade-scripts`, `upgrade-scripts-filter`, `upgrade-scripts-nomatch`), and for linked groups `groups-tree` (the Groups
 section of the navigator), `group-editor`, `group-editor-warning` (one member + a name clash: warning and error bands) and

@@ -72,6 +72,17 @@ public partial class MainViewModel
             () => s!.RunScriptOnGroupAsync(), noGroup ?? run, "Ctrl+Shift+F5", "all databases compare");
         yield return Entry("script.close-group-run", "Script", "Close the group run panel", "IconClose", Do(() => s!.CloseGroupRunPanel()),
             none ?? (s!.GroupRun is null ? "No group run is shown" : s.IsGroupRunning ? "A group run is in progress" : null));
+        var ask = none ?? s!.ClaudeDisabledReason;
+        yield return Entry("script.claude-explain", "Script", "Claude: explain the error", "IconConsole",
+            () => s!.ExplainErrorAsync(), ask, keywords: "ai why failed fix");
+        yield return Entry("script.claude-optimise", "Script", "Claude: optimise the query…", "IconConsole",
+            () => s!.OptimiseQueryAsync(), ask, keywords: "ai optimize faster performance rewrite statistics");
+        yield return Entry("script.claude-generate", "Script", "Claude: generate SQL from a description…", "IconConsole",
+            () => s!.GenerateSqlAsync(), ask, keywords: "ai write create query natural language");
+        yield return Entry("script.claude-plan", "Script", "Claude: analyse the execution plan", "IconConsole",
+            () => s!.AnalysePlanAsync(),
+            ask ?? (s!.ResultTabs.OfType<PlanResultTab>().Any() ? null : "Show an execution plan first (Ctrl+L)"),
+            keywords: "ai analyze index operators cost");
         yield return Entry("script.format", "Script", "Format SQL", "IconFormat", Do(() => s!.FormatSql()), none,
             "Ctrl+Shift+F", "beautify indent pretty");
         yield return Entry("script.estimated-plan", "Script", "Show estimated execution plan", "IconSchema",

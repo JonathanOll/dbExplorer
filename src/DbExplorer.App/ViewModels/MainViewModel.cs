@@ -629,7 +629,7 @@ public partial class MainViewModel : ObservableObject
         var hooks = new ScriptTabHooks(
             ct => ResolveScriptSessionAsync(connection.Id, ct), _scriptFiles, _scriptStore, Status, _scriptDialogs, SwitchHooks, Tree.FindSession,
             _library, OnScriptFileUsed, _history, () => Tree.Config.RecordHistory, () => Tree.Config.Format,
-            Guard);
+            Guard, Assistant);
         return new ScriptTabViewModel(connection, Tree.FindSession(connection.Id), hooks, ++_scriptCounter, restored);
     }
 

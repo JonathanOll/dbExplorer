@@ -64,6 +64,10 @@ public static class ShortcutCatalog
             new("Ctrl+K, Ctrl+C", "Comment the selected lines"),
             new("Ctrl+K, Ctrl+U", "Uncomment the selected lines"),
         ]),
+        new("Claude panel", [
+            new("Ctrl+Enter", "Prepare the question typed (nothing is sent before you see it the first time)"),
+            new("Esc", "Stop the question, then close the panel"),
+        ]),
         new("Execution plan", [
             new("Mouse wheel", "Zoom around the cursor (with or without Ctrl)"),
             new("Drag", "Pan the plan (Shift+wheel pans sideways)"),

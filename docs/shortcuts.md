@@ -21,6 +21,8 @@ Every shortcut of the app. The same list is in the app (`F1`, and Settings > Sho
 | `Ctrl+L` | table tab | Fuzzy-search a column and scroll to it |
 | `Ctrl+L` | script tab | Show the estimated execution plan of the selection / the statement under the cursor (nothing runs) |
 | `Ctrl+M` | script tab | Include the actual execution plan in the next runs (switch) |
+| `Ctrl+Enter` | Claude panel, request box | Prepare the question typed (nothing runs; see [Ask Claude](claude-code.md#ask-claude-from-dbexplorer)) |
+| `Esc` | Claude panel | Stop the question, then close the panel |
 | `Mouse wheel` / `Ctrl+wheel` | execution plan | Zoom around the cursor |
 | `Drag` / `Shift+wheel` | execution plan | Pan the plan / pan it sideways |
 | `Ctrl++` / `Ctrl+-` / `Ctrl+0` | execution plan | Zoom in / zoom out / fit the whole plan |

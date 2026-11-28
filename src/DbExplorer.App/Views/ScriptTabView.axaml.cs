@@ -150,6 +150,7 @@ public partial class ScriptTabView : UserControl
         _vm.RevealRequested += OnRevealRequested;
         _vm.FormatRequested += OnFormatRequested;
         _vm.EditorAttached();
+        _vm.RefreshClaude();   // access may have changed while the tab was behind
         _syncing = true;
         try
         {
@@ -301,6 +302,26 @@ public partial class ScriptTabView : UserControl
     private void OnRunScriptOnGroupMenu(object? sender, RoutedEventArgs e)
     {
         if (_vm is { CanRun: true } vm) _ = RunSafe(vm, vm.RunScriptOnGroupAsync);
+    }
+
+    // ---- questions to Claude ----
+
+    private void OnClaudeExplainClick(object? sender, RoutedEventArgs e) => Ask(vm => vm.ExplainErrorAsync());
+
+    private void OnClaudeOptimiseClick(object? sender, RoutedEventArgs e) => Ask(vm => vm.OptimiseQueryAsync());
+
+    private void OnClaudeGenerateClick(object? sender, RoutedEventArgs e) => Ask(vm => vm.GenerateSqlAsync());
+
+    private void OnClaudeAnalyseClick(object? sender, RoutedEventArgs e) => Ask(vm => vm.AnalysePlanAsync());
+
+    private void OnExplainErrorClick(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is StatementResultViewModel result) Ask(vm => vm.ExplainErrorAsync(result));
+    }
+
+    private void Ask(Func<ScriptTabViewModel, Task> question)
+    {
+        if (_vm is { } vm) _ = RunSafe(vm, () => question(vm));
     }
 
     // ---- results ----
@@ -470,6 +491,8 @@ public partial class ScriptTabView : UserControl
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (_vm is not { } vm) return;
+        // The keys typed in the Claude panel are its own: Ctrl+Enter there must never run the script.
+        if ((e.Source as Visual)?.FindAncestorOfType<ClaudePanelView>(includeSelf: true) is not null) return;
         ScriptKeyAction resolved;
         if (_chordPending)
         {

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using CommunityToolkit.Mvvm.Input;
 using DbExplorer.Core.Claude;
+using DbExplorer.Core.Claude.Assist;
 using DbExplorer.Core.Model;
 
 namespace DbExplorer.App.ViewModels;
@@ -15,6 +16,7 @@ namespace DbExplorer.App.ViewModels;
 /// <param name="Dialogs">Shows the plain messages.</param>
 /// <param name="Listen">Starts answering the MCP server; disposing stops. Null result: another instance answers already.</param>
 /// <param name="IsWindowActive">The user is working in the app right now.</param>
+/// <param name="Runner">Runs <c>claude -p</c> for the side panel; without it there is no panel.</param>
 public sealed record ClaudeHooks(
     string ServerExe,
     string DataDir,
@@ -25,7 +27,8 @@ public sealed record ClaudeHooks(
     Action<ProcessStartInfo> Start,
     IDialogService Dialogs,
     Func<Func<ClaudeAppRequest, CancellationToken, Task<ClaudeAppReply>>, IDisposable?>? Listen = null,
-    Func<bool>? IsWindowActive = null);
+    Func<bool>? IsWindowActive = null,
+    IClaudeProcessRunner? Runner = null);
 
 /// <summary>The Claude Code integration in the app: what the MCP server may ask of it, and "Open in Claude Code".</summary>
 public partial class MainViewModel
@@ -40,11 +43,27 @@ public partial class MainViewModel
     private readonly HashSet<Guid> _proposedTabs = [];
 
     /// <summary>Only stores the hooks (nothing at start-up); <see cref="SyncClaudeListener"/> starts listening.</summary>
-    public void UseClaude(ClaudeHooks hooks) => _claude = hooks;
+    public void UseClaude(ClaudeHooks hooks)
+    {
+        _claude = hooks;
+        Assistant = hooks.Runner is not { } runner ? null : new ClaudeAssistant(() => Tree.Config, Tree.SetClaude, hooks.FindClaude,
+            runner, Path.Combine(hooks.DataDir, "claude", "ask"), hooks.Log, Tree.Protector);
+        // Tabs restored before this call keep working without it; the window wires Claude before restoring them.
+    }
+
+    /// <summary>The questions to Claude Code; null until <see cref="UseClaude"/> gives the means to run it.</summary>
+    internal ClaudeAssistant? Assistant { get; private set; }
+
+    /// <summary>Stops every question still waiting for an answer (the window is closing).</summary>
+    public void StopClaudeQuestions()
+    {
+        foreach (var tab in Tabs.OfType<ScriptTabViewModel>()) tab.ClaudePanel?.Stop();
+    }
 
     /// <summary>Listens for the MCP server while the integration is on, and only then.</summary>
     public void SyncClaudeListener()
     {
+        foreach (var tab in Tabs.OfType<ScriptTabViewModel>()) tab.RefreshClaude();
         if (_claude?.Listen is not { } listen) return;
         if (!Tree.Config.Claude.Enabled)
         {

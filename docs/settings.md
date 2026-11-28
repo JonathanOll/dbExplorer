@@ -43,6 +43,7 @@ Everything lives in `%APPDATA%\dbExplorer`:
 | `history.jsonl` | the query history, one JSON line per statement, latest 5,000 ([Query history](scripts.md#query-history)) |
 | `claude-activity.jsonl` (and `.old`) | what [Claude Code](claude-code.md) asked, one JSON line per call, no returned data |
 | `claude\mcp.json` | the MCP configuration written by **Open in Claude Code** (no secret) |
+| `claude\ask\` | empty folder `claude -p` runs in for the [questions from the app](claude-code.md#ask-claude-from-dbexplorer) |
 | `window.json` | size, position and maximised state of the main window |
 | `session.json` | the open tabs (order, active tab, table filters / WHERE / sort, script files); delete it to forget them (only unsaved scripts then come back) |
 

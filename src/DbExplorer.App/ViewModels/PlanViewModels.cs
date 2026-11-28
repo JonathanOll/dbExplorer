@@ -507,6 +507,19 @@ public sealed partial class PlanResultTab : ObservableObject, IResultTab
 
     // ---- comparison ----
 
+    /// <summary>Asks Claude about the plan on screen; set by the script tab.</summary>
+    public Func<Task>? Analyse { get; set; }
+
+    internal Func<bool>? CanAnalyseNow { get; set; }
+
+    /// <summary>The "Analyse with Claude" button shows.</summary>
+    public bool ShowAnalyse => Analyse is not null && CanAnalyseNow?.Invoke() == true;
+
+    public void RefreshAnalyse() => OnPropertyChanged(nameof(ShowAnalyse));
+
+    [RelayCommand]
+    private Task AnalyseWithClaudeAsync() => Analyse?.Invoke() ?? Task.CompletedTask;
+
     /// <summary>The script tab that keeps the pinned baseline; null for a plan opened outside a script (tests).</summary>
     public IPlanCompareHost? Host { get; set; }
 

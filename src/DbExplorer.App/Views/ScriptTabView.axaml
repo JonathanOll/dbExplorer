@@ -26,6 +26,7 @@
 
   <!-- What the result strip shows for a statement's result, and for the Statistics / Messages grids (one table each) -->
   <UserControl.DataTemplates>
+    <DataTemplate DataType="vm:ClaudePanelViewModel" x:DataType="vm:ClaudePanelViewModel"><views:ClaudePanelView /></DataTemplate>
     <DataTemplate DataType="vm:StatementResultViewModel" x:DataType="vm:StatementResultViewModel">
       <ContentControl Content="{Binding}" ContentTemplate="{StaticResource StatementResultContent}" />
     </DataTemplate>
@@ -105,6 +106,13 @@
               <SelectableTextBlock Text="{Binding ErrorDetail}" TextWrapping="Wrap" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12" />
             </ScrollViewer>
             <StackPanel Grid.Column="2" Grid.RowSpan="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Top" Margin="12,0,0,0">
+              <Panel IsVisible="{Binding IsFailure}">
+                <Button Classes="ghost" MinHeight="26" Padding="8,0" Content="Explain with Claude" Click="OnExplainErrorClick"
+                        IsVisible="{Binding $parent[views:ScriptTabView].((vm:ScriptTabViewModel)DataContext).ClaudeEnabled}"
+                        IsEnabled="{Binding $parent[views:ScriptTabView].((vm:ScriptTabViewModel)DataContext).CanAskClaude}"
+                        ToolTip.ShowOnDisabled="True"
+                        ToolTip.Tip="{Binding $parent[views:ScriptTabView].((vm:ScriptTabViewModel)DataContext).ClaudeTip}" />
+              </Panel>
               <Button Classes="ghost" MinHeight="26" Padding="8,0" Content="Go to statement" Click="OnGoToStatementClick"
                       IsVisible="{Binding HasRange}" ToolTip.Tip="Select the statement in the editor" />
               <Button Classes="ghost" MinHeight="26" Padding="8,0" Content="Copy" Click="OnCopyErrorClick"
@@ -248,6 +256,25 @@
           <ToggleButton Classes="segment" Content="Actual plan" IsChecked="{Binding ActualPlanEnabled}" IsVisible="{Binding CanUseActualPlan}"
                         VerticalAlignment="Center" Margin="4,0,0,0" ToolTip.Tip="{Binding ActualPlanTip}" AutomationProperties.Name="Include the actual execution plan" />
 
+          <!-- Questions to Claude Code: only while the integration is on -->
+          <Border Classes="vsep" IsVisible="{Binding ClaudeEnabled}" />
+          <DropDownButton x:Name="ClaudeButton" Classes="ghost" MinHeight="30" Padding="8,0" VerticalAlignment="Center"
+                          IsVisible="{Binding ClaudeEnabled}" IsEnabled="{Binding CanAskClaude}" ToolTip.ShowOnDisabled="True"
+                          ToolTip.Tip="{Binding ClaudeTip}" AutomationProperties.Name="Ask Claude">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <PathIcon Data="{StaticResource IconConsole}" Width="14" Height="14" />
+              <TextBlock Text="Claude" VerticalAlignment="Center" />
+            </StackPanel>
+            <DropDownButton.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                <MenuItem Header="Explain the error" Click="OnClaudeExplainClick" />
+                <MenuItem Header="Optimise the query…" Click="OnClaudeOptimiseClick" />
+                <MenuItem Header="Generate SQL from a description…" Click="OnClaudeGenerateClick" />
+                <MenuItem Header="Analyse the execution plan" Click="OnClaudeAnalyseClick" />
+              </MenuFlyout>
+            </DropDownButton.Flyout>
+          </DropDownButton>
+
           <Border Classes="vsep" />
           <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconFormat}"
                   Command="{Binding FormatSqlCommand}" AutomationProperties.Name="Format SQL">
@@ -362,6 +389,10 @@
                 VerticalAlignment="Top" Command="{Binding DismissErrorCommand}" ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss" />
       </Grid>
     </Border>
+
+    <!-- The question to Claude and its answer, beside the editor and the results -->
+    <ContentControl DockPanel.Dock="Right" Width="400" Content="{Binding ClaudePanel}"
+                    IsVisible="{Binding ClaudePanel, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
     <Grid x:Name="SplitGrid">
       <Grid.RowDefinitions>

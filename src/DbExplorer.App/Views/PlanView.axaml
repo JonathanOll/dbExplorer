@@ -98,6 +98,10 @@
         </StackPanel>
 
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+          <Button Classes="ghost" MinHeight="28" Padding="8,0" Command="{Binding AnalyseWithClaudeCommand}" IsVisible="{Binding ShowAnalyse}"
+                  ToolTip.Tip="Ask Claude Code about the costly operators and indexes. You see what is sent; nothing is run." AutomationProperties.Name="Analyse the plan with Claude">
+            <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource IconConsole}" Width="12" Height="12" /><TextBlock Text="Ask Claude" /></StackPanel>
+          </Button>
           <Button Classes="ghost" MinHeight="28" Padding="8,0" Command="{Binding PinPlanCommand}" IsEnabled="{Binding CanPin}" IsVisible="{Binding !IsSelectedPinned}"
                   ToolTip.ShowOnDisabled="True" ToolTip.Tip="{Binding PinTooltip}" AutomationProperties.Name="Pin this plan as the baseline">
             <StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="{StaticResource IconLocate}" Width="12" Height="12" /><TextBlock Text="Pin plan" /></StackPanel>

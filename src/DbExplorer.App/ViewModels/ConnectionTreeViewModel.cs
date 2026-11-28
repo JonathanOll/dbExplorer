@@ -17,6 +17,8 @@ namespace DbExplorer.App.ViewModels;
 public partial class ConnectionTreeViewModel : ObservableObject
 {
     private readonly ConfigStore _store;
+
+    internal ISecretProtector Protector => _store.Protector;
     private readonly SessionManager _sessions;
     private readonly StatusModel _status;
     private readonly IDialogService _dialogs;
@@ -414,7 +416,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
         Config.Connections[index] = updated;
         // The choice was made for this database, outside production: pointed elsewhere or flagged, it must be made again.
         if (!SessionManager.SameDatabase(old, updated) || updated.IsProduction)
-            Config.Claude.Connections.Remove(updated.Id);
+            Config.Claude.Forget(updated.Id);
 
         // Name, folder, read-only flag and environment do not affect the connection itself; anything else invalidates a live
         // session and a connect still in flight.
@@ -430,7 +432,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
     {
         Config.Connections.RemoveAll(c => c.Id == connection.Id);
         Config.VirtualKeys.Remove(connection.Id);
-        Config.Claude.Connections.Remove(connection.Id);
+        Config.Claude.Forget(connection.Id);
         GroupRules.RemoveConnection(Config, connection.Id);   // a group only references ids: it must not dangle
         _connecting.GetValueOrDefault(connection.Id)?.Cancel();
         _sessions.Remove(connection.Id);

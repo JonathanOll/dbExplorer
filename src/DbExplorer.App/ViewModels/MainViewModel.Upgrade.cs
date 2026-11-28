@@ -104,7 +104,9 @@ public partial class MainViewModel
 
             var targets = UpgradeRules.TargetsFor(Tree.Config, current);
             var vm = new UpgradeViewModel(catalog, targets, ResolveScriptSessionAsync, CopyToClipboard, guard: Guard);
-            await dialogs.ShowUpgradeAsync(vm);
+            vm.UseClaude(Assistant);
+            try { await dialogs.ShowUpgradeAsync(vm); }
+            finally { vm.CloseClaudePanel(); }   // no question outlives its dialog
         }
         catch (Exception ex)
         {

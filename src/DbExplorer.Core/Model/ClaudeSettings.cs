@@ -24,12 +24,32 @@ public sealed record ClaudeSettings
     /// <summary>Connection id to access level.</summary>
     public Dictionary<Guid, ClaudeAccess> Connections { get; set; } = new();
 
+    /// <summary>
+    /// Connections for which the user has read what a question sends and sent it, with the access level it was read at: the
+    /// first question of another connection, or after a change of level, shows the text before sending it.
+    /// </summary>
+    public Dictionary<Guid, ClaudeAccess> Previewed { get; set; } = new();
+
     /// <summary>A copy safe to use: a null map (hand-edited file) is empty and unknown levels grant nothing.</summary>
-    public ClaudeSettings Normalized() => Connections is { Count: 0 } ? this : this with
+    public ClaudeSettings Normalized()
     {
-        Connections = (Connections ?? new()).Where(p => Enum.IsDefined(p.Value) && p.Value != ClaudeAccess.None)
-            .ToDictionary(p => p.Key, p => p.Value),
-    };
+        if (Connections is { Count: 0 } && Previewed is { Count: 0 }) return this;
+        var connections = (Connections ?? new()).Where(p => Enum.IsDefined(p.Value) && p.Value != ClaudeAccess.None)
+            .ToDictionary(p => p.Key, p => p.Value);
+        return this with
+        {
+            Connections = connections,
+            Previewed = (Previewed ?? new()).Where(p => connections.TryGetValue(p.Key, out var a) && a == p.Value)
+                .ToDictionary(p => p.Key, p => p.Value),
+        };
+    }
+
+    /// <summary>The connection must be chosen (and previewed) again.</summary>
+    public void Forget(Guid connectionId)
+    {
+        Connections.Remove(connectionId);
+        Previewed.Remove(connectionId);
+    }
 
     public ClaudeAccess Of(Guid connectionId) => Connections.GetValueOrDefault(connectionId);
 }

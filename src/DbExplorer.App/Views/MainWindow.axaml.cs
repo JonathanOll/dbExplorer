@@ -211,6 +211,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         base.OnClosed(e);
+        (DataContext as MainViewModel)?.StopClaudeQuestions();   // no claude process outlives the window
         try
         {
             (DataContext as MainViewModel)?.PersistScripts();   // idempotent; skips the scripts the user discarded

@@ -428,6 +428,8 @@ public sealed partial class UpgradeViewModel : ObservableObject
         RequestRetryCommand.NotifyCanExecuteChanged();
         CopyLogCommand.NotifyCanExecuteChanged();
         RefreshLongToggle();
+        if (value is not (UpgradePhase.Preview or UpgradePhase.Confirm)) CloseClaudePanel();
+        RefreshClaude();
         if (value != UpgradePhase.Running)
         {
             ConfirmingStop = false;
@@ -625,6 +627,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
             return;
         }
 
+        CloseClaudePanel();   // a review of the former list
         _plan = plan;
         FilterText = "";   // a new list is shown whole
         ConfirmToken = plan.ConfirmToken;
@@ -642,6 +645,7 @@ public sealed partial class UpgradeViewModel : ObservableObject
     /// <summary>A failed load leaves no stale preview behind: nothing can be run from rows that do not match the input.</summary>
     private void Reject(string message)
     {
+        CloseClaudePanel();
         _plan = null;
         Rows.Clear();
         Groups = [];
@@ -690,6 +694,9 @@ public sealed partial class UpgradeViewModel : ObservableObject
         OnPropertyChanged(nameof(IsDangerRun));
         RequestRunCommand.NotifyCanExecuteChanged();
         RefreshLongToggle();
+        // A text waiting to be sent no longer matches the ticks.
+        if (ClaudePanel is { IsPreview: true } stale) stale.Close();
+        RefreshClaude();
     }
 
     private bool CanRequestRun() => Phase == UpgradePhase.Preview && SelectedCount > 0 && Rows.All(r => !r.HasLoadError);
@@ -804,6 +811,8 @@ public sealed partial class UpgradeViewModel : ObservableObject
 
     partial void OnSelectedTargetChanged(UpgradeTarget? value)
     {
+        CloseClaudePanel();
+        RefreshClaude();
         OnPropertyChanged(nameof(RunButtonText));
         OnPropertyChanged(nameof(IsDangerRun));
     }
