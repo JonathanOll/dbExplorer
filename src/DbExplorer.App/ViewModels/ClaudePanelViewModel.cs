@@ -86,8 +86,11 @@ public sealed partial class ClaudePanelViewModel : ObservableObject
     /// <summary>The sent text is unfolded (always in the preview).</summary>
     [ObservableProperty] private bool _showSent;
 
-    [NotifyPropertyChangedFor(nameof(ShowAnswer))]
+    [NotifyPropertyChangedFor(nameof(ShowAnswer), nameof(AnswerBlocks))]
     [ObservableProperty] private string _answer = "";
+
+    /// <summary>The answer cut at its ``` fences: the panel draws code blocks monospaced, without the fences.</summary>
+    public IReadOnlyList<AnswerBlock> AnswerBlocks => AnswerBlock.Split(Answer);
 
     /// <summary>What is going on while waiting.</summary>
     [ObservableProperty] private string _statusText = "";

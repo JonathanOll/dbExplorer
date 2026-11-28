@@ -9,7 +9,7 @@
       <Button Grid.Column="1" Command="{Binding CopyMarkdownCommand}" ToolTip.Tip="Copy the whole list as a markdown table"
               AutomationProperties.Name="Copy the shortcuts as markdown">
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <PathIcon Data="{StaticResource IconSave}" Width="14" Height="14" />
+          <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14" />
           <TextBlock Text="Copy as markdown" />
         </StackPanel>
       </Button>

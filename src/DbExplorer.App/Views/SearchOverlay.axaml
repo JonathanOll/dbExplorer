@@ -34,7 +34,7 @@
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
               <Border Classes="kbd"><TextBlock Text="↑↓" /></Border>
-              <TextBlock Classes="dim small" Text="select" VerticalAlignment="Center" />
+              <TextBlock Classes="dim small" Text="navigate" VerticalAlignment="Center" />
               <Border Classes="kbd" Margin="6,0,0,0"><TextBlock Text="Enter" /></Border>
               <TextBlock Classes="dim small" Text="search / open" VerticalAlignment="Center" />
               <Border Classes="kbd" Margin="6,0,0,0"><TextBlock Text="Esc" /></Border>
@@ -142,7 +142,7 @@
                   <TextBlock Grid.Column="2" Classes="faint small" Text="{Binding Detail}" Margin="8,0,0,0" TextTrimming="CharacterEllipsis"
                              VerticalAlignment="Center" IsVisible="{Binding HasDetail}" />
                   <Border Grid.Column="3" Classes="badge warn" Margin="8,0,0,0" IsVisible="{Binding IsUnsaved}">
-                    <TextBlock Classes="small" Text="unsaved" />
+                    <TextBlock Text="unsaved" />
                   </Border>
                   <TextBlock Grid.Column="4" Classes="faint small" Text="{Binding CountText}" Margin="12,0,0,0" VerticalAlignment="Center" />
                 </Grid>
@@ -152,10 +152,12 @@
                   <TextBlock Classes="faint small" Text="{Binding LineLabel}" Width="40" TextAlignment="Right" Margin="0,0,12,0"
                              VerticalAlignment="Center" FontFamily="{StaticResource DbxMonoFont}" IsVisible="{Binding HasLine}" />
                   <Border Grid.Column="1" Classes="badge" Margin="0,0,10,0" IsVisible="{Binding HasBadge}" VerticalAlignment="Center">
-                    <TextBlock Classes="small" Text="{Binding Badge}" />
+                    <TextBlock Text="{Binding Badge}" />
                   </Border>
+                  <!-- SQL lines and cell values are code: monospaced, like the editor and the grid -->
                   <views:MatchText Grid.Column="2" Source="{Binding Text}" MatchStart="{Binding MatchStart}" MatchLength="{Binding MatchLength}"
-                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="12.5" />
+                                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                   FontFamily="{DynamicResource DbxMonoFont}" FontSize="{DynamicResource DbxMonoFontSize}" />
                 </Grid>
               </DataTemplate>
             </ListBox.DataTemplates>

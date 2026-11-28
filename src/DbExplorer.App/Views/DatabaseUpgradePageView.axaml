@@ -4,12 +4,12 @@
              x:Class="DbExplorer.App.Views.DatabaseUpgradePageView"
              x:DataType="vm:DatabaseUpgradeSettingsPage">
   <StackPanel Spacing="10" DataContext="{Binding Options}" x:DataType="vm:OptionsViewModel">
-    <TextBlock Classes="section" Text="DATABASE UPDATES" Margin="0" />
+    <TextBlock Classes="section" Text="Database updates" Margin="0" />
 
     <StackPanel Spacing="4">
       <Label Content="_dbupdate folder" Target="{Binding #PathBox}" Padding="0" FontWeight="SemiBold" />
       <TextBlock Classes="dim small" TextWrapping="Wrap"
-                 Text="The dbupdate folder of the repository (its dbupdate folder). Leave it empty to switch the upgrade feature off. The folder is checked and kept when you leave the box or press Enter." />
+                 Text="The dbupdate folder of your repository. Leave it empty to switch the upgrade feature off. The folder is checked and kept when you leave the box or press Enter." />
     </StackPanel>
 
     <Grid ColumnDefinitions="*,Auto">

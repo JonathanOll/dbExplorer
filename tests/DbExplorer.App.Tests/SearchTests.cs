@@ -242,6 +242,21 @@ public sealed class SearchTests : ShellTestBase
     }
 
     [Fact]
+    public async Task Data_TheMatchedColumn_IsNamedOncePerRunOfHits()
+    {
+        var vm = Vm();
+        vm.Scope = SearchScope.Data;
+        vm.Query = "a";
+        vm.TableFilter = "custom";
+        await vm.SearchAsync();
+
+        var hits = vm.Rows.OfType<SearchHitRow>().ToList();
+        Assert.True(hits.Count >= 2);   // Alice, Carol, Dave
+        Assert.Equal("name", hits[0].Badge);
+        Assert.All(hits.Skip(1), h => Assert.Null(h.Badge));   // the same column: not repeated on every row
+    }
+
+    [Fact]
     public async Task Data_StopWhileConnecting_EndsCleanly()
     {
         var started = new TaskCompletionSource();

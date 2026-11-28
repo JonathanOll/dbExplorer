@@ -15,7 +15,7 @@ public partial class DatabaseUpgradePageView : UserControl
     public DatabaseUpgradePageView()
     {
         InitializeComponent();
-        PathBox.TextChanged += (_, _) => (Page?.Options)?.ValidateSoonAsync();
+        PathBox.TextChanged += OnPathTextChanged;
         PathBox.LostFocus += (_, _) => Page?.Commit();
         PathBox.KeyDown += (_, e) =>
         {
@@ -27,6 +27,18 @@ public partial class DatabaseUpgradePageView : UserControl
     }
 
     private DatabaseUpgradeSettingsPage? Page => DataContext as DatabaseUpgradeSettingsPage;
+
+    private async void OnPathTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        try
+        {
+            if (Page?.Options is { } options) await options.ValidateSoonAsync();
+        }
+        catch (Exception)
+        {
+            // the check reports its own problems under the box; nothing here may reach the dispatcher as an unhandled fault
+        }
+    }
 
     private async void OnBrowseClick(object? sender, RoutedEventArgs e)
     {

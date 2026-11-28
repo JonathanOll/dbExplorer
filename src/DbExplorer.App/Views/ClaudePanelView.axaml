@@ -10,7 +10,7 @@
     <Style Selector="Border.diffline.removed"><Setter Property="Background" Value="{DynamicResource DbxErrorBg}" /></Style>
     <Style Selector="SelectableTextBlock.mono, TextBlock.mono">
       <Setter Property="FontFamily" Value="{DynamicResource DbxMonoFont}" />
-      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontSize" Value="{DynamicResource DbxMonoFontSize}" />
     </Style>
     <Style Selector="Border.box">
       <Setter Property="Background" Value="{DynamicResource DbxContentBg}" />
@@ -50,8 +50,10 @@
             <Button Classes="primary" Content="Send to Claude" Command="{Binding SendCommand}" IsVisible="{Binding IsPreview}"
                     ToolTip.Tip="Send exactly the text above. The next questions of this connection go at once." />
             <Button Content="Stop" Command="{Binding StopCommand}" IsVisible="{Binding IsRunning}" ToolTip.Tip="Stop Claude Code (Esc)" />
-            <Button Content="Try again" Command="{Binding RetryCommand}" IsVisible="{Binding CanAskAgain}" />
-            <Button Content="Copy answer" Click="OnCopyAnswerClick" IsVisible="{Binding IsDone}" />
+            <Button Content="Try again" Command="{Binding RetryCommand}" IsVisible="{Binding CanAskAgain}"
+                    ToolTip.Tip="Ask Claude Code the same question again" />
+            <Button Content="Copy answer" Click="OnCopyAnswerClick" IsVisible="{Binding IsDone}"
+                    ToolTip.Tip="Copy the answer to the clipboard" />
             <Button Content="Reject" Command="{Binding RejectCommand}" IsVisible="{Binding HasProposal}"
                     ToolTip.Tip="Drop the proposed change" />
             <Button Classes="primary" Content="Apply" Command="{Binding ApplyCommand}" IsVisible="{Binding HasProposal}"
@@ -95,7 +97,7 @@
 
           <!-- Proposed change, before the explanation: it is what the user acts on -->
           <StackPanel Spacing="6" IsVisible="{Binding HasProposal}">
-            <TextBlock Classes="section" Text="PROPOSED CHANGE" />
+            <TextBlock Classes="section" Text="Proposed change" />
             <TextBlock Classes="dim small" TextWrapping="Wrap" Text="{Binding ApplyDisabledReason}"
                        IsVisible="{Binding ApplyDisabledReason, Converter={x:Static ObjectConverters.IsNotNull}}" />
             <Border Classes="box" Padding="0,4">
@@ -117,8 +119,24 @@
           </StackPanel>
 
           <StackPanel Spacing="6" IsVisible="{Binding ShowAnswer}">
-            <TextBlock Classes="section" Text="ANSWER" />
-            <SelectableTextBlock Text="{Binding Answer}" TextWrapping="Wrap" AutomationProperties.Name="Answer of Claude" />
+            <TextBlock Classes="section" Text="Answer" />
+            <ItemsControl ItemsSource="{Binding AnswerBlocks}" AutomationProperties.Name="Answer of Claude">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:AnswerBlock">
+                  <Panel>
+                    <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" IsVisible="{Binding !IsCode}" />
+                    <Border Classes="box" Padding="10,8" IsVisible="{Binding IsCode}">
+                      <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                        <SelectableTextBlock Classes="mono" Text="{Binding Text}" />
+                      </ScrollViewer>
+                    </Border>
+                  </Panel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
           </StackPanel>
 
           <ToggleButton Classes="segment" Content="Show what was sent" IsChecked="{Binding ShowSent}" HorizontalAlignment="Left"

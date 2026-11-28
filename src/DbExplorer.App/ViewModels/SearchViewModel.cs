@@ -413,6 +413,7 @@ public sealed partial class SearchViewModel : ObservableObject
                         var header = new SearchHeaderRow(table.Name, table.Schema, "IconTable", false) { Count = hits.Count };
                         Rows.Add(header);
                         _groupCount++;
+                        string? lastColumn = null;
                         foreach (var hit in hits)
                         {
                             if (HitCount >= MaxResults)
@@ -422,7 +423,8 @@ public sealed partial class SearchViewModel : ObservableObject
                                 cts.Cancel();
                                 break;
                             }
-                            Rows.Add(DataRow(hit));
+                            Rows.Add(DataRow(hit, showColumn: hit.Column != lastColumn));
+                            lastColumn = hit.Column;
                             HitCount++;
                         }
                         break;
@@ -444,7 +446,8 @@ public sealed partial class SearchViewModel : ObservableObject
         if (summary?.Cancelled == true && !capped) StatusText = $"Search stopped: {Summary()} · {summary.TablesSearched:N0} of {summary.TablesTotal:N0} tables searched" + tail;
     }
 
-    private static SearchHitRow DataRow(DataMatch hit)
+    /// <summary>A data hit; the matched column is named on the first hit of a run in that column only (not on every row of the table).</summary>
+    private static SearchHitRow DataRow(DataMatch hit, bool showColumn)
     {
         var text = new System.Text.StringBuilder();
         var start = 0;
@@ -460,7 +463,7 @@ public sealed partial class SearchViewModel : ObservableObject
             }
             text.Append(cell.Text);
         }
-        return new SearchHitRow { Badge = hit.Column, Text = text.ToString(), MatchStart = start, MatchLength = length, Data = hit };
+        return new SearchHitRow { Badge = showColumn ? hit.Column : null, Text = text.ToString(), MatchStart = start, MatchLength = length, Data = hit };
     }
 
     private sealed class Progress(Action<DataSearchProgress> report) : IProgress<DataSearchProgress>

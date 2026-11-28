@@ -21,7 +21,7 @@
     </CheckBox>
 
     <StackPanel Spacing="4">
-      <TextBlock Classes="section" Text="CONNECTIONS" Margin="0,0,0,6" />
+      <TextBlock Classes="section" Text="Connections" Margin="0,0,0,6" />
       <TextBlock Classes="dim small" TextWrapping="Wrap" IsVisible="{Binding HasNoConnections}" Text="No connection yet." />
       <ItemsControl ItemsSource="{Binding Connections}">
         <ItemsControl.ItemTemplate>
@@ -50,11 +50,11 @@
     </StackPanel>
 
     <StackPanel Spacing="6">
-      <TextBlock Classes="section" Text="USE IT" Margin="0" />
+      <TextBlock Classes="section" Text="Use it" Margin="0" />
       <TextBlock Classes="dim small" TextWrapping="Wrap"
                  Text="Tools, Open in Claude Code starts a session with these tools. To have them in your own sessions too, run this command once:" />
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-        <TextBox Text="{Binding AddCommand, Mode=OneWay}" IsReadOnly="True" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12"
+        <TextBox Text="{Binding AddCommand, Mode=OneWay}" IsReadOnly="True" FontFamily="{DynamicResource DbxMonoFont}" FontSize="{DynamicResource DbxMonoFontSize}"
                  AutomationProperties.Name="Command that adds the server to Claude Code" />
         <Button Grid.Column="1" Command="{Binding CopyAddCommandCommand}" ToolTip.Tip="Copy the command"
                 AutomationProperties.Name="Copy the command" Content="Copy" />
@@ -63,7 +63,7 @@
 
     <StackPanel Spacing="4">
       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-        <TextBlock Classes="section" Text="ACTIVITY" Margin="0" VerticalAlignment="Center" />
+        <TextBlock Classes="section" Text="Activity" Margin="0" VerticalAlignment="Center" />
         <Button Grid.Column="1" Content="Refresh" Command="{Binding LoadActivityCommand}" ToolTip.Tip="Read the activity log again" />
         <Button Grid.Column="2" Content="Clear" Command="{Binding ClearActivityCommand}" ToolTip.Tip="Empty the activity log" />
       </Grid>
@@ -79,11 +79,11 @@
                   <TextBlock Grid.Column="1" Classes="small" Text="{Binding Tool}" VerticalAlignment="Center" />
                   <TextBlock Grid.Column="2" Classes="small" Text="{Binding Connection}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                   <Border Grid.Column="3" Classes="badge" Classes.error="{Binding Failed}" Classes.success="{Binding !Failed}">
-                    <TextBlock Text="{Binding Outcome}" FontSize="10.5" />
+                    <TextBlock Text="{Binding Outcome}" />
                   </Border>
                 </Grid>
-                <TextBlock Classes="dim small" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" MaxLines="1"
-                           FontFamily="{DynamicResource DbxMonoFont}" IsVisible="{Binding HasDetail}" />
+                <TextBlock Classes="dim" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" MaxLines="1"
+                           FontFamily="{DynamicResource DbxMonoFont}" FontSize="{DynamicResource DbxMonoFontSize}" IsVisible="{Binding HasDetail}" />
               </StackPanel>
             </Border>
           </DataTemplate>
