@@ -582,12 +582,26 @@ public partial class ConnectionTreeViewModel : ObservableObject
     public void Disconnect(Guid connectionId)
     {
         _connecting.GetValueOrDefault(connectionId)?.Cancel();
-        _sessions.Close(connectionId);
+        // The session leaves the manager now; its teardown (pool clear, SSH tunnel close) must not freeze the UI.
+        _ = CloseInBackgroundAsync(connectionId);
         if (!_connectionNodes.TryGetValue(connectionId, out var node)) return;
         node.SetChildren([]);
         node.State = ConnectionState.Disconnected;
         node.ErrorMessage = null;
         node.IsExpanded = false;
+    }
+
+    private async Task CloseInBackgroundAsync(Guid connectionId)
+    {
+        try
+        {
+            await _sessions.CloseInBackground(connectionId).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            // The session is already gone from the tree and the manager: a failed teardown only leaks until exit.
+            System.Diagnostics.Trace.TraceWarning($"Closing session {connectionId} failed: {e}");
+        }
     }
 
     /// <summary>
@@ -1075,7 +1089,7 @@ public partial class ConnectionTreeViewModel : ObservableObject
             var id = load.Config.Id;
             if (_sessions.Find(id) != load.Session) continue;
             if (_connectionNodes.TryGetValue(id, out var node) && node.State is ConnectionState.Connected or ConnectionState.Connecting) continue;
-            _sessions.Close(id);
+            _ = CloseInBackgroundAsync(id);
         }
     }
     /// <summary>Shows a session opened behind the tree's back (the schema check) as a connected node.</summary>

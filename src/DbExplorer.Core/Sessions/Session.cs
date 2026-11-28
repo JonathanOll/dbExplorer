@@ -14,7 +14,7 @@ public partial class Session : IDisposable
 {
     private readonly ISecretProtector? _protector;
     private readonly ConnectionLink _link;
-    private volatile bool _disposed;
+    private int _disposed;   // 0 open, 1 disposed: set once, atomically, by the first Dispose
 
     /// <param name="protector">Used to decrypt <c>Config.ProtectedPassword</c> on each open, so no plain password is kept in memory.</param>
     public Session(ConnectionConfig config, IDbDriver driver, IReadOnlyList<TableInfo> schema, ISecretProtector? protector = null)
@@ -43,12 +43,24 @@ public partial class Session : IDisposable
     /// <summary>Last loaded schema; replaced as a whole by <see cref="SessionManager.RefreshSchemaAsync"/>.</summary>
     public IReadOnlyList<TableInfo> Schema { get; private set; }
 
-    /// <summary>Opens a new connection; the caller disposes it.</summary>
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
+
+    /// <summary>Opens a new connection; the caller disposes it. Throws <see cref="ObjectDisposedException"/> once the session is closed.</summary>
     public async Task<DbConnection> OpenConnectionAsync(CancellationToken ct)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        var connection = await _link.OpenAsync(Config, PlainPassword(), ct).ConfigureAwait(false);
-        if (!_disposed) return connection;
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+        DbConnection connection;
+        try
+        {
+            connection = await _link.OpenAsync(Config, PlainPassword(), ct).ConfigureAwait(false);
+        }
+        catch (Exception e) when (IsDisposed && e is not ObjectDisposedException)
+        {
+            // Closed while opening: the failure (tunnel torn down, pool cleared) is a consequence of the close.
+            throw new ObjectDisposedException(nameof(Session), e);
+        }
+
+        if (!IsDisposed) return connection;
         await connection.DisposeAsync().ConfigureAwait(false);
         throw new ObjectDisposedException(nameof(Session));
     }
@@ -93,7 +105,8 @@ public partial class Session : IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
+        // Set first and atomically: concurrent disposes (a close racing a replace) must tear down only once.
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         _lifetime.Cancel();   // reads of definitions and routines in flight
         // Held connections first: closing them returns them to the pool, which is cleared right after.
         foreach (var script in DedicatedConnections()) script.Dispose();
@@ -109,8 +122,9 @@ public partial class Session : IDisposable
         }
         finally
         {
-            _disposed = true;
             _link.Dispose();   // after the pool: its connections go through the tunnel
+            _lifetime.Dispose();
+            _routineGate.Dispose();
         }
     }
 

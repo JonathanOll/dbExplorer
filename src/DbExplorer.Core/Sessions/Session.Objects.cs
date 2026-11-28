@@ -23,7 +23,8 @@ public partial class Session
         }
         finally
         {
-            _routineGate.Release();
+            try { _routineGate.Release(); }
+            catch (ObjectDisposedException) { /* the session closed during the read: nobody waits on the gate any more */ }
         }
     }
 
@@ -44,7 +45,7 @@ public partial class Session
     // Cancelled by the caller or by the session closing. A provider may report a cancel with its own exception type.
     private async Task<T> ReadAsync<T>(Func<DbConnection, CancellationToken, Task<T>> read, CancellationToken ct)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, _lifetime.Token);
         var token = linked.Token;
         try

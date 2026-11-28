@@ -25,6 +25,11 @@ public class SessionManager(
     private readonly Func<DbKind, IDbDriver> _drivers =
         kind => (driverFactory ?? DriverFactory.For)(kind).WithSecrets(protector);
     private readonly object _gate = new();
+
+    // Orders the metadata cache writes and deletes of all connections, so disk I/O never runs under _gate (which the UI
+    // thread takes): a write checks under _gate that its session is still open, then writes, all under this lock, and a
+    // delete takes it after detaching. Lock order: _cacheGate, then _gate.
+    private readonly object _cacheGate = new();
     private readonly Dictionary<Guid, Session> _open = new();
     private readonly Dictionary<Guid, Attempt> _pending = new();
 
@@ -111,15 +116,24 @@ public class SessionManager(
         session?.Dispose();
     }
 
+    /// <summary>
+    /// As <see cref="Close"/>, but only the detach runs on the caller's thread: <see cref="Find"/> returns null at once, and the
+    /// teardown (pool clear, SSH tunnel close, which can wait on the network) runs on the thread pool.
+    /// </summary>
+    public Task CloseInBackground(Guid id)
+    {
+        Session? session;
+        lock (_gate) session = Detach(id);
+        return session is null ? Task.CompletedTask : Task.Run(session.Dispose);
+    }
+
     /// <summary>Closes the session and deletes its metadata cache (used when a connection is deleted).</summary>
     public void Remove(Guid id)
     {
         Session? session;
-        lock (_gate)
-        {
-            session = Detach(id);
-            cache.Delete(id);
-        }
+        lock (_gate) session = Detach(id);
+        // After the detach: a write that starts now finds the session gone; one in progress finishes first, then is deleted.
+        lock (_cacheGate) cache.Delete(id);
 
         session?.Dispose();
     }
@@ -135,11 +149,15 @@ public class SessionManager(
             return await session.Driver.LoadSchemaAsync(connection, ct).ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
 
-        lock (_gate)
+        lock (_cacheGate)
         {
-            if (_open.GetValueOrDefault(id) != session) return; // closed meanwhile: do not resurrect the cache
+            lock (_gate)
+            {
+                if (_open.GetValueOrDefault(id) != session) return; // closed meanwhile: do not resurrect the cache
+                session.ReplaceSchema(schema);
+            }
+
             TrySaveCache(id, schema);
-            session.ReplaceSchema(schema);
         }
     }
 
@@ -150,9 +168,9 @@ public class SessionManager(
     public async Task<IReadOnlyList<RoutineInfo>> LoadRoutinesAsync(Session session, CancellationToken ct)
     {
         var routines = await session.LoadRoutinesAsync(ct).ConfigureAwait(false);
-        lock (_gate)
+        lock (_cacheGate)
         {
-            if (_open.GetValueOrDefault(session.Config.Id) != session) return routines;   // closed meanwhile
+            if (!IsOpen(session)) return routines;   // closed meanwhile
             try { cache.SaveRoutines(session.Config.Id, routines); }
             catch (Exception) { /* like the table cache: only the search across connections misses them */ }
         }
@@ -232,6 +250,11 @@ public class SessionManager(
         catch (Exception) { /* disk full, locked or read-only folder: quick-open across connections just lacks this one */ }
     }
 
+    private bool IsOpen(Session session)
+    {
+        lock (_gate) return _open.GetValueOrDefault(session.Config.Id) == session;
+    }
+
     /// <summary>Removes the open session and cancels the pending attempt of a connection. Call under the lock.</summary>
     private Session? Detach(Guid id)
     {
@@ -247,7 +270,11 @@ public class SessionManager(
             {
                 _ = t.Exception; // observe: an abandoned attempt must not raise an unobserved task exception
                 lock (_gate)
+                {
                     if (_pending.TryGetValue(c.Id, out var current) && current == attempt) _pending.Remove(c.Id);
+                    // Nothing cancels a finished attempt any more: it is out of _pending and WaitAsync skips completed tasks.
+                    attempt.Cts.Dispose();
+                }
             },
             CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         return attempt;
@@ -281,6 +308,7 @@ public class SessionManager(
             await using var connection = await link.OpenAsync(c, password, ct).ConfigureAwait(false);
             var schema = await driver.LoadSchemaAsync(connection, ct).ConfigureAwait(false);
 
+            Session session;
             lock (_gate)
             {
                 if (ct.IsCancellationRequested || !_pending.TryGetValue(c.Id, out var current) || current != attempt)
@@ -289,12 +317,15 @@ public class SessionManager(
                     throw new OperationCanceledException("The connection was closed or changed while it was opening.");
                 }
 
-                TrySaveCache(c.Id, schema);   // the cache only feeds the search: a write failure must not fail the connect
-                var session = new Session(attempt.Latest, link, schema, protector);
+                session = new Session(attempt.Latest, link, schema, protector);
                 owned = true;
                 _open[c.Id] = session;
-                return session;
             }
+
+            // The cache only feeds the search: a write failure must not fail the connect. Skipped when closed meanwhile.
+            lock (_cacheGate)
+                if (IsOpen(session)) TrySaveCache(c.Id, schema);
+            return session;
         }
         finally
         {
