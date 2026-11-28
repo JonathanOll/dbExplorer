@@ -215,7 +215,7 @@ public partial class DiagramView : UserControl
         }
         catch (Exception e)
         {
-            System.Diagnostics.Trace.WriteLine("Opening a table from the diagram failed: " + e.Message);
+            if (_tab is not null) _tab.Error = $"Cannot open the table: {ErrorText.Describe(e)}";
         }
     }
 
@@ -256,11 +256,10 @@ public partial class DiagramView : UserControl
         var tab = _tab;
         try
         {
-            var name = string.Concat(tab.Title.Replace("ER · ", "").Split(Path.GetInvalidFileNameChars()));
             var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
                 Title = "Export the diagram",
-                SuggestedFileName = $"{name}-diagram.png",
+                SuggestedFileName = tab.SuggestedFileName,
                 DefaultExtension = "png",
                 FileTypeChoices = [new FilePickerFileType("PNG picture") { Patterns = ["*.png"] }],
             });

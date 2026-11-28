@@ -185,6 +185,17 @@ public sealed class DiagramTabViewModelTests : IDisposable
     }
 
     [Fact]
+    public void Export_SuggestsAFileNameFromWhatTheDiagramShows()
+    {
+        var config = TreeFixture.Conn("Db");
+        var hooks = new DiagramHooks(_ => Task.FromResult<Session?>(null), (_, _) => Task.CompletedTask);
+
+        Assert.Equal("Db-diagram.png", new DiagramTabViewModel(config, new DiagramRequest(), hooks).SuggestedFileName);
+        Assert.Equal("stock-diagram.png", new DiagramTabViewModel(config, new DiagramRequest(Schema: "stock"), hooks).SuggestedFileName);
+        Assert.Equal("ab-diagram.png", new DiagramTabViewModel(config, new DiagramRequest(Schema: "a/b"), hooks).SuggestedFileName);
+    }
+
+    [Fact]
     public void Zoom_IsClamped_AndStepsShrinkWhenFarOut()
     {
         var config = TreeFixture.Conn("Db");

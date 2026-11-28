@@ -54,7 +54,13 @@ public sealed partial class DiagramTabViewModel : TabViewModel
 
     public DiagramRequest Request => _request;
 
-    public override string Title => $"ER · {_request.Table?.Name ?? _request.Schema ?? Connection.Name}";
+    public override string Title => $"ER · {Subject}";
+
+    // What the diagram is of: the focused table, the schema or the connection.
+    private string Subject => _request.Table?.Name ?? _request.Schema ?? Connection.Name;
+
+    /// <summary>"orders-diagram.png": the name offered by Export PNG, without the characters a file name cannot hold.</summary>
+    public string SuggestedFileName => $"{string.Concat(Subject.Split(Path.GetInvalidFileNameChars()))}-diagram.png";
 
     public override string IconKey => "IconDiagram";
 

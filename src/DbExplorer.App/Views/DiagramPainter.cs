@@ -137,9 +137,10 @@ internal sealed class DiagramPainter(DiagramPalette palette)
 
         if (zoom < DetailZoom)
         {
-            // Zoomed out: one name, as large as the card allows, only when it can still be read.
-            var size = Math.Min(Math.Min(11 / zoom, 28), r.Height * 0.7);
-            if (size * zoom >= 4.5)
+            // Zoomed out: one name, as large as the card allows, while it still makes a shape on screen (a 40 px name
+            // at 13% is 5 px: the overview of a big database still says where each table is).
+            var size = Math.Min(Math.Min(11 / zoom, 40), r.Height * 0.7);
+            if (size * zoom >= 4)
             {
                 var name = Text(title, size, true, palette.Text, r.Width - 8);
                 var y = onlyHeader ? r.Y + (r.Height - name.Height) / 2
