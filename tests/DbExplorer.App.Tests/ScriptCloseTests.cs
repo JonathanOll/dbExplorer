@@ -190,10 +190,10 @@ public class ScriptCloseTests : ShellTestBase
         var asking = main.ConfirmExitAsync();
 
         Assert.True(asking.IsCompletedSuccessfully);   // synchronous: the window closes without being cancelled and re-closed
-        Assert.True(asking.Result);
+        Assert.True(await asking);
         Assert.Equal(0, Dialogs.AskCount);
         Assert.Same(table, main.ActiveTab);   // scripts are not brought to the front
-        Assert.Equal(["SELECT 1", "SELECT 2"], Store.LoadAll().Select(s => s.Text).Order().ToArray());
+        Assert.Equal(["SELECT 1", "SELECT 2"], Store.LoadAll().Select(s => s.Text!).Order().ToArray());
 
         main.PersistScripts();   // what the window does once the close is confirmed
         Assert.Equal(2, Store.LoadAll().Count);
@@ -290,7 +290,7 @@ public class ScriptCloseTests : ShellTestBase
         main.PersistScripts();
 
         // the first script was discarded only as part of a close that did not happen: it is an ordinary open tab again
-        Assert.Equal(["SELECT 1", "SELECT 2"], new ScriptSessionStore(broken).LoadAll().Select(s => s.Text).Order().ToArray());
+        Assert.Equal(["SELECT 1", "SELECT 2"], new ScriptSessionStore(broken).LoadAll().Select(s => s.Text!).Order().ToArray());
     }
 
     [AvaloniaFact]
@@ -369,7 +369,7 @@ public class ScriptCloseTests : ShellTestBase
         var asking = main.ConfirmExitAsync();
 
         Assert.True(asking.IsCompletedSuccessfully);
-        Assert.True(asking.Result);
+        Assert.True(await asking);
         Assert.Same(first, main.ActiveTab);
         Assert.NotSame(second, main.ActiveTab);
     }

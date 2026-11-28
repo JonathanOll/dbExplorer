@@ -380,8 +380,8 @@ public sealed class MySqlIntegrationTests : IAsyncLifetime
         var manager = await Assert.ThrowsAsync<ConnectionStageException>(() =>
             SessionManager.TestConnectionAsync(config, "wrong", CancellationToken.None));
         Assert.Equal(ConnectionStage.DatabaseSignIn, manager.Stage);
-        await SessionManager.TestConnectionAsync(config, new MySqlConnectionStringBuilder(ServerString).Password, CancellationToken.None);
+        await SessionManager.TestConnectionAsync(config, new MySqlConnectionStringBuilder(ServerString!).Password, CancellationToken.None);
         await SessionManager.TestConnectionAsync(config with { Tls = new TlsConfig(TlsMode.Require) },
-            new MySqlConnectionStringBuilder(ServerString).Password, CancellationToken.None);
+            new MySqlConnectionStringBuilder(ServerString!).Password, CancellationToken.None);
     }
 }

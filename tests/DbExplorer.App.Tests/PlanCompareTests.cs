@@ -36,9 +36,9 @@ public class PlanCompareViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Pin_KeepsThePlanOnTheScriptTab_AcrossRuns()
+    public async Task Pin_KeepsThePlanOnTheScriptTab_AcrossRuns()
     {
-        var script = _t.NewTab("SELECT id FROM t").GetAwaiter().GetResult();
+        var script = await _t.NewTab("SELECT id FROM t");
         var first = BaselineTab(script);
         script.ResultTabs.Add(first);
 
@@ -62,9 +62,9 @@ public class PlanCompareViewModelTests : IDisposable
     }
 
     [Fact]
-    public void Unpin_ForgetsTheBaseline()
+    public async Task Unpin_ForgetsTheBaseline()
     {
-        var script = _t.NewTab("SELECT id FROM t").GetAwaiter().GetResult();
+        var script = await _t.NewTab("SELECT id FROM t");
         var tab = BaselineTab(script);
         script.ResultTabs.Add(tab);
         tab.PinPlanCommand.Execute(null);
@@ -77,9 +77,9 @@ public class PlanCompareViewModelTests : IDisposable
     }
 
     [Fact]
-    public void ComparePinned_OpensTheComparison_AndClosing_ReturnsToThePlan()
+    public async Task ComparePinned_OpensTheComparison_AndClosing_ReturnsToThePlan()
     {
-        var script = _t.NewTab("SELECT id FROM t").GetAwaiter().GetResult();
+        var script = await _t.NewTab("SELECT id FROM t");
         var before = BaselineTab(script);
         script.ResultTabs.Add(before);
         before.PinPlanCommand.Execute(null);
@@ -113,9 +113,9 @@ public class PlanCompareViewModelTests : IDisposable
     }
 
     [Fact]
-    public void SelectingAnOperator_SelectsItsCounterpartOnTheOtherSide()
+    public async Task SelectingAnOperator_SelectsItsCounterpartOnTheOtherSide()
     {
-        var script = _t.NewTab("SELECT id FROM t").GetAwaiter().GetResult();
+        var script = await _t.NewTab("SELECT id FROM t");
         var before = BaselineTab(script);
         script.ResultTabs.Add(before);
         before.PinPlanCommand.Execute(null);
@@ -158,9 +158,9 @@ public class PlanCompareViewModelTests : IDisposable
     }
 
     [Fact]
-    public void CompareChoices_ListThePinnedPlan_AndTheOtherStatements()
+    public async Task CompareChoices_ListThePinnedPlan_AndTheOtherStatements()
     {
-        var script = _t.NewTab("SELECT id FROM t").GetAwaiter().GetResult();
+        var script = await _t.NewTab("SELECT id FROM t");
         var tab = BaselineTab(script);
         script.ResultTabs.Add(tab);
         Assert.Empty(tab.GetCompareChoices());   // nothing to compare with yet

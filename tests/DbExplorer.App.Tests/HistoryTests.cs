@@ -22,7 +22,7 @@ public class HistoryRecordingTests : IDisposable
         var history = new QueryHistory(_file);
         var session = await _t.Sessions.GetOrOpenAsync(config, CancellationToken.None);
         var hooks = new ScriptTabHooks(
-            ct => _t.Sessions.GetOrOpenAsync(config, ct), _t.Files, _t.Store, _t.Fx.Status, History: history, RecordHistory: () => _record);
+            async ct => await _t.Sessions.GetOrOpenAsync(config, ct), _t.Files, _t.Store, _t.Fx.Status, History: history, RecordHistory: () => _record);
         var tab = _t.Track(new ScriptTabViewModel(config, session, hooks, 1) { Text = text });
         return (tab, history);
     }
@@ -67,7 +67,7 @@ public class HistoryRecordingTests : IDisposable
         using var ro = new ScriptTabFixture(readOnly: true);
         var history = new QueryHistory(Path.Combine(ro.Fx.Dir, "h.jsonl"));
         var session = await ro.Sessions.GetOrOpenAsync(ro.Config, CancellationToken.None);
-        var hooks = new ScriptTabHooks(ct => ro.Sessions.GetOrOpenAsync(ro.Config, ct), null, null, ro.Fx.Status, History: history);
+        var hooks = new ScriptTabHooks(async ct => await ro.Sessions.GetOrOpenAsync(ro.Config, ct), null, null, ro.Fx.Status, History: history);
         var tab = ro.Track(new ScriptTabViewModel(ro.Config, session, hooks, 1) { Text = "DELETE FROM t" });
 
         await tab.RunScriptAsync();

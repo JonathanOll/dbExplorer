@@ -716,7 +716,7 @@ public class EditingViewModelTests : IDisposable
     public void KeyDialog_AllColumns_IsStar_WhenEveryColumnIsComparable()
     {
         var vm = new VirtualKeyDialogViewModel(Table(("a", "int"), ("b", "nvarchar(50)")), DbKind.SqlServer, null) { UseAllColumns = true };
-        Assert.Equal(["*"], vm.Result);
+        Assert.Equal(["*"], vm.Result!);
         Assert.Contains("several rows", VirtualKeyDialogViewModel.Warning);
     }
 
@@ -727,7 +727,7 @@ public class EditingViewModelTests : IDisposable
             Table(("a", "int"), ("t", "text"), ("n", "ntext"), ("i", "image"), ("x", "xml"), ("m", "nvarchar(max)")), DbKind.SqlServer, null)
         { UseAllColumns = true };
 
-        Assert.Equal(["a", "m"], vm.Result);   // explicit list, never "*" (it would include the unusable ones)
+        Assert.Equal(["a", "m"], vm.Result!);   // explicit list, never "*" (it would include the unusable ones)
         Assert.True(vm.HasExcludedColumns);
         Assert.Contains("t, n, i, x", vm.ExcludedNote);
         Assert.All(vm.Columns.Where(c => c.Name is "t" or "n" or "i" or "x"), c => Assert.False(c.IsKeyable));
@@ -744,7 +744,7 @@ public class EditingViewModelTests : IDisposable
         Assert.Null(vm.Result);
 
         vm.Columns[0].IsSelected = true;
-        Assert.Equal(["a"], vm.Result);
+        Assert.Equal(["a"], vm.Result!);
     }
 
     [Fact]

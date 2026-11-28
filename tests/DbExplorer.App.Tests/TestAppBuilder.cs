@@ -7,6 +7,7 @@ using DbExplorer.App.Tests;
 namespace DbExplorer.App.Tests;
 
 /// <summary>Boots the real App (theme, DataGrid styles) on the headless platform for [AvaloniaFact] tests.</summary>
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public static class TestAppBuilder
 {
     public static AppBuilder BuildAvaloniaApp() =>

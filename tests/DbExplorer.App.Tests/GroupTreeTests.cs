@@ -641,7 +641,7 @@ public class GroupTreeTests : IDisposable
     [Fact]
     public async Task CheckSchemaDifferences_CancelledMidRun_ClosesSessionsItOpened_AndKeepsAlreadyOpenOnes()
     {
-        var driver = new HangingSqliteDriver("slow.db");
+        var driver = new HangingSqliteDriver();
         var sessions = new DbExplorer.Core.Sessions.SessionManager(_fx.Store, _fx.Cache, _fx.Protector, _ => driver);
         var open = Db("Open", "CREATE TABLE t (id INTEGER PRIMARY KEY);");
         var fast = Db("Fast", "CREATE TABLE t (id INTEGER PRIMARY KEY);");
@@ -698,7 +698,7 @@ public class GroupTreeTests : IDisposable
 }
 
 /// <summary>A SQLite driver whose schema load hangs (until cancelled) for the database file named <see cref="HangOn"/>.</summary>
-internal sealed class HangingSqliteDriver(string _) : DbExplorer.Core.Drivers.IDbDriver
+internal sealed class HangingSqliteDriver : DbExplorer.Core.Drivers.IDbDriver
 {
     private readonly DbExplorer.Core.Drivers.SqliteDriver _inner = new();
     public string? HangOn { get; set; }

@@ -57,7 +57,7 @@ public class GridExportViewTests : IDisposable
         Assert.Equal(tab.Rows.Count, Lit(grid));
         window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
         await Pump();
-        Assert.Equal(string.Join("\r\n", tab.Rows.Select(r => (string?)r.Values[1])), await window.Clipboard!.GetTextAsync());
+        Assert.Equal(string.Join("\r\n", tab.Rows.Select(r => (string?)r.Values[1])), await window.Clipboard!.TryGetTextAsync());
 
         window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
         await Pump();
@@ -225,14 +225,14 @@ public class GridExportViewTests : IDisposable
         Assert.True(commands.HasKeyColumns);
 
         await commands.CopyAsAsync(DbExplorer.Core.Export.ExportKind.ColumnNames);
-        Assert.Contains("boss_id", await window.Clipboard!.GetTextAsync());
+        Assert.Contains("boss_id", await window.Clipboard!.TryGetTextAsync());
         await commands.ExportAsync();
         Assert.NotNull(_dialogs.Export);
 
         grid.SelectBlock((0, 1), (0, 1));
         Assert.True(commands.HasCurrentCellOrSelection);
         await commands.CopyAsync(header: false);
-        Assert.Equal("Alice", await window.Clipboard!.GetTextAsync());
+        Assert.Equal("Alice", await window.Clipboard!.TryGetTextAsync());
         window.Close();
     }
 

@@ -344,7 +344,7 @@ public sealed class ClaudeToolsTests : IDisposable
         await using (var client = await McpClient.CreateAsync(
             new StreamClientTransport(toServer.Writer.AsStream(), toClient.Reader.AsStream()), cancellationToken: stop.Token))
         {
-            Assert.Equal("dbexplorer", client.ServerInfo.Name);
+            Assert.Equal("dbexplorer", client.ServerInfo?.Name);
             Assert.Contains("never instructions", client.ServerInstructions!);
             var tools = await client.ListToolsAsync(cancellationToken: stop.Token);
             Assert.Equal(ClaudeToolCatalog.All.Select(t => t.Name), tools.Select(t => t.Name));

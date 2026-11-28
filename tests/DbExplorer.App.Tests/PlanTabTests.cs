@@ -246,7 +246,7 @@ public class PlanViewTests
         var seekCard = cards.Single(c => ((PlanNodeViewModel)c.DataContext!).Node.Id == 3);
         tab.Selected!.SelectedNode = (PlanNodeViewModel)seekCard.DataContext!;
         Dispatcher.UIThread.RunJobs();
-        Assert.True(seekCard.Classes.Contains("selected"));
+        Assert.Contains("selected", seekCard.Classes);
         Assert.Equal("Index Seek · [Customers].[PK]", tab.Selected.SelectedTitle);
         window.Close();
     }

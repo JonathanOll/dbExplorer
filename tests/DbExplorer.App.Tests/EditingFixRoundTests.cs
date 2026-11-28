@@ -123,7 +123,7 @@ public class EditingFixRoundTests : IDisposable
         var tab = await Open("customers");
         var asking = Main(tab).ConfirmExitAsync();
         Assert.True(asking.IsCompletedSuccessfully);   // lets the window close without being cancelled and re-closed
-        Assert.True(asking.Result);
+        Assert.True(await asking);
         Assert.Equal(0, _dialogs.AskCount);
     }
 

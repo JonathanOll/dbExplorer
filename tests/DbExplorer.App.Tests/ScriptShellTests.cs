@@ -166,7 +166,7 @@ public class ScriptShellTests : IDisposable
 
         main.PersistScripts();
 
-        Assert.Equal(["SELECT 1", "SELECT 2"], _store.LoadAll().Select(s => s.Text).Order().ToArray());
+        Assert.Equal(["SELECT 1", "SELECT 2"], _store.LoadAll().Select(s => s.Text!).Order().ToArray());
         foreach (var s in main.Tabs.OfType<ScriptTabViewModel>()) s.Close();
     }
 
