@@ -244,6 +244,7 @@ public sealed partial class SearchViewModel : ObservableObject
         _run = cts;
         Rows.Clear();
         HitCount = 0;
+        _groupCount = 0;
         SelectedRow = null;
         Notice = null;
         ErrorMessage = null;

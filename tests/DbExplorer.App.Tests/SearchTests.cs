@@ -63,6 +63,19 @@ public sealed class SearchTests : ShellTestBase
     }
 
     [Fact]
+    public async Task Scripts_ANewSearch_CountsItsScriptsFromZero()
+    {
+        var vm = Vm([Tab("one", "needle"), Tab("two", "needle")]);
+        vm.Query = "needle";
+        await vm.SearchAsync();
+        Assert.Equal("2 matches in 2 scripts", vm.StatusText);
+
+        await vm.SearchAsync();
+
+        Assert.Equal("2 matches in 2 scripts", vm.StatusText);
+    }
+
+    [Fact]
     public async Task Scripts_TheTabTextReplacesItsFile_SoUnsavedEditsAreSearched()
     {
         var root = Library(("a.sql", "needle on disk"));
