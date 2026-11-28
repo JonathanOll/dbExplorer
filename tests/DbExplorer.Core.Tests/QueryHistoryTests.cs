@@ -85,6 +85,7 @@ public class QueryHistoryTests : IDisposable
     {
         var big = new QueryHistory(File_, maxEntries: 100);
         for (var i = 0; i < 30; i++) big.Append(Entry($"SELECT {i}"));
+        big.Flush();
 
         var small = new QueryHistory(File_, maxEntries: 10);
         Assert.Equal(10, small.Query(limit: 100).Count);
@@ -108,8 +109,10 @@ public class QueryHistoryTests : IDisposable
     {
         var h = new QueryHistory(File_);
         h.Append(Entry("SELECT 1"));
+        h.Flush();
         File.AppendAllText(File_, "{not json\n\n{\"Id\":\"x\"}\n");
         h.Append(Entry("SELECT 2"));
+        h.Flush();
 
         var fresh = new QueryHistory(File_);
         Assert.Equal(["SELECT 2", "SELECT 1"], fresh.Query().Select(e => e.Sql).ToArray());
@@ -140,6 +143,7 @@ public class QueryHistoryTests : IDisposable
         Assert.Empty(new QueryHistory(File_).Query());
 
         h.Append(Entry("SELECT 2"));
+        h.Flush();
         Assert.Single(new QueryHistory(File_).Query());
     }
 
@@ -164,7 +168,66 @@ public class QueryHistoryTests : IDisposable
         {
             for (var i = 0; i < 25; i++) h.Append(Entry($"SELECT {t}-{i}"));
         })));
+        h.Flush();
 
         Assert.Equal(200, new QueryHistory(File_).Query(limit: 1000).Count);
+    }
+
+    [Fact]
+    public void ManyAppends_AfterFlush_AreAllInTheFile_InCallOrder()
+    {
+        var h = new QueryHistory(File_);
+        for (var i = 0; i < 500; i++) h.Append(Entry($"SELECT {i}"));
+
+        h.Flush();
+
+        // read by another instance: only what reached the disk counts
+        var sql = new QueryHistory(File_).Query(limit: 1000).Select(e => e.Sql).Reverse().ToArray();
+        Assert.Equal(Enumerable.Range(0, 500).Select(i => $"SELECT {i}").ToArray(), sql);
+    }
+
+    [Fact]
+    public void Query_SeesEntriesAppendedJustBefore_WithoutAFlush()
+    {
+        var h = new QueryHistory(File_);
+        for (var i = 0; i < 50; i++) h.Append(Entry($"SELECT {i}"));
+
+        Assert.Equal(50, h.Count);
+        Assert.Equal("SELECT 49", h.Query()[0].Sql);
+    }
+
+    [Fact]
+    public void Flush_WithNothingQueued_DoesNothing()
+    {
+        var h = new QueryHistory(File_);
+        h.Flush();
+        Assert.False(File.Exists(File_));
+    }
+
+    [Fact]
+    public void Cap_CompactsTheFile_WithoutAnyRead()
+    {
+        var h = new QueryHistory(File_, maxEntries: 20);
+        for (var i = 0; i < 50; i++) h.Append(Entry($"SELECT {i}"));
+
+        h.Flush();
+
+        Assert.True(File.ReadAllLines(File_).Length < 30);   // compacted by the writer, nobody queried this instance
+        var kept = new QueryHistory(File_, maxEntries: 20).Query(limit: 100);
+        Assert.Equal(20, kept.Count);
+        Assert.Equal("SELECT 49", kept[0].Sql);
+    }
+
+    [Fact]
+    public void Clear_DropsWhatWasQueuedBeforeIt()
+    {
+        var h = new QueryHistory(File_);
+        for (var i = 0; i < 20; i++) h.Append(Entry($"SELECT {i}"));
+
+        h.Clear();
+        h.Append(Entry("SELECT after"));
+        h.Flush();
+
+        Assert.Equal("SELECT after", Assert.Single(new QueryHistory(File_).Query()).Sql);
     }
 }

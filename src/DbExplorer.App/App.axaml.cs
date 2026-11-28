@@ -80,6 +80,7 @@ public class App : Application
             {
                 main.PersistScripts();
                 main.PersistSession();
+                main.History?.Flush();   // history lines are written in the background: the last ones must not be lost
             };
             // The update check starts a few seconds after the window opened (see UpdateStartup); nothing here touches the disk. Not in
             // read-only-config mode: the real setting is unknown there.

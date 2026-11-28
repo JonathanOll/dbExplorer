@@ -732,7 +732,10 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
         }
     }
 
-    /// <summary>One line of the query history for a statement that ran (a refused or failed one is recorded with its error). Never throws.</summary>
+    /// <summary>
+    /// One line of the query history for a statement that ran (a refused or failed one is recorded with its error). Never throws,
+    /// never touches the disk here: the history queues it for its background writer.
+    /// </summary>
     private void RecordInHistory(ConnectionConfig config, StatementResult r, PlanMode planMode)
     {
         if (_hooks.History is not { } history || !(_hooks.RecordHistory?.Invoke() ?? true)) return;
@@ -1218,7 +1221,11 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
         {
             if (!keepOpen) _closed = true;
             try { _hooks.Store?.Delete(Id); }
-            catch (Exception) { }
+            catch (Exception e)
+            {
+                // best effort: a leftover autosave copy only comes back as a restored tab, it must not break closing or reverting
+                System.Diagnostics.Trace.WriteLine("Script tab: discarding the autosave failed: " + e.Message);
+            }
         }
     }
 
