@@ -316,6 +316,45 @@ public class ScriptTabViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task TrySetRowLimit_AcceptsSeparators_ClampsAndRefusesText()
+    {
+        var tab = await _t.NewTab();
+
+        Assert.True(tab.TrySetRowLimit("2500"));
+        Assert.Equal(2500, tab.RowLimit);
+        Assert.True(tab.TrySetRowLimit("12,000"));
+        Assert.Equal(12_000, tab.RowLimit);
+        Assert.True(tab.TrySetRowLimit("3 000"));   // a French "3 000"
+        Assert.Equal(3000, tab.RowLimit);
+        Assert.True(tab.TrySetRowLimit("999999"));
+        Assert.Equal(100_000, tab.RowLimit);   // clamped
+
+        Assert.False(tab.TrySetRowLimit("lots"));
+        Assert.False(tab.TrySetRowLimit("-5"));
+        Assert.False(tab.TrySetRowLimit(""));
+        Assert.False(tab.TrySetRowLimit(null));
+        Assert.Equal(100_000, tab.RowLimit);   // unchanged
+    }
+
+    [Fact]
+    public async Task ElapsedText_FollowsTheRunStart_AndFormatsMinutesThenHours()
+    {
+        Assert.Equal("0:07", ScriptTabViewModel.FormatElapsed(TimeSpan.FromSeconds(7)));
+        Assert.Equal("12:05", ScriptTabViewModel.FormatElapsed(TimeSpan.FromSeconds(725)));
+        Assert.Equal("1:02:03", ScriptTabViewModel.FormatElapsed(new TimeSpan(1, 2, 3)));
+        Assert.Equal("0:00", ScriptTabViewModel.FormatElapsed(TimeSpan.FromSeconds(-3)));   // clock moved back
+
+        var tab = await _t.NewTab();
+        Assert.Equal("", tab.ElapsedText);
+        var start = DateTime.Now;
+        tab.RunStartedAt = start;
+        tab.RefreshElapsed(start.AddSeconds(65));
+        Assert.Equal("1:05", tab.ElapsedText);
+        tab.RunStartedAt = null;
+        Assert.Equal("", tab.ElapsedText);
+    }
+
+    [Fact]
     public async Task Results_NotTruncated_HaveNoNotice()
     {
         var tab = await _t.NewTab("SELECT id FROM t");

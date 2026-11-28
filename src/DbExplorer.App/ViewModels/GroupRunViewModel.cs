@@ -187,7 +187,7 @@ public sealed partial class GroupRunViewModel : ObservableObject
     [ObservableProperty] private GroupResultTab? _selectedTab;
 
     /// <summary>True from the start of the run until <see cref="Complete"/> / <see cref="Detach"/> / a refusal.</summary>
-    [NotifyPropertyChangedFor(nameof(CanShowDifferences), nameof(SummaryText))]
+    [NotifyPropertyChangedFor(nameof(CanShowDifferences), nameof(DifferencesTip), nameof(SummaryText))]
     [ObservableProperty] private bool _isRunning;
 
     /// <summary>Everything that needs the user's attention about this run (one line per notice), or null.</summary>
@@ -275,6 +275,12 @@ public sealed partial class GroupRunViewModel : ObservableObject
 
     public bool CanShowDifferences => !IsRunning && _prepared is not null;
 
+    /// <summary>The tooltip of the "Differences" segment: what it does, or why it is off.</summary>
+    public string DifferencesTip =>
+        IsRunning ? "Available once every database has finished"
+        : _prepared is null ? "Nothing to compare: the run ended without results"
+        : "Only the rows that are not identical in all databases, with the databases that have them";
+
     partial void OnShowDifferencesChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowAllRows));
@@ -323,6 +329,7 @@ public sealed partial class GroupRunViewModel : ObservableObject
         IsRunning = false;
         if (notice is not null) Notice = notice;
         OnPropertyChanged(nameof(CanShowDifferences));
+        OnPropertyChanged(nameof(DifferencesTip));
         OnPropertyChanged(nameof(SummaryText));
     }
 
@@ -482,6 +489,7 @@ public sealed partial class GroupRunViewModel : ObservableObject
         SelectedTab = Tabs[0];
         OnPropertyChanged(nameof(HasResults));
         OnPropertyChanged(nameof(CanShowDifferences));
+        OnPropertyChanged(nameof(DifferencesTip));
         OnPropertyChanged(nameof(DifferenceCount));
         OnPropertyChanged(nameof(IsIdentical));
         OnPropertyChanged(nameof(DifferenceChipText));

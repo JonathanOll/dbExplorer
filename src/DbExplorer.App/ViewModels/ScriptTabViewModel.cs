@@ -106,6 +106,24 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
     /// <summary>When the running script or group run started (the view shows the elapsed time); null when nothing runs.</summary>
     [ObservableProperty] private DateTime? _runStartedAt;
 
+    /// <summary>How long the current run has lasted ("0:07", "1:02:03"); empty when nothing runs. The view refreshes it on a timer.</summary>
+    [ObservableProperty] private string _elapsedText = "";
+
+    partial void OnRunStartedAtChanged(DateTime? value) => RefreshElapsed(DateTime.Now);
+
+    /// <summary>Recomputes <see cref="ElapsedText"/> for the given time.</summary>
+    public void RefreshElapsed(DateTime now) =>
+        ElapsedText = RunStartedAt is { } started ? FormatElapsed(now - started) : "";
+
+    /// <summary>"m:ss" under an hour, "h:mm:ss" from then on; a negative span (clock change) reads 0:00.</summary>
+    public static string FormatElapsed(TimeSpan elapsed)
+    {
+        if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
+        return elapsed.TotalHours >= 1
+            ? elapsed.ToString(@"h\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture)
+            : elapsed.ToString(@"m\:ss", System.Globalization.CultureInfo.InvariantCulture);
+    }
+
     /// <summary>"Running statement 2 of 5" / "Running on 3 databases" while something runs; null otherwise.</summary>
     [ObservableProperty] private string? _runProgressText;
 
@@ -279,6 +297,19 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
 
     /// <summary>Limits offered by the row limit menu.</summary>
     public static IReadOnlyList<int> RowLimitPresets { get; } = [100, 500, 1_000, 5_000, 10_000, 100_000];
+
+    /// <summary>
+    /// The custom row limit typed in the menu ("2500", "2,500", "2 500"): true and <see cref="RowLimit"/> set (clamped) when it
+    /// is a whole number, false and nothing changed otherwise.
+    /// </summary>
+    public bool TrySetRowLimit(string? text)
+    {
+        var digits = new string((text ?? "").Where(c => c != ',' && !char.IsWhiteSpace(c)).ToArray());   // thousands separators, NBSP included
+        if (!int.TryParse(digits, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var limit))
+            return false;
+        RowLimit = limit;
+        return true;
+    }
 
     /// <summary>
     /// "Raise limit" of a truncated result: the limit grows tenfold (at most <see cref="MaxRowLimit"/>) and what ran last
@@ -777,7 +808,7 @@ public sealed partial class ScriptTabViewModel : TabViewModel, IPlanCompareHost
         else if (failed is not null)
         {
             var notRun = total - ran;
-            RunSummary = $"Stopped at statement {failed.Index} of {total:N0}" + (notRun > 0 ? $" · {notRun:N0} not run" : "")
+            RunSummary = $"Statement {failed.Index} of {total:N0} failed" + (notRun > 0 ? $" · {notRun:N0} not run" : "")
                          + $" · {ms:N0} ms";
         }
         else

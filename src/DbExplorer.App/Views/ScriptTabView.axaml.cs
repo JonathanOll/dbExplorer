@@ -1,6 +1,5 @@
 using System.Collections.Specialized;
 using System.ComponentModel;
-using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -61,7 +60,7 @@ public partial class ScriptTabView : UserControl
         {
             SettingsService.Instance.Changed -= OnSettingsChanged;
             Attach(null);
-            StopElapsedTimer();
+            _elapsedTimer?.Stop();
         };
         AttachedToVisualTree += (_, _) =>
         {
@@ -254,32 +253,15 @@ public partial class ScriptTabView : UserControl
     {
         if (_vm?.RunStartedAt is null)
         {
-            StopElapsedTimer();
+            _elapsedTimer?.Stop();
             return;
         }
-        ShowElapsed();
         if (_elapsedTimer is null)
         {
             _elapsedTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-            _elapsedTimer.Tick += (_, _) => ShowElapsed();
+            _elapsedTimer.Tick += (_, _) => _vm?.RefreshElapsed(DateTime.Now);
         }
         _elapsedTimer.Start();
-    }
-
-    private void StopElapsedTimer()
-    {
-        _elapsedTimer?.Stop();
-        ElapsedText.Text = "";
-    }
-
-    private void ShowElapsed()
-    {
-        if (_vm?.RunStartedAt is not { } started) return;
-        var elapsed = DateTime.Now - started;
-        if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
-        ElapsedText.Text = elapsed.TotalHours >= 1
-            ? elapsed.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture)
-            : elapsed.ToString(@"m\:ss", CultureInfo.InvariantCulture);
     }
 
     // ---- toolbar: row limit, run on group ----
@@ -295,9 +277,7 @@ public partial class ScriptTabView : UserControl
     {
         if (e.Key != Key.Enter || _vm is null || sender is not TextBox box) return;
         e.Handled = true;
-        var text = (box.Text ?? "").Replace(",", "").Replace(" ", "").Replace(" ", "");
-        if (!int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var limit)) return;   // not a number: stay open
-        _vm.RowLimit = limit;   // clamped to 1 .. 100,000
+        if (!_vm.TrySetRowLimit(box.Text)) return;   // not a number: stay open (the limit is clamped to 1 .. 100,000)
         box.Text = "";
         RowLimitButton.Flyout?.Hide();
     }

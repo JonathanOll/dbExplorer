@@ -142,7 +142,7 @@ public class ScriptUxTests : IDisposable
 
         await tab.RunScriptAsync();
 
-        Assert.StartsWith("Stopped at statement 2 of 4 · 2 not run", tab.RunSummary);
+        Assert.StartsWith("Statement 2 of 4 failed · 2 not run", tab.RunSummary);
         Assert.True(tab.RunSummaryIsError);
         Assert.False(tab.RunSummaryIsSuccess);
     }

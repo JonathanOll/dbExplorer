@@ -632,6 +632,27 @@ public class GroupRunViewModelTests : IDisposable
     }
 
     [AvaloniaFact]
+    public void DifferencesSegment_TooltipSaysWhyItIsOff()
+    {
+        var one = Conn("one");
+        var two = Conn("two");
+        var running = new GroupRunViewModel([one, two], 100);
+        Assert.False(running.CanShowDifferences);
+        Assert.Equal("Available once every database has finished", running.DifferencesTip);
+
+        running.Detach();   // ended without results
+        Assert.False(running.CanShowDifferences);
+        Assert.StartsWith("Nothing to compare", running.DifferencesTip);
+
+        var done = new GroupRunViewModel([one, two], 100);
+        done.Complete([
+            new MemberResult(one, MemberState.Done, [Stmt(["id"], [[1L]])], TimeSpan.FromMilliseconds(1), null),
+            new MemberResult(two, MemberState.Done, [Stmt(["id"], [[2L]])], TimeSpan.FromMilliseconds(1), null)], 1);
+        Assert.True(done.CanShowDifferences);
+        Assert.StartsWith("Only the rows that are not identical", done.DifferencesTip);
+    }
+
+    [AvaloniaFact]
     public void Detach_MarksUnfinishedMembersCancelled_AndIgnoresLateReports()
     {
         var one = Conn("one");

@@ -70,7 +70,7 @@ public class QuietStatementTests : IDisposable
 
         Assert.Equal([tab.Results[1], tab.Results[2]], tab.ResultTabs.Cast<StatementResultViewModel>().ToArray());
         Assert.Same(tab.Results[2], tab.SelectedResultTab);
-        Assert.StartsWith("Stopped at statement 3 of 3", tab.RunSummary);
+        Assert.StartsWith("Statement 3 of 3 failed", tab.RunSummary);
     }
 
     [Fact]
