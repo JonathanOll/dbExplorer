@@ -204,4 +204,34 @@ public class TableGridInteractionTests : IDisposable
         Assert.Equal(1.0, nullCell.Opacity);   // faint through its colour, not through a transparency that fails contrast
         window.Close();
     }
+    [AvaloniaFact]
+    public async Task EditedNumber_StaysRightAligned()
+    {
+        var (tab, _, window, grid) = await Show("orders");
+        var total = tab.FindColumn("total")!.Value;
+        tab.SetCell(0, total, "26.1");   // staged as text until saved
+        await Pump();
+
+        var edited = grid.GetVisualDescendants().OfType<GridCell>().Single(c => ReferenceEquals(c.Row, tab.Rows[0]) && c.Index == total);
+        Assert.Equal(Avalonia.Media.TextAlignment.Right, edited.TextAlignment);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task UntypedColumnOfNumbers_IsRightAligned_NameIncluded()
+    {
+        // A script result carries no column types: the first rows decide.
+        var rows = new List<object?[]> { new object?[] { 1L, "a" }, new object?[] { null, "b" }, new object?[] { 2.5, "c" } };
+        var grid = new ResultGrid { Columns = [new ResultColumn("credit"), new ResultColumn("name")], ItemsSource = rows };
+        var window = new Window { Content = grid, Width = 600, Height = 300 };
+        window.Show();
+        await Pump();
+
+        var inner = grid.GetVisualDescendants().OfType<DataGrid>().First();
+        Assert.True(((GridCellColumn)inner.Columns[0]).IsNumber);
+        Assert.False(((GridCellColumn)inner.Columns[1]).IsNumber);
+        var title = grid.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "credit" && t.Classes.Contains("colTitle"));
+        Assert.Equal(6, ((Grid)title.Parent!).ColumnDefinitions.Count);   // the right-aligned header layout
+        window.Close();
+    }
 }

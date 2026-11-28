@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Utils;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -49,6 +50,15 @@ public sealed class GridCell : TextBlock
     private const double CellPadding = 16;
     private static Cursor? _handCursor;
 
+    // The default strike line is a hairline that vanishes on the red of a deleted row in the dark theme: draw it thicker.
+    private static readonly TextDecorationCollection Strike =
+    [
+        new TextDecoration
+        {
+            Location = TextDecorationLocation.Strikethrough, StrokeThickness = 1.5, StrokeThicknessUnit = TextDecorationUnit.Pixel,
+        },
+    ];
+
     protected override Type StyleKeyOverride => typeof(TextBlock);
 
     public int Index { get; init; }
@@ -95,7 +105,9 @@ public sealed class GridCell : TextBlock
         IsLink = CanLink && !formatted.IsNull;
         var untouched = formatted.IsNull && row is { IsNew: true };   // an insert leaves NULL cells out: the column default applies
         Text = untouched ? "DEFAULT" : formatted.Text;
-        TextAlignment = formatted.IsNumber ? TextAlignment.Right : value is bool ? TextAlignment.Center : TextAlignment.Left;
+        // A staged edit is text until it is saved: in a number column it keeps the alignment of the digits around it.
+        TextAlignment = formatted.IsNumber || (!formatted.IsNull && Column?.IsNumber == true) ? TextAlignment.Right
+            : value is bool ? TextAlignment.Center : TextAlignment.Left;
         FontStyle = formatted.IsNull ? FontStyle.Italic : FontStyle.Normal;
         if (formatted.IsNull || value is false) Foreground = CellBrushes.Faint;
         else if (IsLink) Foreground = CellBrushes.Link;
@@ -111,7 +123,7 @@ public sealed class GridCell : TextBlock
             _ when dirty => CellBrushes.Edited,
             _ => Brushes.Transparent,   // hit-testable across the whole cell
         };
-        TextDecorations = row is { IsDeleted: true } ? Avalonia.Media.TextDecorations.Strikethrough : null;
+        TextDecorations = row is { IsDeleted: true } ? Strike : null;
         ToolTip.SetTip(this, BuildTip(formatted, row, dirty, untouched));
         if (Row is IMarkedRow marked) ShowMark(marked);
         ApplyPicked();
@@ -125,7 +137,8 @@ public sealed class GridCell : TextBlock
         if (mark == CellMark.Changed)
         {
             FontWeight = FontWeight.SemiBold;
-            TextAlignment = TextAlignment.Left;
+            // "16.1 → 26.1" in a number column stays on the right with the other numbers
+            TextAlignment = Column?.IsNumber == true ? TextAlignment.Right : TextAlignment.Left;
         }
         Background = mark switch
         {
@@ -134,7 +147,7 @@ public sealed class GridCell : TextBlock
             CellMark.Removed => CellBrushes.Deleted,
             _ => Brushes.Transparent,
         };
-        if (mark == CellMark.Removed) TextDecorations = Avalonia.Media.TextDecorations.Strikethrough;
+        if (mark == CellMark.Removed) TextDecorations = Strike;
         if (row.TipOf(Index) is { } tip) ToolTip.SetTip(this, tip);
     }
 
@@ -177,7 +190,7 @@ public sealed class GridCell : TextBlock
     {
         Cursor = on ? _handCursor ??= new Cursor(StandardCursorType.Hand) : null;
         TextDecorations = on ? Avalonia.Media.TextDecorations.Underline
-            : Row is RowViewModel { IsDeleted: true } ? Avalonia.Media.TextDecorations.Strikethrough : null;
+            : Row is RowViewModel { IsDeleted: true } ? Strike : null;
     }
 }
 
@@ -202,6 +215,9 @@ public sealed class CellEditor : TextBox
 public sealed class GridCellColumn(int index, ResultColumn column, bool isLink) : DataGridColumn
 {
     public int Index => index;
+
+    /// <summary>The column holds numbers (declared, or seen in the first rows of an untyped result): its values are right-aligned.</summary>
+    public bool IsNumber { get; set; } = column.IsNumeric;
 
     /// <summary>Whether the cell of this row and column is part of the cell or column selection.</summary>
     public Func<object?, int, bool>? IsPicked { get; init; }
@@ -256,8 +272,9 @@ public sealed class GridCellColumn(int index, ResultColumn column, bool isLink) 
         var setNull = new Button
         {
             Content = "NULL", Classes = { "ghost" }, Focusable = false, MinHeight = 0, Height = 20, Padding = new Thickness(6, 0),
-            FontSize = 10.5, Margin = new Thickness(0, 0, 3, 0), VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 3, 0), VerticalAlignment = VerticalAlignment.Center,
         };
+        setNull.Bind(TemplatedControl.FontSizeProperty, setNull.GetResourceObservable("DbxBadgeFontSize"));
         ToolTip.SetTip(setNull, "Set this cell to NULL (Ctrl+0)");
         setNull.Click += (_, _) =>
         {

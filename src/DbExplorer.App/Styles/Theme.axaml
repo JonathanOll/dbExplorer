@@ -211,6 +211,10 @@
       <StaticResource x:Key="ComboBoxBackgroundPointerOver" ResourceKey="DbxInputBg" />
       <StaticResource x:Key="ComboBoxBackgroundPressed" ResourceKey="DbxInputBg" />
       <StaticResource x:Key="ComboBoxBackgroundUnfocused" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="ComboBoxBackgroundDisabled" ResourceKey="DbxWindowBg" />
+      <StaticResource x:Key="ComboBoxBorderBrushDisabled" ResourceKey="DbxBorderSubtle" />
+      <StaticResource x:Key="ComboBoxForegroundDisabled" ResourceKey="DbxTextFaint" />
+      <StaticResource x:Key="ComboBoxDropDownGlyphForegroundDisabled" ResourceKey="DbxTextFaint" />
       <StaticResource x:Key="ComboBoxBackgroundBorderBrushFocused" ResourceKey="DbxAccent" />
       <StaticResource x:Key="ComboBoxBackgroundBorderBrushUnfocused" ResourceKey="DbxAccent" />
       <StaticResource x:Key="ComboBoxBorderBrush" ResourceKey="DbxBorder" />
@@ -349,7 +353,7 @@
       <SolidColorBrush x:Key="DbxToolbarBg" Color="#1F2228" />
       <SolidColorBrush x:Key="DbxInputBg" Color="#1A1D22" />
       <SolidColorBrush x:Key="DbxSurface" Color="#262A32" />
-      <SolidColorBrush x:Key="DbxScrim" Color="#99000000" />
+      <SolidColorBrush x:Key="DbxScrim" Color="#B8000000" />
       <!-- Lines -->
       <SolidColorBrush x:Key="DbxBorder" Color="#343841" />
       <SolidColorBrush x:Key="DbxBorderSubtle" Color="#2A2E35" />
@@ -383,9 +387,9 @@
       <SolidColorBrush x:Key="DbxRowSelected" Color="#34478C" />
       <SolidColorBrush x:Key="DbxRowSelectedInactive" Color="#2C3558" />
       <!-- Grid cell states (translucent: they read over zebra and selection) and editor -->
-      <SolidColorBrush x:Key="DbxCellEdited" Color="#55F2B600" />
+      <SolidColorBrush x:Key="DbxCellEdited" Color="#66E8901A" />
       <SolidColorBrush x:Key="DbxCellNew" Color="#5538C26A" />
-      <SolidColorBrush x:Key="DbxCellDeleted" Color="#66E5534B" />
+      <SolidColorBrush x:Key="DbxCellDeleted" Color="#4DE5534B" />
       <SolidColorBrush x:Key="DbxCellError" Color="#F2766E" />
       <SolidColorBrush x:Key="DbxEditorSelection" Color="#34437F" />
       <SolidColorBrush x:Key="DbxEditorCurrentLine" Color="#262B3A" />
@@ -494,6 +498,10 @@
       <StaticResource x:Key="ComboBoxBackgroundPointerOver" ResourceKey="DbxInputBg" />
       <StaticResource x:Key="ComboBoxBackgroundPressed" ResourceKey="DbxInputBg" />
       <StaticResource x:Key="ComboBoxBackgroundUnfocused" ResourceKey="DbxInputBg" />
+      <StaticResource x:Key="ComboBoxBackgroundDisabled" ResourceKey="DbxWindowBg" />
+      <StaticResource x:Key="ComboBoxBorderBrushDisabled" ResourceKey="DbxBorderSubtle" />
+      <StaticResource x:Key="ComboBoxForegroundDisabled" ResourceKey="DbxTextFaint" />
+      <StaticResource x:Key="ComboBoxDropDownGlyphForegroundDisabled" ResourceKey="DbxTextFaint" />
       <StaticResource x:Key="ComboBoxBackgroundBorderBrushFocused" ResourceKey="DbxAccent" />
       <StaticResource x:Key="ComboBoxBackgroundBorderBrushUnfocused" ResourceKey="DbxAccent" />
       <StaticResource x:Key="ComboBoxBorderBrush" ResourceKey="DbxBorder" />

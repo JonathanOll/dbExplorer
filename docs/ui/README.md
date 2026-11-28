@@ -99,7 +99,7 @@ toolbar 40, document tab strip 38, sub tab strip 36, text box / combo 32, button
 | `DbxGridLine` / `DbxGridZebra` | `#EDEFF3` / `#FAFBFD` | `#2B2F36` / `#22252C` | row lines, alternate rows |
 | `DbxColumnFlash` / `DbxColumnFlashHeader` | `#FFE27A` / `#FFC933` | `#6E5B12` / `#9A7F10` | short highlight of a result grid column (`DataGridCell.flash` / `StackPanel.flashHeader` in `ResultGrid`) when it is jumped to |
 | `DbxRowHover` / `DbxRowSelected` / `DbxRowSelectedInactive` | `#F1F4FA` / `#DCE5FD` / `#E8EDF8` | `#262A33` / `#2C3A6E` / `#2A3050` | grid rows |
-| `DbxCellEdited` / `DbxCellNew` / `DbxCellDeleted` / `DbxCellError` | `#55F2B600` / `#4429A329` / `#44D32F2F` / `#C8372D` | `#55F2B600` / `#5538C26A` / `#66E5534B` / `#F2766E` | grid cell states: edited amber, new row green, deleted row red (with strike-through), error border. Translucent, so they read over zebra and selection; `DbxCellError` is opaque (border) |
+| `DbxCellEdited` / `DbxCellNew` / `DbxCellDeleted` / `DbxCellError` | `#55F2B600` / `#4429A329` / `#44D32F2F` / `#C8372D` | `#66E8901A` / `#5538C26A` / `#4DE5534B` / `#F2766E` | grid cell states: edited amber, new row green, deleted row red (with strike-through), error border. Translucent, so they read over zebra and selection; `DbxCellError` is opaque (border) |
 | `DbxEditorSelection` / `DbxEditorCurrentLine` / `DbxEditorGutterText` / `DbxEditorGutterBorder` | `#C9D7FB` / `#F2F5FD` / `#8892A2` / `#E5E8EE` | `#34437F` / `#262B3A` / `#707A8A` / `#2A2E35` | SQL editor (the AvaloniaEdit theme in `ScriptTabView` should read these, not the grid tokens) |
 | `DbxSyntaxKeyword` / `DbxSyntaxComment` / `DbxSyntaxString` | `#1F5FBF` / `#4F7F2D` / `#A8381C` | `#6CB0F5` / `#7FA66A` / `#E39A7A` | SQL syntax colours (keywords, comments, string literals), read by `ScriptTabView` for the highlighting and switched with the theme |
 | `DbxError` + `Bg` / `Border` / `Text` | `#C8372D` `#FDEDEB` `#F3C2BD` `#8F2A22` | `#F2766E` `#3A1F1E` `#6E3631` `#FFA39B` | error banner, badge, icon, `fielderror` |
@@ -111,7 +111,7 @@ toolbar 40, document tab strip 38, sub tab strip 36, text box / combo 32, button
 | `DbxIcon` | `#5F6B7B` | `#9AA3B2` | default icon colour |
 | `DbxIconFolder` / `Table` / `View` / `Key` | `#A98B57` `#5E7391` `#7F70AE` `#B08718` | `#BBA371` `#8CA0BD` `#A196CC` `#D1AE4A` | muted icon tints (tables and views are told apart by shape) |
 | `DbxThumb` / `DbxThumbHover` / `DbxThumbPressed` | `#C2C8D2` / `#98A1AF` / `#76808F` | `#4A505B` / `#6B7380` / `#8A92A0` | scroll bar thumb (not used by views) |
-| `DbxScrim` | `#4D0F1626` | `#99000000` | quick-open backdrop |
+| `DbxScrim` | `#4D0F1626` | `#B8000000` | quick-open backdrop |
 
 The `DbxEnginePostgres` / `SqlServer` / `Sqlite` tokens are gone: engines are not colour coded.
 

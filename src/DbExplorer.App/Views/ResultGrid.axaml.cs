@@ -325,17 +325,32 @@ public partial class ResultGrid : UserControl
         if (untyped.Count == 0) return;
 
         var longest = new int[columns.Count];
+        var numbers = new int[columns.Count];   // non-NULL number values among the first rows; -1 once a non-number is seen
         var seen = 0;
         foreach (var row in source)
         {
             if (seen++ >= 40) break;
             if (GridCellColumn.ValuesOf(row) is not { } values) continue;
             foreach (var i in untyped)
-                if (i < values.Length) longest[i] = Math.Max(longest[i], Math.Min(CellFormatter.Format(values[i]).Text.Length, CellFormatter.MaxCellChars));
+            {
+                if (i >= values.Length) continue;
+                var formatted = CellFormatter.Format(values[i]);
+                longest[i] = Math.Max(longest[i], Math.Min(formatted.Text.Length, CellFormatter.MaxCellChars));
+                if (!formatted.IsNull && numbers[i] >= 0) numbers[i] = IsNumberValue(values[i], formatted) ? numbers[i] + 1 : -1;
+            }
         }
         if (seen == 0) return;
         foreach (var i in untyped)
         {
+            // Numbers are right-aligned in their cells: the name and an edited value follow them.
+            if (numbers[i] > 0 && Grid.Columns[i] is GridCellColumn { IsNumber: false } cells)
+            {
+                cells.IsNumber = true;
+                foreach (var cell in Grid.GetVisualDescendants().OfType<GridCell>())
+                    if (cell.Index == i) cell.Refresh();
+                if (i < _headers.Count) AlignHeaderRight(_headers[i].Line, _headers[i].Title, Grid.Columns[i].ActualWidth > 0 ? Grid.Columns[i].ActualWidth : DefaultWidth(columns[i]));
+            }
+
             // A column the user has resized since is left alone.
             var current = Grid.Columns[i].Width;
             var untouched = current.IsAbsolute && (Math.Abs(current.Value - DefaultWidth(columns[i])) < 0.5
@@ -346,6 +361,11 @@ public partial class ResultGrid : UserControl
             Grid.Columns[i].Width = new DataGridLength(width);
         }
     }
+
+    // A compared cell ("16.1 → 26.1") counts as a number when both sides are numbers (or NULL).
+    private static bool IsNumberValue(object? value, FormattedCell formatted) => value is CellChange change
+        ? (change.Left is null || CellFormatter.Format(change.Left).IsNumber) && (change.Right is null || CellFormatter.Format(change.Right).IsNumber)
+        : formatted.IsNumber;
 
     private void ApplyFilterRowVisibility()
     {
@@ -519,18 +539,18 @@ public partial class ResultGrid : UserControl
 
         // Text columns: key and link icons, then the name filling the rest. Number columns: an empty first cell pushes the icons and the
         // name to the right edge, so the name sits over the digits and the icons stay next to it.
-        var offset = column.IsNumeric ? 1 : 0;
-        var line = new Avalonia.Controls.Grid { ColumnDefinitions = new ColumnDefinitions(column.IsNumeric ? "*,Auto,Auto,Auto,Auto,Auto" : "Auto,Auto,*,Auto,Auto") };
-        if (column.IsPrimaryKey) AddTo(line, HeaderIcon("IconKey", "pk"), offset, new Thickness(0, 0, 4, 0));
-        if (column.LinkTarget is not null) AddTo(line, HeaderIcon("IconLink", "fk"), offset + 1, new Thickness(0, 0, 4, 0));
-        if (column.IsNumeric) title.MaxWidth = Math.Max(40, DefaultWidth(column) - 70);   // an Auto cell does not trim: cap the name instead
-        AddTo(line, title, offset + 2, default);
-        AddTo(line, filterMark, offset + 3, default);
-        AddTo(line, glyph, offset + 4, new Thickness(4, 0, 0, 0));
+        var line = new Avalonia.Controls.Grid { ColumnDefinitions = new ColumnDefinitions(TextHeaderColumns) };
+        if (column.IsPrimaryKey) AddTo(line, HeaderIcon("IconKey", "pk"), 0, new Thickness(0, 0, 4, 0));
+        if (column.LinkTarget is not null) AddTo(line, HeaderIcon("IconLink", "fk"), 1, new Thickness(0, 0, 4, 0));
+        AddTo(line, title, 2, default);
+        AddTo(line, filterMark, 3, default);
+        AddTo(line, glyph, 4, new Thickness(4, 0, 0, 0));
+        if (column.IsNumeric) AlignHeaderRight(line, title, DefaultWidth(column));
 
         var nameBand = new Border { Child = line };
         nameBand.Classes.Add("nameBand");
         var root = new StackPanel();
+        root.AttachedToVisualTree += (_, _) => DropSortIconSlot(root);
         var tip = column.TypeName is { Length: > 0 } type ? $"{column.Name} ({type})" : column.Name;
         if (column.IsPrimaryKey) tip += "\nPrimary key";
         if (column.LinkTarget is not null) tip += $"\nForeign key → {column.LinkTarget} (Ctrl+click or double-click a value to open it)";
@@ -632,8 +652,33 @@ public partial class ResultGrid : UserControl
             root.Children.Add(band);
         }
 
-        parts = new HeaderParts(column, root, glyph, filter, title, filterMark, band);
+        parts = new HeaderParts(column, root, glyph, filter, title, filterMark, band, line);
         return parts;
+    }
+
+    private const string TextHeaderColumns = "Auto,Auto,*,Auto,Auto";
+
+    /// <summary>
+    /// The DataGrid header template keeps a 32 px column for its own sort arrow, which this grid never shows (it draws its own glyph):
+    /// without it the filter box spans the column minus the band's padding instead of stopping short of the right edge.
+    /// </summary>
+    private static void DropSortIconSlot(Control root)
+    {
+        for (var parent = root.GetVisualParent(); parent is not null and not DataGridColumnHeader; parent = parent.GetVisualParent())
+            if (parent is Avalonia.Controls.Grid { ColumnDefinitions.Count: 2 } grid && grid.ColumnDefinitions[1].MinWidth > 0)
+                grid.ColumnDefinitions[1].MinWidth = 0;
+    }
+
+    /// <summary>
+    /// Puts the name of a number column over its digits: an empty first cell pushes the icons and the name to the right edge.
+    /// Used for a declared number type when the header is built, and for an untyped column once its first rows are all numbers.
+    /// </summary>
+    private static void AlignHeaderRight(Avalonia.Controls.Grid line, TextBlock title, double width)
+    {
+        if (line.ColumnDefinitions.Count == 6) return;
+        line.ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto,Auto,Auto,Auto");
+        foreach (var child in line.Children) Avalonia.Controls.Grid.SetColumn(child, Avalonia.Controls.Grid.GetColumn(child) + 1);
+        title.MaxWidth = Math.Max(40, width - 70);   // an Auto cell does not trim: cap the name instead
     }
 
     private static void AddTo(Avalonia.Controls.Grid grid, Control child, int column, Thickness margin)
@@ -1142,7 +1187,7 @@ public partial class ResultGrid : UserControl
             var hasValue = GridCellColumn.ValuesOf(_contextCell.Row) is { } vs && _contextCell.Index < vs.Length && vs[_contextCell.Index] is not null;
             copyOpening();
             compareOpening();
-            viewItem.IsEnabled = hasValue;
+            Explain(viewItem, hasValue ? null : "The cell is NULL: there is no value to show");
             filterSeparator.IsVisible = table;
             filterItem.IsVisible = table;
             excludeItem.IsVisible = table;
@@ -1150,21 +1195,31 @@ public partial class ResultGrid : UserControl
             excludeItem.Header = hasValue ? "Exclude this value" : "Hide NULL";
             followItem.IsVisible = table && _contextCell.IsLink;
             followItem.Header = _contextCell.LinkTarget is { } target ? $"Follow foreign key → {target}" : "Follow foreign key";
-            followItem.IsEnabled = hasValue;
+            Explain(followItem, hasValue ? null : "The cell is NULL: it points to no row");
 
             var canEdit = MayEdit(_contextCell.Row);   // a new row of a keyless table is editable, its loaded rows are not
             var deleted = _contextCell.Row is RowViewModel { IsDeleted: true };
             var binary = _contextCell.Index < Grid.Columns.Count && Grid.Columns[_contextCell.Index].IsReadOnly;
             editSeparator.IsVisible = canEdit;
             editItem.IsVisible = canEdit;
-            editItem.IsEnabled = !deleted && !binary;
+            Explain(editItem, deleted ? DeletedRowReason : binary ? "Binary values cannot be typed in" : null);
             nullItem.IsVisible = canEdit;
-            nullItem.IsEnabled = !deleted;
+            Explain(nullItem, deleted ? DeletedRowReason : null);
             deleteItem.IsVisible = canEdit && !deleted;
             restoreItem.IsVisible = canEdit && deleted;
             addItem.IsVisible = _editing?.CanInsert == true;
         };
         return menu;
+    }
+
+    private const string DeletedRowReason = "The row is marked for deletion: restore it first";
+
+    /// <summary>Enables a menu item, or disables it with the reason as its tooltip (null = enabled).</summary>
+    private static void Explain(MenuItem item, string? disabledReason)
+    {
+        item.IsEnabled = disabledReason is null;
+        ToolTip.SetShowOnDisabled(item, true);
+        ToolTip.SetTip(item, disabledReason);
     }
 
     /// <summary>The complete value (the cell may show a shortened form).</summary>
@@ -1175,5 +1230,6 @@ public partial class ResultGrid : UserControl
         _ => CellFormatter.Format(value).Text,
     };
 
-    private sealed record HeaderParts(ResultColumn Column, Control Root, PathIcon SortGlyph, TextBox? Filter, TextBlock Title, PathIcon FilterMark, Border? Band);
+    private sealed record HeaderParts(ResultColumn Column, Control Root, PathIcon SortGlyph, TextBox? Filter, TextBlock Title, PathIcon FilterMark, Border? Band,
+        Avalonia.Controls.Grid Line);
 }
