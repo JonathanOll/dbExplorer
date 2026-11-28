@@ -23,7 +23,8 @@ public sealed partial class TableTabViewModel : ICompareHost
         }
         if (HasPendingEdits) notes.Add("pending changes that are not saved are included.");
         var filtered = HasActiveFilters ? ", filtered" : "";
-        return new CompareSnapshot(Table.Name, $"{Table}{filtered} ({Connection.Name})", Connection, data,
+        // " · " and not parentheses: connection names often carry their own "(local)".
+        return new CompareSnapshot(Table.Name, $"{Table}{filtered} · {Connection.Name}", Connection, data,
             notes.Count == 0 ? null : string.Join(" ", notes));
     }
 }

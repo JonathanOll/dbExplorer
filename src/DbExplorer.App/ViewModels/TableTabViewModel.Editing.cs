@@ -68,7 +68,7 @@ public sealed partial class TableTabViewModel : ITableEditActions
     /// </summary>
     public bool CanInsert => Info is { IsView: false } && !_session.Config.ReadOnly;
 
-    /// <summary>Tooltip of "+ Row": what it does, or why it is disabled (shown on the disabled button too).</summary>
+    /// <summary>Tooltip of "Add row": what it does, or why it is disabled (shown on the disabled button too).</summary>
     public string AddRowTip => CanInsert ? "Add an empty row (inserted on save)" : InsertBlockedReason();
 
     /// <summary>Tooltip of "Delete row": what it does, or why it is disabled.</summary>
@@ -275,6 +275,24 @@ public sealed partial class TableTabViewModel : ITableEditActions
     [RelayCommand]
     public void DismissNotice() => Notice = null;
 
+    /// <summary>
+    /// The notice is only a confirmation ("Saved", "Key saved", "No pending changes"): the view lets it go away by itself.
+    /// Any other notice (a warning, a refusal) stays until dismissed. Reset by every new notice.
+    /// </summary>
+    [ObservableProperty] private bool _noticeIsTransient;
+
+    partial void OnNoticeChanged(string? value) => NoticeIsTransient = false;
+
+    /// <summary>Shows a confirmation that dismisses itself (<see cref="NoticeIsTransient"/>).</summary>
+    private void ShowTransientNotice(string text)
+    {
+        Notice = text;
+        NoticeIsTransient = true;
+    }
+
+    /// <summary>"Delete" was clicked with nothing selected: say so briefly.</summary>
+    public void NothingSelectedToDelete() => ShowTransientNotice("Select the rows to delete first.");
+
     [RelayCommand]
     public void DismissCellError() => CellError = null;
 
@@ -406,7 +424,7 @@ public sealed partial class TableTabViewModel : ITableEditActions
         if (IsSaving) return;
         if (!HasPendingEdits)
         {
-            Notice = "No pending changes.";
+            ShowTransientNotice("No pending changes.");
             return;
         }
         if (!CanSaveNow(out var why))
@@ -534,11 +552,12 @@ public sealed partial class TableTabViewModel : ITableEditActions
         if (reloaded && Rows.Count == 0 && PageIndex > 0) reloaded = await RunAsync(query, PageIndex - 1);
         if (reloaded)
         {
-            Notice = plan.Count == 1 ? "Saved 1 statement." : $"Saved {plan.Count} statements.";
+            var saved = plan.Count == 1 ? "Saved 1 statement." : $"Saved {plan.Count} statements.";
             if (inserted > 0 && NewRowsMayBeElsewhere(query))
-                Notice += inserted == 1
+                saved += inserted == 1
                     ? " The new row may be on another page or hidden by the filters or sort."
                     : " The new rows may be on another page or hidden by the filters or sort.";
+            ShowTransientNotice(saved);
             return;
         }
 
@@ -718,8 +737,7 @@ public sealed partial class TableTabViewModel : ITableEditActions
 
         ErrorMessage = null;
         RefreshEditState();
-        Notice = saved
-            ? "Key saved."
-            : "This key is applied for this session only: the config could not be saved, so it will be lost when the app closes.";
+        if (saved) ShowTransientNotice("Key saved.");
+        else Notice = "This key is applied for this session only: the config could not be saved, so it will be lost when the app closes.";
     }
 }

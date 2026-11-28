@@ -11,7 +11,7 @@ using Microsoft.Data.Sqlite;
 
 namespace DbExplorer.App.Tests;
 
-/// <summary>The "+ Row" button: who may insert, what the user sees when it is disabled, where editing starts, and the save notice.</summary>
+/// <summary>The "Add row" button: who may insert, what the user sees when it is disabled, where editing starts, and the save notice.</summary>
 public class AddRowTests : IDisposable
 {
     private readonly TableTabFixture _t = new();
@@ -161,7 +161,7 @@ public class AddRowTests : IDisposable
         window.Show();
         await Pump();
 
-        Click(window, Button(view, "+ Row"));
+        Click(window, Button(view, "Add row"));
         await Pump();
 
         var grid = InnerGrid(view);
@@ -185,7 +185,7 @@ public class AddRowTests : IDisposable
         var window = new Window { Content = view, Width = 1100, Height = 500 };
         window.Show();
         await Pump();
-        var add = Button(view, "+ Row");
+        var add = Button(view, "Add row");
         Assert.True(add.IsEnabled);
         Assert.False(Button(view, "Delete row").IsEnabled);
         Assert.True(ToolTip.GetShowOnDisabled(Button(view, "Delete row")));
@@ -212,7 +212,7 @@ public class AddRowTests : IDisposable
         var window = new Window { Content = view, Width = 1100, Height = 500 };
         window.Show();
         await Pump();
-        var add = Button(view, "+ Row");
+        var add = Button(view, "Add row");
         Assert.False(add.IsEnabled);
         Assert.Contains("view", ToolTip.GetTip(add) as string);
         Assert.True(ToolTip.GetShowOnDisabled(add));

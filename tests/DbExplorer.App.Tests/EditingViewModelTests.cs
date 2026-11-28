@@ -319,6 +319,7 @@ public class EditingViewModelTests : IDisposable
         Assert.Equal(["x", "y"], reloaded.VirtualKeys[_t.Config.Id]["nopk"]);
         Assert.Contains("saved", tab.Notice, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("session", tab.Notice!);
+        Assert.True(tab.NoticeIsTransient);   // a confirmation: goes away by itself
     }
 
     [Fact]
@@ -339,6 +340,7 @@ public class EditingViewModelTests : IDisposable
 
         Assert.True(tab.CanEdit);
         Assert.Contains("session only", tab.Notice);
+        Assert.False(tab.NoticeIsTransient);   // a warning stays until dismissed
         Assert.False(File.Exists(_t.Fx.ConfigPath));   // nothing written
     }
 
@@ -425,6 +427,93 @@ public class EditingViewModelTests : IDisposable
         Assert.Equal("Alicia", Cell(tab, 0, "name"));   // page reloaded from the database
         Assert.All(tab.Rows, r => Assert.False(r.HasChanges));
         Assert.Contains("Saved", tab.Notice);
+        Assert.True(tab.NoticeIsTransient);
+    }
+
+    [Fact]
+    public async Task Notices_OnlyConfirmationsAreTransient_AndANewNoticeResetsTheFlag()
+    {
+        var tab = await Open("customers");
+
+        await tab.ReviewAndSaveAsync();   // nothing pending
+        Assert.Equal("No pending changes.", tab.Notice);
+        Assert.True(tab.NoticeIsTransient);
+
+        tab.Notice = "Something the user must read.";
+        Assert.False(tab.NoticeIsTransient);
+
+        tab.NothingSelectedToDelete();
+        Assert.Equal("Select the rows to delete first.", tab.Notice);
+        Assert.True(tab.NoticeIsTransient);
+
+        tab.DismissNotice();
+        Assert.Null(tab.Notice);
+        Assert.False(tab.NoticeIsTransient);
+    }
+
+    [Fact]
+    public async Task Paging_TooltipsSayWhyTheButtonsAreOff_AndTheCommandsFollow()
+    {
+        var tab = await Open("customers");   // 4 rows: one page
+
+        Assert.False(tab.PrevPageCommand.CanExecute(null));
+        Assert.Equal("Already on the first page", tab.PrevPageTip);
+        Assert.False(tab.NextPageCommand.CanExecute(null));
+        Assert.Equal("Already on the last page", tab.NextPageTip);
+
+        tab.PageIndex = 1;
+        tab.HasNextPage = true;
+        Assert.True(tab.PrevPageCommand.CanExecute(null));
+        Assert.Equal("Previous page (Alt+Left)", tab.PrevPageTip);
+        Assert.True(tab.NextPageCommand.CanExecute(null));
+        Assert.Equal("Next page (Alt+Right)", tab.NextPageTip);
+    }
+
+    [Fact]
+    public async Task CompareSnapshot_NamesTheConnectionAfterADot_NotInParentheses()
+    {
+        var tab = await Open("customers");
+        var snapshot = tab.CreateCompareSnapshot(tab.GridColumns, tab.Rows.Select(r => r.Values).ToList());
+        Assert.Equal($"{tab.Table} · {tab.Connection.Name}", snapshot.Detail);
+    }
+
+    [Fact]
+    public async Task SavingBar_TooltipsSayASaveIsRunning()
+    {
+        var tab = await Open("customers");
+        Assert.Equal("Discard all pending changes", tab.RevertTip);
+        Assert.Contains("Ctrl+S", tab.SaveTip);
+
+        tab.IsSaving = true;
+        Assert.StartsWith("Saving…", tab.RevertTip);
+        Assert.StartsWith("Saving…", tab.SaveTip);
+    }
+
+    [Fact]
+    public async Task Selection_IsWordedInRows_AndACellBlockSaysItsCellsAndRows()
+    {
+        var tab = await Open("customers");
+        Assert.True(tab.FiltersVisible);
+        Assert.Equal("", tab.SelectionText);
+        Assert.Equal("Delete row", tab.DeleteButtonText);
+
+        tab.SetSelection(1);
+        Assert.Equal("1 row selected", tab.SelectionText);
+        Assert.Equal("Delete row", tab.DeleteButtonText);
+
+        tab.SetSelection(3);
+        Assert.Equal("3 rows selected", tab.SelectionText);
+        Assert.Equal("Delete 3 rows", tab.DeleteButtonText);
+
+        tab.SetSelection(6, 18);   // a 6 x 3 rectangle: a delete takes the 6 rows
+        Assert.Equal("18 cells in 6 rows", tab.SelectionText);
+        Assert.Equal("Delete 6 rows", tab.DeleteButtonText);
+
+        tab.SetSelection(1, 1);
+        Assert.Equal("1 cell in 1 row", tab.SelectionText);
+
+        tab.SetSelection(0);
+        Assert.Equal("", tab.SelectionText);
     }
 
     [Fact]

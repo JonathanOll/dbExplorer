@@ -97,7 +97,7 @@ public class ResultGridRecyclingTests : IDisposable
         window.Show();
         await Pump();
 
-        var button = view.GetVisualDescendants().OfType<Button>().First(b => b.Content as string == "+ Row");
+        var button = view.GetVisualDescendants().OfType<Button>().First(b => b.Content as string == "Add row");
         var p = button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)!.Value;
         window.MouseDown(p, MouseButton.Left);
         window.MouseUp(p, MouseButton.Left);

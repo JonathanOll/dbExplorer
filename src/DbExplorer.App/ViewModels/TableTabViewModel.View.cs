@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DbExplorer.Core.Querying;
 
@@ -139,6 +140,69 @@ public sealed partial class TableTabViewModel
     /// <summary>Text of the pending-changes bar's primary button.</summary>
     public string SaveButtonText => IsSaving ? "Saving…" : "Review and save…";
 
+    /// <summary>Tooltip of "Revert": what it does, or why it is off while a save runs.</summary>
+    public string RevertTip => IsSaving ? "Saving…: wait for the save to finish" : "Discard all pending changes";
+
+    /// <summary>Tooltip of the save button: what it does, or why it is off while a save runs.</summary>
+    public string SaveTip => IsSaving
+        ? "Saving…: the pending changes are being applied"
+        : "Review the SQL, then apply all pending changes in one transaction (Ctrl+S)";
+
+    // ---- paging ----
+
+    public bool CanGoToPreviousPage => PageIndex > 0;
+
+    public bool CanGoToNextPage => HasNextPage;
+
+    /// <summary>Tooltip of the previous-page button, also shown while it is disabled.</summary>
+    public string PrevPageTip => CanGoToPreviousPage ? "Previous page (Alt+Left)" : "Already on the first page";
+
+    /// <summary>Tooltip of the next-page button, also shown while it is disabled.</summary>
+    public string NextPageTip => CanGoToNextPage ? "Next page (Alt+Right)" : "Already on the last page";
+
+    partial void OnHasNextPageChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanGoToNextPage));
+        OnPropertyChanged(nameof(NextPageTip));
+        NextPageCommand.NotifyCanExecuteChanged();
+    }
+
+    // ---- filter boxes and selection ----
+
+    /// <summary>The filter boxes of the grid and the WHERE row are shown (the Filters toggle).</summary>
+    [ObservableProperty] private bool _filtersVisible = true;
+
+    private int _selectedRowCount;
+    private int _selectedCellCount;
+
+    /// <summary>
+    /// The grid's selection changed: <paramref name="rows"/> distinct rows, <paramref name="cells"/> cells when a rectangle or
+    /// whole columns are picked (0 for a plain row selection).
+    /// </summary>
+    public void SetSelection(int rows, int cells = 0)
+    {
+        _selectedRowCount = Math.Max(0, rows);
+        _selectedCellCount = Math.Max(0, cells);
+        OnPropertyChanged(nameof(SelectionText));
+        OnPropertyChanged(nameof(DeleteButtonText));
+    }
+
+    /// <summary>"3 rows selected", or "18 cells in 6 rows" for a cell selection; empty when nothing is selected.</summary>
+    public string SelectionText
+    {
+        get
+        {
+            if (_selectedRowCount == 0) return "";
+            var rows = _selectedRowCount == 1 ? "1 row" : $"{_selectedRowCount:N0} rows";
+            if (_selectedCellCount == 0) return rows + " selected";
+            var cells = _selectedCellCount == 1 ? "1 cell" : $"{_selectedCellCount:N0} cells";
+            return $"{cells} in {rows}";
+        }
+    }
+
+    /// <summary>"Delete row", or "Delete 3 rows" when several rows have something selected (a delete always takes whole rows).</summary>
+    public string DeleteButtonText => _selectedRowCount > 1 ? $"Delete {_selectedRowCount:N0} rows" : "Delete row";
+
     private void NotifyViewState()
     {
         OnPropertyChanged(nameof(ShowInitialLoad));
@@ -149,6 +213,8 @@ public sealed partial class TableTabViewModel
         OnPropertyChanged(nameof(ShowStaleRows));
         OnPropertyChanged(nameof(IsBusy));
         OnPropertyChanged(nameof(SaveButtonText));
+        OnPropertyChanged(nameof(RevertTip));
+        OnPropertyChanged(nameof(SaveTip));
     }
 
     partial void OnIsLoadingChanged(bool value) => NotifyViewState();

@@ -88,34 +88,23 @@ public partial class TableTabView : UserControl
     private void OnDeleteRowsClick(object? sender, RoutedEventArgs e)
     {
         if (ViewModel is not { } vm) return;
-        if (DataGridView.DeleteSelectedRows() == 0) vm.Notice = "Select the rows to delete first.";
+        if (DataGridView.DeleteSelectedRows() == 0) vm.NothingSelectedToDelete();
     }
 
-    // ---- filter rows ----
-
-    private void OnFilterToggleClick(object? sender, RoutedEventArgs e) => ApplyFilterVisibility();
-
+    // Ctrl+F / Ctrl+Shift+F: the boxes must be shown before one is focused (the bindings apply at once).
     private void ShowFilters()
     {
-        if (FilterToggle.IsChecked == true) return;
-        FilterToggle.IsChecked = true;
-        ApplyFilterVisibility();
+        if (ViewModel is { FiltersVisible: false } vm) vm.FiltersVisible = true;
     }
 
-    private void ApplyFilterVisibility()
-    {
-        var on = FilterToggle.IsChecked == true;
-        DataGridView.ShowFilterRow = on;
-        WhereRow.IsVisible = on;
-    }
-
-    // ---- selection ----
+    // ---- selection: the grid counts, the view-model words it ----
 
     private void UpdateSelectionState()
     {
-        var count = DataGridView.SelectedRows.Count;
-        SelectionText.Text = count switch { 0 => "", 1 => "1 row selected", _ => $"{count:N0} rows selected" };
-        DeleteButton.Content = count > 1 ? $"Delete {count:N0} rows" : "Delete row";
+        if (ViewModel is not { } vm) return;
+        var rows = DataGridView.SelectedRows.Count;
+        var cells = DataGridView.CellSelection.IsActive && DataGridView.CurrentSlice() is { } slice ? slice.Rows.Count * slice.Columns.Count : 0;
+        vm.SetSelection(rows, cells);
     }
 
     // ---- structure ----
@@ -143,20 +132,21 @@ public partial class TableTabView : UserControl
             _subscribed.FocusColumnRequested += OnFocusColumn;
             _subscribed.PropertyChanged += OnViewModelChanged;
             WatchNotice();
+            UpdateSelectionState();   // a recreated grid starts with no selection: the counter must not keep the old one
         }
     }
 
-    // A "Saved ..." notice is only a confirmation: it goes away by itself. Anything else (a warning about a key kept for the
-    // session only, a refusal) stays until dismissed.
+    // A confirmation notice (the view-model flags it transient) goes away by itself. Anything else (a warning about a key kept
+    // for the session only, a refusal) stays until dismissed.
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(TableTabViewModel.Notice)) WatchNotice();
+        if (e.PropertyName is nameof(TableTabViewModel.Notice) or nameof(TableTabViewModel.NoticeIsTransient)) WatchNotice();
     }
 
     private void WatchNotice()
     {
         StopNoticeTimer();
-        if (_subscribed?.Notice is not { } notice || !IsConfirmation(notice)) return;
+        if (_subscribed is not { NoticeIsTransient: true, Notice: { } notice }) return;
         var timer = new DispatcherTimer { Interval = NoticeLifetime };
         timer.Tick += (_, _) =>
         {
@@ -166,10 +156,6 @@ public partial class TableTabView : UserControl
         _noticeTimer = timer;
         timer.Start();
     }
-
-    private static bool IsConfirmation(string notice) =>
-        notice.StartsWith("Saved", StringComparison.Ordinal) || notice.StartsWith("Key saved", StringComparison.Ordinal)
-        || notice.StartsWith("No pending", StringComparison.Ordinal) || notice.StartsWith("Select the rows", StringComparison.Ordinal);
 
     private void StopNoticeTimer()
     {

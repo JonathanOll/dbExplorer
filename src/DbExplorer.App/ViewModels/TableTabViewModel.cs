@@ -193,14 +193,14 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
         await RunAsync(q, PageIndex);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanGoToNextPage))]
     public async Task NextPage()
     {
         if (!HasNextPage || _applied is not { } q || !await ConfirmLeaveAsync()) return;
         await RunAsync(q, PageIndex + 1);
     }
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanGoToPreviousPage))]
     public async Task PrevPage()
     {
         if (PageIndex <= 0 || _applied is not { } q || !await ConfirmLeaveAsync()) return;
@@ -626,7 +626,13 @@ public sealed partial class TableTabViewModel : TabViewModel, ITableGridActions
 
     partial void OnTotalCountChanged(long? value) => OnPropertyChanged(nameof(RangeText));
 
-    partial void OnPageIndexChanged(int value) => OnPropertyChanged(nameof(RangeText));
+    partial void OnPageIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(RangeText));
+        OnPropertyChanged(nameof(CanGoToPreviousPage));
+        OnPropertyChanged(nameof(PrevPageTip));
+        PrevPageCommand.NotifyCanExecuteChanged();
+    }
 
     partial void OnInfoChanged(TableInfo? value)
     {

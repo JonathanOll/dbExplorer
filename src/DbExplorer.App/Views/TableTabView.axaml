@@ -23,7 +23,8 @@
       <Setter Property="MinHeight" Value="30" />
       <Setter Property="FontWeight" Value="SemiBold" />
     </Style>
-    <Style Selector="DataGrid.structure TextBlock"><Setter Property="Margin" Value="10,0" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
+    <!-- cells only: the header has its own padding, a margin there too would push the header text past the values -->
+    <Style Selector="DataGrid.structure DataGridCell TextBlock"><Setter Property="Margin" Value="10,0" /><Setter Property="VerticalAlignment" Value="Center" /></Style>
     <Style Selector="DataGrid.structure Border.badge TextBlock"><Setter Property="Margin" Value="0" /></Style>
     <Style Selector="TextBlock.req"><Setter Property="FontWeight" Value="SemiBold" /></Style>
     <Style Selector="Button.link"><Setter Property="Foreground" Value="{DynamicResource DbxLink}" /></Style>
@@ -96,18 +97,18 @@
               <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconRefresh}" Command="{Binding RefreshCommand}"
                         ToolTip.Tip="Reload this page (F5)" AutomationProperties.Name="Reload this page" />
-                <ToggleButton x:Name="FilterToggle" Classes="segment" IsChecked="True" Margin="4,0,0,0" MinHeight="28" MinWidth="116"
+                <ToggleButton x:Name="FilterToggle" Classes="segment" IsChecked="{Binding FiltersVisible}" Margin="4,0,0,0" MinHeight="28" MinWidth="116"
                               ToolTip.Tip="Show or hide the filter boxes and the WHERE row (Ctrl+F focuses the WHERE box)"
-                              AutomationProperties.Name="Show the filters" Click="OnFilterToggleClick">
+                              AutomationProperties.Name="Show the filters">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <PathIcon Data="{StaticResource IconFilter}" Width="13" Height="13" />
                     <TextBlock Text="{Binding FiltersLabel}" MinWidth="76" />
                   </StackPanel>
                 </ToggleButton>
                 <Border Classes="vsep" />
-                <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconAdd}" Content="+ Row" Click="OnAddRowClick"
+                <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconAdd}" Content="Add row" Click="OnAddRowClick"
                         IsEnabled="{Binding CanInsert}" ToolTip.Tip="{Binding AddRowTip}" ToolTip.ShowOnDisabled="True" />
-                <Button x:Name="DeleteButton" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconDelete}" Content="Delete row"
+                <Button x:Name="DeleteButton" Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconDelete}" Content="{Binding DeleteButtonText}"
                         Click="OnDeleteRowsClick" IsEnabled="{Binding CanEdit}" ToolTip.Tip="{Binding DeleteRowTip}" ToolTip.ShowOnDisabled="True" />
               </WrapPanel>
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="8,0,0,0">
@@ -118,7 +119,7 @@
                         ToolTip.Tip="{Binding EditBadgeTip}">
                   <StackPanel Orientation="Horizontal" Spacing="4">
                     <PathIcon Data="{StaticResource IconLock}" Width="10" Height="10" />
-                    <TextBlock Text="{Binding EditBadge}" FontSize="11.5" />
+                    <TextBlock Text="{Binding EditBadge}" />
                   </StackPanel>
                 </Border>
               </StackPanel>
@@ -126,11 +127,11 @@
           </Border>
 
           <!-- Raw WHERE: appended to the column filters with AND -->
-          <Border x:Name="WhereRow" DockPanel.Dock="Top" Background="{DynamicResource DbxContentBg}" BorderBrush="{DynamicResource DbxBorderSubtle}"
+          <Border x:Name="WhereRow" DockPanel.Dock="Top" IsVisible="{Binding FiltersVisible}" Background="{DynamicResource DbxContentBg}" BorderBrush="{DynamicResource DbxBorderSubtle}"
                   BorderThickness="0,0,0,1" Padding="8,6">
             <Grid ColumnDefinitions="Auto,*,Auto">
               <StackPanel Orientation="Horizontal" Spacing="6" Margin="4,0,8,0" VerticalAlignment="Center">
-                <TextBlock Classes="dim" Text="WHERE" FontWeight="SemiBold" FontSize="12" />
+                <TextBlock Classes="dim" Text="WHERE" FontWeight="SemiBold" FontFamily="{DynamicResource DbxMonoFont}" FontSize="{DynamicResource DbxMonoFontSize}" />
               </StackPanel>
               <TextBox x:Name="WhereBox" Grid.Column="1" Text="{Binding RawWhere}" FontFamily="{DynamicResource DbxMonoFont}"
                        Watermark="status = 'A' AND id > 10" Padding="10,0,32,0"
@@ -141,16 +142,16 @@
                 </TextBox.KeyBindings>
               </TextBox>
               <!-- Over the right end of the box, a fixed size: it can come and go without the layout around it having to follow -->
-              <Button Grid.Column="1" Classes="ghost" Focusable="False" Width="22" Height="22" MinHeight="0" Padding="0" Margin="0,0,5,0"
+              <Button Grid.Column="1" Classes="ghost" Width="22" Height="22" MinHeight="0" Padding="0" Margin="0,0,5,0"
                       HorizontalAlignment="Right" VerticalAlignment="Center"
-                      Command="{Binding ClearWhereCommand}" ToolTip.Tip="Clear the WHERE condition"
+                      Command="{Binding ClearWhereCommand}" ToolTip.Tip="Clear the WHERE condition and reload"
                       AutomationProperties.Name="Clear the WHERE condition"
                       IsVisible="{Binding RawWhere, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                 <PathIcon Data="{StaticResource IconClose}" Width="9" Height="9" />
               </Button>
               <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" Margin="8,0,0,0" VerticalAlignment="Center">
                 <TextBlock Classes="faint small" Text="{Binding NotAppliedText}" VerticalAlignment="Center" MinWidth="92" TextAlignment="Right" />
-                <Button Classes="accent" Content="Apply filters" Command="{Binding ApplyFiltersCommand}"
+                <Button Content="Apply filters" Command="{Binding ApplyFiltersCommand}"
                         ToolTip.Tip="Apply the column filters and the WHERE condition (Enter)" />
               </StackPanel>
             </Grid>
@@ -169,7 +170,7 @@
                   <DataTemplate x:DataType="vm:FilterChip">
                     <Border Classes="badge" Margin="0,2,6,2" Padding="9,2,3,2">
                       <StackPanel Orientation="Horizontal" Spacing="4">
-                        <TextBlock Text="{Binding Label}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="12" MaxWidth="320"
+                        <TextBlock Text="{Binding Label}" FontFamily="{DynamicResource DbxMonoFont}" FontSize="{DynamicResource DbxMonoFontSize}" MaxWidth="320"
                                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
                         <Button Classes="ghost" Focusable="True" Width="18" Height="18" MinHeight="0" Padding="0" Command="{Binding RemoveCommand}"
                                 ToolTip.Tip="{Binding RemoveTip}" AutomationProperties.Name="{Binding RemoveTip}">
@@ -196,15 +197,15 @@
 
           <!-- Status strip: paging, count, timing, selection -->
           <Border DockPanel.Dock="Bottom" Background="{DynamicResource DbxToolbarBg}" BorderBrush="{DynamicResource DbxBorderSubtle}"
-                  BorderThickness="0,1,0,0" Padding="6,2" MinHeight="34">
+                  BorderThickness="0,1,0,0" Padding="6,1" MinHeight="32">
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconChevronLeft}" Command="{Binding PrevPageCommand}"
-                        IsEnabled="{Binding !!PageIndex}" ToolTip.Tip="Previous page (Alt+Left)" AutomationProperties.Name="Previous page" />
+                        ToolTip.Tip="{Binding PrevPageTip}" ToolTip.ShowOnDisabled="True" AutomationProperties.Name="Previous page" />
                 <TextBlock Text="{Binding RangeText}" MinWidth="150" TextAlignment="Center" VerticalAlignment="Center" Margin="2,0"
-                           FontWeight="SemiBold" FontSize="12.5" />
+                           FontWeight="SemiBold" />
                 <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconChevronRight}" Command="{Binding NextPageCommand}"
-                        IsEnabled="{Binding HasNextPage}" ToolTip.Tip="Next page (Alt+Right)" AutomationProperties.Name="Next page" />
+                        ToolTip.Tip="{Binding NextPageTip}" ToolTip.ShowOnDisabled="True" AutomationProperties.Name="Next page" />
                 <Border Classes="vsep" />
                 <Button Theme="{StaticResource DbxToolButton}" Tag="{StaticResource IconCount}" Content="Count rows" Command="{Binding CountCommand}"
                         IsVisible="{Binding TotalCount, Converter={x:Static ObjectConverters.IsNull}}"
@@ -213,7 +214,7 @@
                           IsVisible="{Binding CountCommand.IsRunning}" />
               </StackPanel>
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Margin="12,0,6,0">
-                <TextBlock x:Name="SelectionText" Classes="dim small" VerticalAlignment="Center" />
+                <TextBlock x:Name="SelectionText" Classes="dim small" Text="{Binding SelectionText}" VerticalAlignment="Center" />
                 <PathIcon Classes="spin dim" Data="{StaticResource IconRefresh}" Width="12" Height="12" VerticalAlignment="Center"
                           IsVisible="{Binding IsLoading}" />
                 <TextBlock Classes="dim small" Text="{Binding ElapsedText}" VerticalAlignment="Center"
@@ -234,9 +235,9 @@
               </StackPanel>
               <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
                 <Button Content="Revert" Command="{Binding RevertCommand}" IsEnabled="{Binding !IsSaving}"
-                        ToolTip.Tip="Discard all pending changes" />
+                        ToolTip.Tip="{Binding RevertTip}" ToolTip.ShowOnDisabled="True" />
                 <Button x:Name="SaveButton" Classes="accent" Content="{Binding SaveButtonText}" Click="OnSaveClick" IsEnabled="{Binding !IsSaving}"
-                        ToolTip.Tip="Review the SQL, then apply all pending changes in one transaction (Ctrl+S)" />
+                        ToolTip.Tip="{Binding SaveTip}" ToolTip.ShowOnDisabled="True" />
               </StackPanel>
             </Grid>
           </Border>
@@ -244,7 +245,8 @@
           <!-- The grid, with its empty, loading and failed states drawn over the (empty) body -->
           <Grid>
             <views:ResultGrid x:Name="DataGridView" Columns="{Binding GridColumns}" ItemsSource="{Binding Rows}"
-                              Features="{Binding}" Editing="{Binding}" Classes.reloading="{Binding IsReloading}" />
+                              Features="{Binding}" Editing="{Binding}" Classes.reloading="{Binding IsReloading}"
+                              ShowFilterRow="{Binding FiltersVisible}" />
             <StackPanel Classes="empty" Margin="0,80,0,0" IsVisible="{Binding ShowInitialLoad}">
               <PathIcon Classes="spin" Data="{StaticResource IconRefresh}" IsVisible="{Binding ShowInitialLoad}" />
               <TextBlock Classes="h2" Text="Loading rows…" />
@@ -259,7 +261,7 @@
               <PathIcon Data="{StaticResource IconTable}" />
               <TextBlock Classes="h2" Text="This table is empty" />
               <TextBlock Classes="dim" TextWrapping="Wrap" Text="There are no rows to show yet." />
-              <Button Classes="accent" Content="+ Row" Click="OnAddRowClick" IsVisible="{Binding CanInsert}" />
+              <Button Classes="accent" Content="Add row" Click="OnAddRowClick" IsVisible="{Binding CanInsert}" />
             </StackPanel>
             <StackPanel Classes="empty" Margin="0,80,0,0" IsVisible="{Binding ShowLoadFailed}">
               <PathIcon Data="{StaticResource IconError}" />
@@ -304,13 +306,13 @@
                           <Border Classes="badge" IsVisible="{Binding IsPrimaryKey}">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                               <PathIcon Classes="keyIcon" Data="{StaticResource IconKey}" Width="10" Height="10" />
-                              <TextBlock Text="PK" FontSize="11" />
+                              <TextBlock Text="PK" />
                             </StackPanel>
                           </Border>
                           <Border Classes="badge" IsVisible="{Binding HasReference}">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                               <PathIcon Classes="linkIcon" Data="{StaticResource IconLink}" Width="10" Height="10" />
-                              <TextBlock Text="FK" FontSize="11" />
+                              <TextBlock Text="FK" />
                             </StackPanel>
                           </Border>
                         </StackPanel>
@@ -357,9 +359,13 @@
                     <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="2*" />
                     <DataGridTemplateColumn Header="Unique" Width="Auto" MinWidth="100">
                       <DataTemplate x:DataType="vm:StructureIndex">
-                        <Border Classes="badge success" HorizontalAlignment="Left" Margin="10,0" IsVisible="{Binding Unique}">
-                          <TextBlock Text="UNIQUE" FontSize="11" Margin="0" />
-                        </Border>
+                        <Panel>
+                          <Border Classes="badge success" HorizontalAlignment="Left" Margin="10,0" VerticalAlignment="Center" IsVisible="{Binding Unique}">
+                            <TextBlock Text="UNIQUE" Margin="0" />
+                          </Border>
+                          <!-- a blank cell would read as "unknown": say it -->
+                          <TextBlock Classes="faint" Text="No" IsVisible="{Binding !Unique}" />
+                        </Panel>
                       </DataTemplate>
                     </DataGridTemplateColumn>
                     <DataGridTextColumn Header="Columns" Binding="{Binding Columns}" Width="2*" />
