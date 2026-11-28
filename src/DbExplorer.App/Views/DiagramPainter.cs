@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
@@ -15,7 +16,13 @@ internal sealed record DiagramPalette(
     public static DiagramPalette From(StyledElement owner)
     {
         object? Find(string key) => owner.TryFindResource(key, owner.ActualThemeVariantOf(), out var value) ? value : null;
-        IBrush Brush(string key) => Find(key) as IBrush ?? Brushes.Gray;
+        // A missing token draws nothing (not a stray named colour) and says so in the trace, so it is seen in dev.
+        IBrush Brush(string key)
+        {
+            if (Find(key) is IBrush brush) return brush;
+            Trace.TraceWarning($"DiagramPalette: theme token '{key}' not found");
+            return Brushes.Transparent;
+        }
         return new DiagramPalette(
             Brush("DbxContentBg"), Brush("DbxSurface"), Brush("DbxGridHeaderBg"), Brush("DbxBorder"), Brush("DbxBorderStrong"),
             Brush("DbxText"), Brush("DbxTextDim"), Brush("DbxAccent"), Brush("DbxLink"), Brush("DbxIconKey"),

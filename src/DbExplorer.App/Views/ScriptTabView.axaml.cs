@@ -90,26 +90,34 @@ public partial class ScriptTabView : UserControl
     // The highlighting definition is a process-wide singleton: its colours are switched once per theme, not once per tab.
     private static ThemeVariant? s_syntaxVariant;
 
-    private static readonly Dictionary<string, (string Light, string Dark)> SyntaxColors = new()
+    // TSQL highlighting colour name -> theme token (Theme.axaml)
+    private static readonly Dictionary<string, string> SyntaxTokens = new()
     {
-        ["Keywords"] = ("#1F5FBF", "#6CB0F5"),
-        ["Comment"] = ("#4F7F2D", "#7FA66A"),
-        ["Char"] = ("#A8381C", "#E39A7A"),   // string literals
+        ["Keywords"] = "DbxSyntaxKeyword",
+        ["Comment"] = "DbxSyntaxComment",
+        ["Char"] = "DbxSyntaxString",   // string literals
     };
 
     /// <summary>Gives the editor the colours of the current theme: syntax colours, gutter, selection, current line, run marks.</summary>
     private void ApplyEditorTheme()
     {
         var variant = ActualThemeVariant;
+        IBrush? Token(string key) => this.TryFindResource(key, variant, out var value) ? value as IBrush : null;
+
         if (!Equals(s_syntaxVariant, variant) && Editor.SyntaxHighlighting is { } definition)
         {
+            var found = false;
             foreach (var color in definition.NamedHighlightingColors)
-                if (SyntaxColors.TryGetValue(color.Name ?? "", out var pair))
-                    color.Foreground = new SimpleHighlightingBrush(Color.Parse(variant == ThemeVariant.Dark ? pair.Dark : pair.Light));
-            s_syntaxVariant = variant;
+                if (SyntaxTokens.TryGetValue(color.Name ?? "", out var key) && Token(key) is ISolidColorBrush brush)
+                {
+                    color.Foreground = new SimpleHighlightingBrush(brush.Color);
+                    found = true;
+                }
+            // Not yet in a tree with the theme resources: try again on the next call instead of caching nothing.
+            if (found)
+                s_syntaxVariant = variant;
         }
 
-        IBrush? Token(string key) => this.TryFindResource(key, variant, out var value) ? value as IBrush : null;
         Editor.LineNumbersForeground = Token("DbxEditorGutterText");
         Editor.TextArea.SelectionBrush = Token("DbxEditorSelection");
         Editor.TextArea.TextView.CurrentLineBackground = Token("DbxEditorCurrentLine");

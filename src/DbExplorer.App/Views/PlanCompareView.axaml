@@ -6,42 +6,7 @@
              x:DataType="vm:PlanCompareViewModel">
   <UserControl.Styles>
     <!-- the same cards as the plan canvas -->
-    <Style Selector="Border.plannode">
-      <Setter Property="Background" Value="{DynamicResource DbxSurface}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource DbxBorder}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Cursor" Value="Hand" />
-    </Style>
-    <Style Selector="Border.plannode:pointerover"><Setter Property="BorderBrush" Value="{DynamicResource DbxBorderStrong}" /></Style>
-    <Style Selector="Border.plannode.path"><Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" /></Style>
-    <Style Selector="Border.plannode.selected">
-      <Setter Property="BorderThickness" Value="2" />
-      <Setter Property="BorderBrush" Value="{DynamicResource DbxAccent}" />
-      <Setter Property="Background" Value="{DynamicResource DbxAccentSoft}" />
-    </Style>
-    <Style Selector="Border.tile">
-      <Setter Property="Width" Value="32" />
-      <Setter Property="Height" Value="32" />
-      <Setter Property="CornerRadius" Value="7" />
-      <Setter Property="Background" Value="{DynamicResource DbxHover}" />
-    </Style>
-    <Style Selector="Border.tile > PathIcon">
-      <Setter Property="Width" Value="18" />
-      <Setter Property="Height" Value="18" />
-      <Setter Property="Foreground" Value="{DynamicResource DbxIcon}" />
-    </Style>
-    <Style Selector="views|HeatBar">
-      <Setter Property="Track" Value="{DynamicResource DbxBorder}" />
-      <Setter Property="Fill" Value="{DynamicResource DbxTextFaint}" />
-    </Style>
-    <Style Selector="views|HeatBar.low"><Setter Property="Fill" Value="{DynamicResource DbxAccent}" /></Style>
-    <Style Selector="views|HeatBar.mid"><Setter Property="Fill" Value="{DynamicResource DbxWarn}" /></Style>
-    <Style Selector="views|HeatBar.high"><Setter Property="Fill" Value="{DynamicResource DbxError}" /></Style>
-    <Style Selector="TextBlock.cost"><Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
-    <Style Selector="TextBlock.cost.mid"><Setter Property="Foreground" Value="{DynamicResource DbxWarnText}" /></Style>
-    <Style Selector="TextBlock.cost.high"><Setter Property="Foreground" Value="{DynamicResource DbxErrorText}" /></Style>
-    <Style Selector="PathIcon.warn"><Setter Property="Foreground" Value="{DynamicResource DbxWarn}" /></Style>
+    <StyleInclude Source="avares://DbExplorer/Styles/Plan.axaml" />
 
     <!-- dashed outline of an operator that exists on one side only -->
     <Style Selector="Rectangle.only">

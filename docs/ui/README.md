@@ -10,7 +10,8 @@ Shapes are soft (radius 6 for controls, 10 for cards and flyouts, pill badges). 
 | --- | --- |
 | `Theme.axaml` | colour tokens (light and dark `ThemeDictionaries`), sizes, fonts, radii, and the re-pointing of the Fluent control brushes to the tokens |
 | `Icons.axaml` | about 40 vector icons as `StreamGeometry` (24x24, Material-style). No icon font, no bitmaps |
-| `Controls.axaml` | control themes (tool button, document tabs, sub tabs), style classes (buttons, inputs, bands, banners, badges, key caps, cards, empty state, spinner) |
+| `Controls.axaml` | control themes (tool button, document tabs, sub tabs), style classes (buttons, inputs, bands, banners, badges, key caps, cards, folding toggles, empty state, spinner) |
+| `Plan.axaml` | execution plan cards shared by `PlanView` and `PlanCompareView` (`Border.plannode` + `path`/`selected`, `Border.tile`, `HeatBar` + `low`/`mid`/`high`, `TextBlock.cost` + `mid`/`high`, `PathIcon.warn`/`hint`/`bad`). Not global: a plan view pulls it in with `<StyleInclude Source="avares://DbExplorer/Styles/Plan.axaml" />` |
 
 Screenshots of every screen, light and dark: [`before/`](before) (original), [`after/`](after).
 Regenerate with `dotnet run --project tools/UiShots -- <folder>` (in-process, headless, synthetic data in a temp folder,
@@ -62,12 +63,16 @@ toolbar 40, document tab strip 38, sub tab strip 36, text box / combo 32, button
 | Token | Value | Use |
 | --- | --- | --- |
 | `DbxRadius` (`ControlCornerRadius`) | 6 | buttons, inputs, menu items, tree and list rows, tooltips |
+| `DbxRadiusXs` | 2 | tiny marks: bars, swatches, indicators |
 | `DbxRadiusSm` | 4 | key caps, small chips |
+| `DbxRadiusMd` | 8 | `Border.surface`, plan operator cards |
 | `DbxCardRadius` (`OverlayCornerRadius`) | 10 | cards, dialogs, flyouts, menus, combo popups, quick-open card |
 | `DbxPillRadius` | 99 | badges |
 | `DbxRowHeight`, `DbxGridRowHeight` | 28 (**configurable**: 24 / 28 / 32) | tree pitch, data grid rows |
 | `DbxToolbarHeight` / `DbxTabHeight` / `DbxSubTabHeight` / `DbxControlHeight` | 40 / 38 / 36 / 32 | |
-| `DbxFontSize` / `DbxSmallFontSize` / `DbxGridFontSize` / `DbxH1FontSize` / `DbxH2FontSize` | 13 / 11.5 / 12.5 / 20 / 15 | |
+| `DbxFontSize` / `DbxSmallFontSize` / `DbxGridFontSize` / `DbxH1FontSize` / `DbxH2FontSize` | 13 / 11.5 / 12.5 / 20 / 15 | `DbxGridFontSize` is **configurable** and also sizes the grid column headers. Dialog titles use `TextBlock.h2` (no separate token) |
+| `DbxBadgeFontSize` | 11.5 | text of a `Border.badge`, set by the style: views do not set `FontSize` on badge text |
+| `DbxMonoFontSize` | 12 | code, identifiers and SQL snippets in `DbxMonoFont` outside the editor (the editor uses `DbxEditorFontSize`) |
 | `DbxMonoFont`, `DbxCardShadow`, `DbxFocusGlow`, `DbxFocusGlowError`, `DbxFocusInset` | | font and box shadows (focus glow of inputs, inset ring of tabs) |
 | `DbxEditorFont`, `DbxEditorFontSize`, `DbxUiScale` | Consolas, 13, 1.0 | **configurable** (Settings > Editor / Appearance), see rule 9 and 10 |
 
@@ -92,9 +97,11 @@ toolbar 40, document tab strip 38, sub tab strip 36, text box / combo 32, button
 | `DbxLink` | `#3556C4` | `#8AA3F7` | foreign-key values, links |
 | `DbxGridHeaderBg` / `DbxGridFilterBg` | `#F5F7FA` / `#FBFCFD` | `#252930` / `#1D2025` | name band over the lighter filter band |
 | `DbxGridLine` / `DbxGridZebra` | `#EDEFF3` / `#FAFBFD` | `#2B2F36` / `#22252C` | row lines, alternate rows |
+| `DbxColumnFlash` / `DbxColumnFlashHeader` | `#FFE27A` / `#FFC933` | `#6E5B12` / `#9A7F10` | short highlight of a result grid column (`DataGridCell.flash` / `StackPanel.flashHeader` in `ResultGrid`) when it is jumped to |
 | `DbxRowHover` / `DbxRowSelected` / `DbxRowSelectedInactive` | `#F1F4FA` / `#DCE5FD` / `#E8EDF8` | `#262A33` / `#2C3A6E` / `#2A3050` | grid rows |
 | `DbxCellEdited` / `DbxCellNew` / `DbxCellDeleted` / `DbxCellError` | `#55F2B600` / `#4429A329` / `#44D32F2F` / `#C8372D` | `#55F2B600` / `#5538C26A` / `#66E5534B` / `#F2766E` | grid cell states: edited amber, new row green, deleted row red (with strike-through), error border. Translucent, so they read over zebra and selection; `DbxCellError` is opaque (border) |
 | `DbxEditorSelection` / `DbxEditorCurrentLine` / `DbxEditorGutterText` / `DbxEditorGutterBorder` | `#C9D7FB` / `#F2F5FD` / `#8892A2` / `#E5E8EE` | `#34437F` / `#262B3A` / `#707A8A` / `#2A2E35` | SQL editor (the AvaloniaEdit theme in `ScriptTabView` should read these, not the grid tokens) |
+| `DbxSyntaxKeyword` / `DbxSyntaxComment` / `DbxSyntaxString` | `#1F5FBF` / `#4F7F2D` / `#A8381C` | `#6CB0F5` / `#7FA66A` / `#E39A7A` | SQL syntax colours (keywords, comments, string literals), read by `ScriptTabView` for the highlighting and switched with the theme |
 | `DbxError` + `Bg` / `Border` / `Text` | `#C8372D` `#FDEDEB` `#F3C2BD` `#8F2A22` | `#F2766E` `#3A1F1E` `#6E3631` `#FFA39B` | error banner, badge, icon, `fielderror` |
 | `DbxWarn` + `Bg` / `Border` / `Text` | `#B45F06` `#FFF5DC` `#EFD595` `#6B4200` | `#E8B04C` `#3A2E14` `#6E5A2A` `#F2C46D` | warning banner, read-only badge |
 | `DbxInfo` + `Bg` / `Border` / `Text` | `#3E63DD` `#EAEFFD` `#C5D2F8` `#243B8F` | `#8CA3F7` `#222B52` `#3B4A8A` `#B3C2FB` | info banner |
@@ -123,6 +130,7 @@ Themes (`Theme="{StaticResource ...}"`): `DbxToolButton`, `DbxDocTabControl` + `
 | `card` | `Button` | whole clickable card (welcome actions), hover = accent soft |
 | `run` `stop` `link` `tint` `close` | `DbxToolButton` | coloured icon (green / red / link / accent) or 10 px close glyph |
 | `segment` | `ToggleButton` | option chip, checked = accent soft fill + accent border. Put several in a horizontal `StackPanel` (Spacing 6) |
+| `fold` (+ `header`) | `ToggleButton` | folding toggle with a chevron (`IconChevronRight` closed, `IconChevronDown` open). `fold`: quiet dim 11.5 "Details" link; `fold header`: the whole header strip of a card (full width, padding 12,10). Checked paints no accent, hover = `DbxHover` |
 | `choice` | `ListBoxItem` | selectable card (engine picker): selected = accent soft fill + accent border. Use a horizontal `ListBox` |
 | `error` | `TextBox`, `ComboBox` | error border and error focus glow; add `TextBlock.fielderror` under it |
 | `bare` | `TextBox` | no frame, no glow (search box inside a card; `search` is also accepted) |
@@ -132,9 +140,9 @@ Themes (`Theme="{StaticResource ...}"`): `DbxToolButton`, `DbxDocTabControl` + `
 | `toolbar` | `Border` | toolbar band: content colour, hairline below, 40 high, padding 8,4 |
 | `vsep` | `Border` | 1 px vertical separator between toolbar groups |
 | `banner` + `error` `warn` `info` `success` | `Border` | status band; its icon is a `PathIcon` with `Classes="bi"` |
-| `badge` (+ `warn` `error` `info`/`ok` `success`) | `Border` | pill chip |
+| `badge` (+ `warn` `error` `info`/`ok` `success`) | `Border` | pill chip; its `TextBlock` (direct child, or in a `StackPanel`) gets `DbxBadgeFontSize`: do not set `FontSize` locally |
 | `kbd` | `Border` > `TextBlock` | key cap; also fine inside a tooltip (`ToolTip.Tip` = horizontal `StackPanel` of a text and a `Border.kbd`) |
-| `surface` | `Border` | raised panel: surface colour, hairline, radius 8, no padding |
+| `surface` | `Border` | raised panel: surface colour, hairline, radius 8 (`DbxRadiusMd`), no padding |
 | `card` | `Border` | `surface` + padding 16 + radius 10: standard container for a group of content |
 | `empty` | `StackPanel` | empty state: centered, max width 380; children: `PathIcon` (36 px, faint), `TextBlock.h2` title, `TextBlock.dim` hint, optional `Button.accent` |
 | `spin` | `PathIcon` | rotates while its own `IsVisible` is true (bind `IsVisible` on the icon itself, not on a parent) |

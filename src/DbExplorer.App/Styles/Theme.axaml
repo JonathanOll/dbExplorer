@@ -14,7 +14,9 @@
   <x:Double x:Key="DbxSmallFontSize">11.5</x:Double>
   <x:Double x:Key="DbxGridFontSize">12.5</x:Double>
   <x:Double x:Key="DbxH1FontSize">20</x:Double>
-  <x:Double x:Key="DbxH2FontSize">15</x:Double>
+  <x:Double x:Key="DbxH2FontSize">15</x:Double>         <!-- also dialog titles (TextBlock.h2) -->
+  <x:Double x:Key="DbxBadgeFontSize">11.5</x:Double>    <!-- text in Border.badge -->
+  <x:Double x:Key="DbxMonoFontSize">12</x:Double>       <!-- code, identifiers and SQL snippets in DbxMonoFont outside the editor -->
   <x:Double x:Key="DbxRowHeight">28</x:Double>            <!-- tree rows (pitch) -->
   <x:Double x:Key="DbxGridRowHeight">28</x:Double>        <!-- data grid rows -->
   <x:Double x:Key="DbxToolbarHeight">40</x:Double>
@@ -24,7 +26,9 @@
   <CornerRadius x:Key="ControlCornerRadius">6</CornerRadius>
   <CornerRadius x:Key="OverlayCornerRadius">10</CornerRadius>
   <CornerRadius x:Key="DbxRadius">6</CornerRadius>
+  <CornerRadius x:Key="DbxRadiusXs">2</CornerRadius>     <!-- tiny marks: bars, swatches, indicators -->
   <CornerRadius x:Key="DbxRadiusSm">4</CornerRadius>
+  <CornerRadius x:Key="DbxRadiusMd">8</CornerRadius>     <!-- Border.surface -->
   <CornerRadius x:Key="DbxCardRadius">10</CornerRadius>
   <CornerRadius x:Key="DbxPillRadius">99</CornerRadius>
   <Thickness x:Key="ButtonPadding">14,5,14,6</Thickness>
@@ -104,6 +108,10 @@
       <SolidColorBrush x:Key="DbxEditorCurrentLine" Color="#F2F5FD" />
       <SolidColorBrush x:Key="DbxEditorGutterText" Color="#8892A2" />
       <SolidColorBrush x:Key="DbxEditorGutterBorder" Color="#E5E8EE" />
+      <!-- SQL syntax (read by ScriptTabView for the AvaloniaEdit highlighting) -->
+      <SolidColorBrush x:Key="DbxSyntaxKeyword" Color="#1F5FBF" />
+      <SolidColorBrush x:Key="DbxSyntaxComment" Color="#4F7F2D" />
+      <SolidColorBrush x:Key="DbxSyntaxString" Color="#A8381C" />
       <!-- Status: icon colour + banner bg / border / text -->
       <SolidColorBrush x:Key="DbxError" Color="#C8372D" />
       <SolidColorBrush x:Key="DbxErrorBg" Color="#FDEDEB" />
@@ -383,6 +391,10 @@
       <SolidColorBrush x:Key="DbxEditorCurrentLine" Color="#262B3A" />
       <SolidColorBrush x:Key="DbxEditorGutterText" Color="#707A8A" />
       <SolidColorBrush x:Key="DbxEditorGutterBorder" Color="#2A2E35" />
+      <!-- SQL syntax (read by ScriptTabView for the AvaloniaEdit highlighting) -->
+      <SolidColorBrush x:Key="DbxSyntaxKeyword" Color="#6CB0F5" />
+      <SolidColorBrush x:Key="DbxSyntaxComment" Color="#7FA66A" />
+      <SolidColorBrush x:Key="DbxSyntaxString" Color="#E39A7A" />
       <!-- Status: icon colour + banner bg / border / text -->
       <SolidColorBrush x:Key="DbxError" Color="#F2766E" />
       <SolidColorBrush x:Key="DbxErrorBg" Color="#3A1F1E" />

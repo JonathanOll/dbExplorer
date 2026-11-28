@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
@@ -48,18 +49,23 @@ public sealed class PlanEdges : Control
     protected override Size MeasureOverride(Size availableSize) =>
         Statement is { } s ? new Size(s.CanvasWidth, s.CanvasHeight) : default;
 
-    private IBrush Brush(string key, IBrush fallback) =>
-        this.TryFindResource(key, ActualThemeVariant, out var v) && v is IBrush b ? b : fallback;
+    // A missing token draws nothing (not a stray named colour) and says so in the trace, so it is seen in dev.
+    private IBrush Brush(string key)
+    {
+        if (this.TryFindResource(key, ActualThemeVariant, out var v) && v is IBrush b) return b;
+        Trace.TraceWarning($"PlanEdges: theme token '{key}' not found");
+        return Brushes.Transparent;
+    }
 
     public override void Render(DrawingContext context)
     {
         base.Render(context);
         if (Statement is not { } statement) return;
 
-        var normal = Brush("DbxBorderStrong", Brushes.Gray);
-        var lit = Brush("DbxAccent", Brushes.DodgerBlue);
-        var text = Brush("DbxText", Brushes.Gray);
-        var chip = Brush("DbxContentBg", Brushes.White);
+        var normal = Brush("DbxBorderStrong");
+        var lit = Brush("DbxAccent");
+        var text = Brush("DbxText");
+        var chip = Brush("DbxContentBg");
         var typeface = new Typeface(FontFamily.Default);
 
         // Unlit edges first, so a lit one is never hidden under a crossing line.

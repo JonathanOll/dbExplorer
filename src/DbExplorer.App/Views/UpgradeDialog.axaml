@@ -9,11 +9,6 @@
         Width="920" Height="680" MinWidth="740" MinHeight="500"
         WindowStartupLocation="CenterOwner">
 
-  <Window.Resources>
-    <!-- chevron pointing down (the open state of a folding header); the right one is Icons.axaml's IconChevronRight -->
-    <StreamGeometry x:Key="DlgIconChevronDown">M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z</StreamGeometry>
-  </Window.Resources>
-
   <Window.DataTemplates>
     <DataTemplate DataType="vm:ClaudePanelViewModel"><views:ClaudePanelView /></DataTemplate>
   </Window.DataTemplates>
@@ -43,20 +38,6 @@
       <Setter Property="BorderBrush" Value="{DynamicResource DbxErrorBorder}" />
     </Style>
 
-    <!-- "Details" toggle of a card and its chevron -->
-    <Style Selector="ToggleButton.fold">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Padding" Value="4,2" />
-      <Setter Property="MinHeight" Value="0" />
-      <Setter Property="FontSize" Value="11.5" />
-      <Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" />
-    </Style>
-    <Style Selector="ToggleButton.fold:checked /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxTextDim}" />
-    </Style>
   </Window.Styles>
 
   <DockPanel>
@@ -486,7 +467,7 @@
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <Panel VerticalAlignment="Center">
                             <PathIcon Data="{StaticResource IconChevronRight}" Width="10" Height="10" IsVisible="{Binding !IsDetailsOpen}" />
-                            <PathIcon Data="{StaticResource DlgIconChevronDown}" Width="10" Height="10" IsVisible="{Binding IsDetailsOpen}" />
+                            <PathIcon Data="{StaticResource IconChevronDown}" Width="10" Height="10" IsVisible="{Binding IsDetailsOpen}" />
                           </Panel>
                           <TextBlock Text="Details" />
                         </StackPanel>

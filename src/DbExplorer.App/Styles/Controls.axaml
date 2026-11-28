@@ -2,7 +2,7 @@
   Control themes and style classes of dbExplorer (see docs/ui/README.md for the vocabulary).
   Themes (Theme="{StaticResource ...}"):  DbxToolButton, DbxDocTabControl + DbxDocTabItem, DbxSubTabControl + DbxSubTabItem
   Button:     (default = secondary) .accent / .primary, .danger, .subtle, .ghost, .card, .link
-  Toggle:     ToggleButton.segment, ListBoxItem.choice
+  Toggle:     ToggleButton.segment, ToggleButton.fold (+ header), ListBoxItem.choice
   Inputs:     TextBox / ComboBox .error, TextBox.bare, TextBlock.fielderror
   Bands:      Border.banner (+ error / warn / info / success), Border.panelHeader, Border.toolbar, Border.vsep
   Surfaces:   Border.surface, Border.card, StackPanel.empty (empty state)
@@ -95,7 +95,7 @@
     <ControlTheme x:Key="DbxDocTabItem" TargetType="TabItem">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" />
-      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontSize" Value="{DynamicResource DbxFontSize}" />
       <Setter Property="MinHeight" Value="{DynamicResource DbxTabHeight}" />
       <Setter Property="MaxWidth" Value="260" />
       <Setter Property="Padding" Value="0" />
@@ -231,13 +231,13 @@
   </Style>
   <Style Selector="TextBlock.section">
     <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="FontSize" Value="{DynamicResource DbxSmallFontSize}" />
     <Setter Property="LetterSpacing" Value="0.4" />
     <Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" />
     <Setter Property="Margin" Value="0,10,0,4" />
   </Style>
   <Style Selector="TextBlock.fielderror">
-    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="FontSize" Value="{DynamicResource DbxSmallFontSize}" />
     <Setter Property="Foreground" Value="{DynamicResource DbxError}" />
     <Setter Property="TextWrapping" Value="Wrap" />
     <Setter Property="Margin" Value="0,3,0,0" />
@@ -471,7 +471,7 @@
     <Setter Property="Margin" Value="0,1" />
   </Style>
   <Style Selector="MenuItem /template/ TextBlock#PART_InputGestureText">
-    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="FontSize" Value="{DynamicResource DbxSmallFontSize}" />
     <Setter Property="HorizontalAlignment" Value="Right" />
     <Setter Property="Margin" Value="32,0,0,0" />
   </Style>
@@ -499,7 +499,7 @@
   <!-- current cell: 2 px accent frame, fully inside the cell -->
   <Style Selector="DataGridCell /template/ Grid#FocusVisual"><Setter Property="Margin" Value="1" /></Style>
   <Style Selector="DataGridColumnHeader">
-    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontSize" Value="{DynamicResource DbxGridFontSize}" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="MinHeight" Value="32" />
     <Setter Property="Padding" Value="10,0,6,0" />
@@ -533,7 +533,7 @@
     <Setter Property="Background" Value="{DynamicResource DbxSurface}" />
     <Setter Property="BorderBrush" Value="{DynamicResource DbxBorderSubtle}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="CornerRadius" Value="{DynamicResource DbxRadiusMd}" />
   </Style>
   <Style Selector="Border.card">
     <Setter Property="Background" Value="{DynamicResource DbxSurface}" />
@@ -593,6 +593,41 @@
   </Style>
   <Style Selector="Border.banner.success PathIcon.bi"><Setter Property="Foreground" Value="{DynamicResource DbxSuccess}" /></Style>
 
+  <!-- ================= folding toggles ================= -->
+  <!-- ToggleButton.fold: a quiet "Details" toggle with a chevron (IconChevronRight closed, IconChevronDown open), dim small text.
+       ToggleButton.fold.header: the whole header strip of a card is the toggle (full width, normal text, square corners).
+       Checked does not paint the accent: the chevron says the state. -->
+  <Style Selector="ToggleButton.fold">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="4,2" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="FontSize" Value="{DynamicResource DbxSmallFontSize}" />
+    <Setter Property="Foreground" Value="{DynamicResource DbxTextDim}" />
+  </Style>
+  <Style Selector="ToggleButton.fold:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxTextDim}" />
+  </Style>
+  <Style Selector="ToggleButton.fold:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxHover}" />
+  </Style>
+  <Style Selector="ToggleButton.fold:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource DbxHover}" />
+  </Style>
+  <Style Selector="ToggleButton.fold.header">
+    <Setter Property="CornerRadius" Value="0" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="FontSize" Value="{DynamicResource DbxFontSize}" />
+    <Setter Property="Foreground" Value="{DynamicResource DbxText}" />
+  </Style>
+  <Style Selector="ToggleButton.fold.header:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxText}" />
+  </Style>
+
   <!-- ================= badges and key caps ================= -->
   <Style Selector="Border.badge">
     <Setter Property="CornerRadius" Value="{DynamicResource DbxPillRadius}" />
@@ -602,6 +637,8 @@
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
+  <!-- one text size for every badge (direct child, or in a StackPanel with an icon): views do not set FontSize on badge text -->
+  <Style Selector="Border.badge > TextBlock, Border.badge > StackPanel > TextBlock"><Setter Property="FontSize" Value="{DynamicResource DbxBadgeFontSize}" /></Style>
   <Style Selector="Border.badge.warn">
     <Setter Property="Background" Value="{DynamicResource DbxWarnBg}" />
     <Setter Property="BorderBrush" Value="{DynamicResource DbxWarnBorder}" />

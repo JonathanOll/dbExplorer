@@ -8,34 +8,6 @@
         Width="820" Height="620" MinWidth="560" MinHeight="360"
         WindowStartupLocation="CenterOwner">
 
-  <Window.Resources>
-    <!-- chevron pointing down (the open state of a folding header); the right one is Icons.axaml's IconChevronRight -->
-    <StreamGeometry x:Key="DlgIconChevronDown">M7.41,8.59L12,13.17L16.59,8.59L18,10L12,16L6,10L7.41,8.59Z</StreamGeometry>
-  </Window.Resources>
-
-  <Window.Styles>
-    <!-- The folding header of a card: the whole strip is the toggle, the chevron turns when the card is open -->
-    <Style Selector="ToggleButton.fold">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="CornerRadius" Value="0" />
-      <Setter Property="HorizontalAlignment" Value="Stretch" />
-      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-      <Setter Property="Padding" Value="12,10" />
-    </Style>
-    <Style Selector="ToggleButton.fold:checked /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="TextElement.Foreground" Value="{DynamicResource DbxText}" />
-    </Style>
-    <Style Selector="ToggleButton.fold:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource DbxHover}" />
-    </Style>
-    <Style Selector="ToggleButton.fold:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource DbxHover}" />
-    </Style>
-  </Window.Styles>
-
   <DockPanel>
     <views:DialogFooter DockPanel.Dock="Bottom">
       <DockPanel>
@@ -114,12 +86,12 @@
                 <DataTemplate x:DataType="vm:MemberDiffViewModel">
                   <Border Classes="surface" Margin="0,0,0,10" ClipToBounds="True">
                     <StackPanel>
-                      <ToggleButton Classes="fold" IsChecked="{Binding IsExpanded}" AutomationProperties.Name="{Binding Database}"
+                      <ToggleButton Classes="fold header" IsChecked="{Binding IsExpanded}" AutomationProperties.Name="{Binding Database}"
                                     ToolTip.Tip="Show or hide the differences of this database">
                         <Grid ColumnDefinitions="Auto,Auto,*,Auto">
                           <Panel Margin="0,0,10,0" VerticalAlignment="Center">
                             <PathIcon Data="{StaticResource IconChevronRight}" Width="12" Height="12" IsVisible="{Binding !IsExpanded}" />
-                            <PathIcon Data="{StaticResource DlgIconChevronDown}" Width="12" Height="12" IsVisible="{Binding IsExpanded}" />
+                            <PathIcon Data="{StaticResource IconChevronDown}" Width="12" Height="12" IsVisible="{Binding IsExpanded}" />
                           </Panel>
                           <PathIcon Grid.Column="1" Classes="dim" Data="{StaticResource IconDatabase}" Width="15" Height="15" Margin="0,0,8,0" />
                           <TextBlock Grid.Column="2" Text="{Binding Database}" FontWeight="SemiBold" VerticalAlignment="Center" />
